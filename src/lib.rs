@@ -1,9 +1,8 @@
-mod modules;
 mod definitions;
+mod modules;
 
 use winit::event::{ElementState, Event, KeyboardInput, VirtualKeyCode, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop};
-
 
 // Constants
 
@@ -20,10 +19,19 @@ pub fn app<E: Base>() {
     let window = window_builder
         .build(&event_loop)
         .expect("Failed to create window.");
-        
-    let app_info = definitions::VulkanInfo::default();    
+
+    let app_info = definitions::VulkanInfo::default();
     let entry = ash::Entry::new().unwrap();
-    let instance = modules::instance::create_instance(&app_info, &entry);    
+    let instance = modules::instance::create_instance(&app_info, &entry);
+    let surface_stuff = modules::surface::create_surface(&entry, &instance, &window, 800, 600);
+
+    let physical_device = modules::device::pick_physical_device(&instance, &surface_stuff);
+    let (logical_device, graphics_queue) = modules::device::create_logical_device(
+        &instance,
+        physical_device,
+        &app_info,
+        &surface_stuff,
+    );
 
     event_loop.run(move |event, _, control_flow| match event {
         Event::WindowEvent { event, .. } => match event {

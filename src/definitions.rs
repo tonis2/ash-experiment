@@ -28,7 +28,7 @@ pub struct VulkanInfo {
     pub api_version: [i32; 3],
     pub app_name: &'static str,
     pub device_extension: DeviceExtension,
-    pub ValidationInfo: ValidationInfo,
+    pub validation_info: ValidationInfo,
 }
 
 impl Default for VulkanInfo {
@@ -41,7 +41,7 @@ impl Default for VulkanInfo {
             device_extension: DeviceExtension {
                 names: ["VK_KHR_swapchain"],
             },
-            ValidationInfo: ValidationInfo {
+            validation_info: ValidationInfo {
                 is_enable: true,
                 required_validation_layers: ["VK_LAYER_KHRONOS_validation"],
             },
