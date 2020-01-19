@@ -1,7 +1,7 @@
 use ash::vk;
 use std::ptr;
 
-use crate::definitions::{QueueFamilyIndices, SurfaceStuff };
+use crate::definitions::{QueueFamilyIndices, SurfaceStuff};
 use ash::version::DeviceV1_0;
 
 pub struct SwapChainStuff {
@@ -9,9 +9,8 @@ pub struct SwapChainStuff {
     pub swapchain: vk::SwapchainKHR,
     pub swapchain_images: Vec<vk::Image>,
     pub swapchain_format: vk::Format,
-    pub swapchain_extent: vk::Extent2D,
+    pub extent: vk::Extent2D,
 }
-
 
 pub struct SwapChainSupportDetail {
     capabilities: vk::SurfaceCapabilitiesKHR,
@@ -91,7 +90,7 @@ pub fn create_swapchain(
         swapchain_loader,
         swapchain,
         swapchain_format: surface_format.format,
-        swapchain_extent: extent,
+        extent: extent,
         swapchain_images,
     }
 }
@@ -168,7 +167,6 @@ fn query_swapchain_support(
         }
     }
 }
-
 
 pub fn create_image_views(
     device: &ash::Device,

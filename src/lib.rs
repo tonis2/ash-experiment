@@ -58,7 +58,7 @@ pub fn app<E: Base>() {
         &swapchain_stuff.swapchain_images,
     );
 
-    let _pipeline = crate::modules::pipeline::create_graphics_pipeline(&device);
+    let _pipeline = crate::modules::pipeline::create_graphics_pipeline(&device, &swapchain_stuff);
 
     event_loop.run(move |event, _, control_flow| match event {
         Event::WindowEvent { event, .. } => match event {
