@@ -1,15 +1,16 @@
 use ash::vk;
 use std::ptr;
 
-use crate::definitions::{QueueFamilyIndices, SurfaceStuff};
+use crate::definitions::{QueueFamilyIndices, SurfaceStuff };
 
 pub struct SwapChainStuff {
-    swapchain_loader: ash::extensions::khr::Swapchain,
-    swapchain: vk::SwapchainKHR,
-    swapchain_images: Vec<vk::Image>,
-    swapchain_format: vk::Format,
-    swapchain_extent: vk::Extent2D,
+    pub swapchain_loader: ash::extensions::khr::Swapchain,
+    pub swapchain: vk::SwapchainKHR,
+    pub swapchain_images: Vec<vk::Image>,
+    pub swapchain_format: vk::Format,
+    pub swapchain_extent: vk::Extent2D,
 }
+
 
 pub struct SwapChainSupportDetail {
     capabilities: vk::SurfaceCapabilitiesKHR,
