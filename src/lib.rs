@@ -23,6 +23,10 @@ pub fn app<E: Base>() {
     let app_info = definitions::VulkanInfo::default();
     let entry = ash::Entry::new().unwrap();
     let instance = modules::instance::create_instance(&app_info, &entry);
+
+    let (debug_utils_loader, debug_merssager) =
+        modules::debug::setup_debug_utils(app_info.validation_info.is_enable, &entry, &instance);
+
     let surface_stuff = modules::surface::create_surface(&entry, &instance, &window, 800, 600);
 
     let physical_device = modules::device::pick_physical_device(&instance, &surface_stuff);

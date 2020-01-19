@@ -9,10 +9,9 @@ use crate::definitions::VulkanInfo;
 use crate::modules::platforms;
 
 pub fn create_instance(info: &VulkanInfo, entry: &ash::Entry) -> ash::Instance {
-    
     //Check validations
     if info.validation_info.is_enable
-        && check_validation_layer_support(
+        && crate::modules::debug::check_validation_layer_support(
             entry,
             &info.validation_info.required_validation_layers.to_vec(),
         ) == false
@@ -60,38 +59,4 @@ pub fn create_instance(info: &VulkanInfo, entry: &ash::Entry) -> ash::Instance {
     };
 
     instance
-}
-
-fn check_validation_layer_support(
-    entry: &ash::Entry,
-    required_validation_layers: &Vec<&str>,
-) -> bool {
-    // if support validation layer, then return true
-
-    let layer_properties = entry
-        .enumerate_instance_layer_properties()
-        .expect("Failed to enumerate Instance Layers Properties");
-
-    if layer_properties.len() <= 0 {
-        eprintln!("No available layers.");
-        return false;
-    }
-
-    for required_layer_name in required_validation_layers.iter() {
-        let mut is_layer_found = false;
-
-        for layer_property in layer_properties.iter() {
-            let test_layer_name = crate::modules::helpers::vk_to_string(&layer_property.layer_name);
-            if (*required_layer_name) == test_layer_name {
-                is_layer_found = true;
-                break;
-            }
-        }
-
-        if is_layer_found == false {
-            return false;
-        }
-    }
-
-    true
 }
