@@ -74,11 +74,6 @@ pub fn create_graphics_pipeline(
         extent: swapchain.extent,
     }];
 
-    let scissors = [vk::Rect2D {
-        offset: vk::Offset2D { x: 0, y: 0 },
-        extent: swapchain.extent,
-    }];
-
     let viewport_state_create_info = vk::PipelineViewportStateCreateInfo {
         s_type: vk::StructureType::PIPELINE_VIEWPORT_STATE_CREATE_INFO,
         p_next: ptr::null(),
@@ -286,4 +281,39 @@ pub fn create_shader_module(device: &ash::Device, code: Vec<u8>) -> vk::ShaderMo
             .create_shader_module(&shader_module_create_info, None)
             .expect("Failed to create Shader Module!")
     }
+}
+
+pub fn create_framebuffers(
+    device: &ash::Device,
+    render_pass: vk::RenderPass,
+    image_views: &Vec<vk::ImageView>,
+    swapchain: &SwapChainStuff,
+) -> Vec<vk::Framebuffer> {
+    let mut framebuffers = vec![];
+
+    for &image_view in image_views.iter() {
+        let attachments = [image_view];
+
+        let framebuffer_create_info = vk::FramebufferCreateInfo {
+            s_type: vk::StructureType::FRAMEBUFFER_CREATE_INFO,
+            p_next: ptr::null(),
+            flags: vk::FramebufferCreateFlags::empty(),
+            render_pass,
+            attachment_count: attachments.len() as u32,
+            p_attachments: attachments.as_ptr(),
+            width: swapchain.extent.width,
+            height: swapchain.extent.height,
+            layers: 1,
+        };
+
+        let framebuffer = unsafe {
+            device
+                .create_framebuffer(&framebuffer_create_info, None)
+                .expect("Failed to create Framebuffer!")
+        };
+
+        framebuffers.push(framebuffer);
+    }
+
+    framebuffers
 }

@@ -132,4 +132,4 @@ pub unsafe fn create_surface<E: EntryV1_0, I: InstanceV1_0>(
     let win32_surface_loader = Win32Surface::new(entry, instance);
     win32_surface_loader.create_win32_surface(&win32_create_info, None)
 }
-// ------------------------------------------------------------------------
+// ---------
