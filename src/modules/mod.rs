@@ -5,3 +5,4 @@ pub mod instance;
 pub mod platforms;
 pub mod surface;
 pub mod swapchain;
+pub mod pipeline;
