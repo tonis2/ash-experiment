@@ -2,6 +2,7 @@ use ash::vk;
 use std::ptr;
 
 use crate::definitions::{QueueFamilyIndices, SurfaceStuff };
+use ash::version::DeviceV1_0;
 
 pub struct SwapChainStuff {
     pub swapchain_loader: ash::extensions::khr::Swapchain,
@@ -166,4 +167,46 @@ fn query_swapchain_support(
             present_modes,
         }
     }
+}
+
+
+pub fn create_image_views(
+    device: &ash::Device,
+    surface_format: vk::Format,
+    images: &Vec<vk::Image>,
+) -> Vec<vk::ImageView> {
+    let mut swapchain_imageviews = vec![];
+
+    for &image in images.iter() {
+        let imageview_create_info = vk::ImageViewCreateInfo {
+            s_type: vk::StructureType::IMAGE_VIEW_CREATE_INFO,
+            p_next: ptr::null(),
+            flags: vk::ImageViewCreateFlags::empty(),
+            view_type: vk::ImageViewType::TYPE_2D,
+            format: surface_format,
+            components: vk::ComponentMapping {
+                r: vk::ComponentSwizzle::IDENTITY,
+                g: vk::ComponentSwizzle::IDENTITY,
+                b: vk::ComponentSwizzle::IDENTITY,
+                a: vk::ComponentSwizzle::IDENTITY,
+            },
+            subresource_range: vk::ImageSubresourceRange {
+                aspect_mask: vk::ImageAspectFlags::COLOR,
+                base_mip_level: 0,
+                level_count: 1,
+                base_array_layer: 0,
+                layer_count: 1,
+            },
+            image,
+        };
+
+        let imageview = unsafe {
+            device
+                .create_image_view(&imageview_create_info, None)
+                .expect("Failed to create Image View!")
+        };
+        swapchain_imageviews.push(imageview);
+    }
+
+    swapchain_imageviews
 }

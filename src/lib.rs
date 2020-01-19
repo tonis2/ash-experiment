@@ -52,6 +52,12 @@ pub fn app<E: Base>() {
         &family_indices,
     );
 
+    let swapchain_imageviews = crate::modules::swapchain::create_image_views(
+        &device,
+        swapchain_stuff.swapchain_format,
+        &swapchain_stuff.swapchain_images,
+    );
+
     event_loop.run(move |event, _, control_flow| match event {
         Event::WindowEvent { event, .. } => match event {
             WindowEvent::CloseRequested => *control_flow = ControlFlow::Exit,
