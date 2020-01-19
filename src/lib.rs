@@ -61,7 +61,12 @@ pub fn app<E: Base>() {
 
     let render_pass =
         crate::modules::pipeline::create_render_pass(&device, swapchain_stuff.swapchain_format);
-    let _pipeline = crate::modules::pipeline::create_graphics_pipeline(&device, &swapchain_stuff);
+
+    let _pipeline =
+        crate::modules::pipeline::create_graphics_pipeline(&device, render_pass, &swapchain_stuff);
+
+    let _pipeline =
+        crate::modules::pipeline::create_graphics_pipeline(&device, render_pass, &swapchain_stuff);
 
     event_loop.run(move |event, _, control_flow| match event {
         Event::WindowEvent { event, .. } => match event {
