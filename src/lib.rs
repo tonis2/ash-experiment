@@ -44,6 +44,7 @@ pub fn app<E: Base>() {
         unsafe { device.get_device_queue(family_indices.graphics_family.unwrap(), 0) };
     let present_queue =
         unsafe { device.get_device_queue(family_indices.present_family.unwrap(), 0) };
+
     let swapchain_stuff = crate::modules::swapchain::create_swapchain(
         &instance,
         &device,
@@ -58,6 +59,8 @@ pub fn app<E: Base>() {
         &swapchain_stuff.swapchain_images,
     );
 
+    let render_pass =
+        crate::modules::pipeline::create_render_pass(&device, swapchain_stuff.swapchain_format);
     let _pipeline = crate::modules::pipeline::create_graphics_pipeline(&device, &swapchain_stuff);
 
     event_loop.run(move |event, _, control_flow| match event {
