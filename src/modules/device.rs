@@ -1,6 +1,5 @@
-use crate::modules::surface::SurfaceStuff;
 
-use crate::definitions::VulkanInfo;
+use crate::definitions::{VulkanInfo, QueueFamilyIndices, SurfaceStuff};
 use std::os::raw::c_char;
 
 use ash::version::InstanceV1_0;
@@ -9,10 +8,7 @@ use std::collections::HashSet;
 use std::ffi::CString;
 use std::ptr;
 
-pub struct QueueFamilyIndices {
-    graphics_family: Option<u32>,
-    present_family: Option<u32>,
-}
+
 
 impl QueueFamilyIndices {
     pub fn new() -> QueueFamilyIndices {

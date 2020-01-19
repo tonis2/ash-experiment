@@ -1,3 +1,4 @@
+use ash::vk;
 use std::os::raw::c_char;
 
 pub const MAX_FRAMES_IN_FLIGHT: usize = 2;
@@ -47,4 +48,17 @@ impl Default for VulkanInfo {
             },
         }
     }
+}
+
+pub struct QueueFamilyIndices {
+    pub graphics_family: Option<u32>,
+    pub present_family: Option<u32>,
+}
+
+pub struct SurfaceStuff {
+    pub surface_loader: ash::extensions::khr::Surface,
+    pub surface: vk::SurfaceKHR,
+
+    pub screen_width: u32,
+    pub screen_height: u32,
 }

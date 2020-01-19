@@ -4,6 +4,9 @@ mod modules;
 use winit::event::{ElementState, Event, KeyboardInput, VirtualKeyCode, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop};
 
+use ash::version::DeviceV1_0;
+use ash::version::InstanceV1_0;
+
 // Constants
 
 pub trait Base: 'static + Sized {
@@ -30,11 +33,23 @@ pub fn app<E: Base>() {
     let surface_stuff = modules::surface::create_surface(&entry, &instance, &window, 800, 600);
 
     let physical_device = modules::device::pick_physical_device(&instance, &surface_stuff);
-    let (logical_device, graphics_queue) = modules::device::create_logical_device(
+    let (device, family_indices) = modules::device::create_logical_device(
         &instance,
         physical_device,
         &app_info,
         &surface_stuff,
+    );
+
+    let graphics_queue =
+        unsafe { device.get_device_queue(family_indices.graphics_family.unwrap(), 0) };
+    let present_queue =
+        unsafe { device.get_device_queue(family_indices.present_family.unwrap(), 0) };
+    let swapchain_stuff = crate::modules::swapchain::create_swapchain(
+        &instance,
+        &device,
+        physical_device,
+        &surface_stuff,
+        &family_indices,
     );
 
     event_loop.run(move |event, _, control_flow| match event {
