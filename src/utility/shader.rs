@@ -3,8 +3,11 @@ use std::fs::File;
 use std::io::Read;
 use std::mem::align_of;
 
+use super::helpers::*;
 use ash::util::*;
 use ash::vk;
+
+use ash::version::DeviceV1_0;
 
 use crate::utility::buffer::Buffer;
 use crate::VulkanBase;
@@ -76,7 +79,7 @@ pub fn create_index_buffer(indices: &Vec<u16>, base: &VulkanBase) -> Buffer {
 
 pub fn create_vertex_buffer<A: Copy>(
     vertices: &[A],
-    base: &ExampleBase,
+    base: &VulkanBase,
     vertex: &VertexDescriptor,
 ) -> Buffer {
     unsafe {
@@ -148,7 +151,7 @@ pub struct Shader {
 }
 
 impl Shader {
-    pub fn load(&mut self, base: &ExampleBase) -> (vk::ShaderModule, vk::ShaderModule) {
+    pub fn load(&mut self, base: &VulkanBase) -> (vk::ShaderModule, vk::ShaderModule) {
         unsafe {
             let mut vertex_shader = File::open(self.vertex_shader).expect("failed to read font");
             let mut buffer = Vec::new();
