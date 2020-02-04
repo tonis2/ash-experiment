@@ -35,6 +35,8 @@ pub fn find_memorytype_index_f<F: Fn(vk::MemoryPropertyFlags, vk::MemoryProperty
     None
 }
 
+
+
 // Simple offset_of macro akin to C++ offsetof
 #[macro_export]
 macro_rules! offset_of {

@@ -1,12 +1,12 @@
 [package]
-name = "wrapper"
+name = "vulkan"
 version = "0.0.1"
 edition = "2018"
 authors = ["tonis.anton18@gmail.com"]
 
 [dependencies]
 winit = "0.20.0"
-ash = {git = "https://github.com/MaikKlein/ash" }
+ash = { git = "https://github.com/MaikKlein/ash" }
 
 [target.'cfg(windows)'.dependencies]
 winapi = { version = "0.3.4", features = ["windef", "winuser"] }
