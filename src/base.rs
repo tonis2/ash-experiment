@@ -7,9 +7,10 @@ use ash::{
 use winit::window::Window;
 
 const POSSIBLE_SAMPLE_COUNTS: [u32; 7] = [1, 2, 4, 8, 16, 32, 64];
-
+#[allow(dead_code)]
 pub struct VkInstance {
     entry: Entry,
+    debugger: vk::DebugReportCallbackEXT,
     pub instance: Instance,
     pub surface: Surface,
     pub surface_khr: vk::SurfaceKHR,
@@ -84,6 +85,7 @@ impl VkInstance {
 
             Self {
                 entry,
+                debugger,
                 instance,
                 surface,
                 surface_khr,
