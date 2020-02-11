@@ -22,7 +22,7 @@ pub struct VkInstance {
 impl VkInstance {
     pub fn new(window: &Window) -> Self {
         unsafe {
-            let (entry, instance) = crate::utility::create_entry(&window);
+            let (entry, instance) = crate::utility::create_entry();
             let debugger = create_debugger(&entry, &instance);
             let surface = Surface::new(&entry, &instance);
             let surface_khr = create_surface(&entry, &instance, &window).unwrap();

@@ -5,11 +5,11 @@ pub mod shader;
 pub use buffer::Buffer;
 
 use crate::modules::surface::extension_names;
-use ash::version::{EntryV1_0, InstanceV1_0};
+use ash::version::EntryV1_0;
 use ash::{vk, Entry, Instance};
 use std::ffi::CString;
 
-pub unsafe fn create_entry(window: &winit::window::Window) -> (Entry, Instance) {
+pub unsafe fn create_entry() -> (Entry, Instance) {
     let entry = Entry::new().unwrap();
     let app_name = CString::new("VulkanTriangle").unwrap();
 
