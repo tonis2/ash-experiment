@@ -2,4 +2,4 @@ mod base;
 mod modules;
 mod utility;
 
-pub use base::VulkanBase;
+pub use base::VkInstance;

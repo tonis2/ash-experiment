@@ -10,7 +10,7 @@ use ash::vk;
 use ash::version::DeviceV1_0;
 
 use crate::utility::buffer::Buffer;
-use crate::VulkanBase;
+use crate::VkInstance;
 
 pub struct VertexDescriptor {
     pub binding_len: i32,
@@ -21,7 +21,7 @@ pub struct VertexDescriptor {
     pub align: u64,
 }
 
-pub fn create_index_buffer(indices: &Vec<u16>, base: &VulkanBase) -> Buffer {
+pub fn create_index_buffer(indices: &Vec<u16>, base: &VkInstance) -> Buffer {
     unsafe {
         let indices_slice = &indices[..];
         let index_buffer_info = vk::BufferCreateInfo::builder()
@@ -33,7 +33,7 @@ pub fn create_index_buffer(indices: &Vec<u16>, base: &VulkanBase) -> Buffer {
         let index_buffer_memory_req = base.device.get_buffer_memory_requirements(index_buffer);
         let index_buffer_memory_index = find_memorytype_index(
             &index_buffer_memory_req,
-            &base.device_memory_properties,
+            &base.get_physical_device_memory_properties(),
             vk::MemoryPropertyFlags::HOST_VISIBLE | vk::MemoryPropertyFlags::HOST_COHERENT,
         )
         .expect("Unable to find suitable memorytype for the index buffer.");
@@ -79,7 +79,7 @@ pub fn create_index_buffer(indices: &Vec<u16>, base: &VulkanBase) -> Buffer {
 
 pub fn create_vertex_buffer<A: Copy>(
     vertices: &[A],
-    base: &VulkanBase,
+    base: &VkInstance,
     vertex: &VertexDescriptor,
 ) -> Buffer {
     unsafe {
@@ -101,7 +101,7 @@ pub fn create_vertex_buffer<A: Copy>(
 
         let vertex_input_buffer_memory_index = find_memorytype_index(
             &vertex_input_buffer_memory_req,
-            &base.device_memory_properties,
+            &base.get_physical_device_memory_properties(),
             vk::MemoryPropertyFlags::HOST_VISIBLE | vk::MemoryPropertyFlags::HOST_COHERENT,
         )
         .expect("Unable to find suitable memorytype for the vertex buffer.");
@@ -151,7 +151,7 @@ pub struct Shader {
 }
 
 impl Shader {
-    pub fn load(&mut self, base: &VulkanBase) -> (vk::ShaderModule, vk::ShaderModule) {
+    pub fn load(&mut self, base: &VkInstance) -> (vk::ShaderModule, vk::ShaderModule) {
         unsafe {
             let mut vertex_shader = File::open(self.vertex_shader).expect("failed to read font");
             let mut buffer = Vec::new();

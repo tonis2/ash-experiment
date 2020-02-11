@@ -7,6 +7,8 @@ authors = ["tonis.anton18@gmail.com"]
 [dependencies]
 winit = "0.20.0"
 ash = { git = "https://github.com/MaikKlein/ash" }
+log = "0.4"
+env_logger = "0.7.1"
 
 [target.'cfg(windows)'.dependencies]
 winapi = { version = "0.3.4", features = ["windef", "winuser"] }
