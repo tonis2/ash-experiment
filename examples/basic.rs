@@ -1,4 +1,4 @@
-use vulkan;
+use vulkan::{Swapchain, VkInstance};
 use winit::event_loop::EventLoop;
 fn main() {
     let event_loop = EventLoop::new();
@@ -8,5 +8,6 @@ fn main() {
         .build(&event_loop)
         .expect("Failed to create window.");
 
-    let vulkan_base = vulkan::VkInstance::new(&window);
+    let vulkan_base = VkInstance::new(&window);
+    let swap_chain = Swapchain::new(&vulkan_base, 1500, 800);
 }
