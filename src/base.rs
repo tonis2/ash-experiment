@@ -1,12 +1,11 @@
-use crate::modules::{debug::create_debugger, surface::create_surface, swapchain::*};
+use crate::modules::{debug::create_debugger, device, surface};
 use ash::{
-    extensions::khr::{Surface, Swapchain},
+    extensions::khr::Surface,
     version::{DeviceV1_0, InstanceV1_0},
     vk, Device, Entry, Instance,
 };
 use winit::window::Window;
 
-const POSSIBLE_SAMPLE_COUNTS: [u32; 7] = [1, 2, 4, 8, 16, 32, 64];
 #[allow(dead_code)]
 pub struct VkInstance {
     entry: Entry,
@@ -17,7 +16,7 @@ pub struct VkInstance {
     pub physical_device: vk::PhysicalDevice,
     pub device: Device,
     pub queue_family_index: u32,
-    pub present_queue: vk::Queue,
+    pub queue: vk::Queue,
 }
 
 impl VkInstance {
@@ -26,62 +25,11 @@ impl VkInstance {
             let (entry, instance) = crate::utility::create_entry();
             let debugger = create_debugger(&entry, &instance);
             let surface = Surface::new(&entry, &instance);
-            let surface_khr = create_surface(&entry, &instance, &window).unwrap();
-            let pdevices = instance
-                .enumerate_physical_devices()
-                .expect("Physical device error");
-            let (pdevice, queue_family_index) = pdevices
-                .iter()
-                .map(|pdevice| {
-                    instance
-                        .get_physical_device_queue_family_properties(*pdevice)
-                        .iter()
-                        .enumerate()
-                        .filter_map(|(index, ref info)| {
-                            let supports_graphic_and_surface =
-                                info.queue_flags.contains(vk::QueueFlags::GRAPHICS)
-                                    && surface
-                                        .get_physical_device_surface_support(
-                                            *pdevice,
-                                            index as u32,
-                                            surface_khr,
-                                        )
-                                        .unwrap();
-                            if supports_graphic_and_surface {
-                                Some((*pdevice, index))
-                            } else {
-                                None
-                            }
-                        })
-                        .nth(0)
-                })
-                .filter_map(|v| v)
-                .nth(0)
-                .expect("Couldn't find suitable device.");
-            let queue_family_index = queue_family_index as u32;
+            let surface_khr = surface::create_surface(&entry, &instance, &window).unwrap();
 
-            let device_extension_names_raw = [Swapchain::name().as_ptr()];
-            let features = vk::PhysicalDeviceFeatures {
-                shader_clip_distance: 1,
-                ..Default::default()
-            };
-            let priorities = [1.0];
-
-            let queue_info = [vk::DeviceQueueCreateInfo::builder()
-                .queue_family_index(queue_family_index)
-                .queue_priorities(&priorities)
-                .build()];
-
-            let device_create_info = vk::DeviceCreateInfo::builder()
-                .queue_create_infos(&queue_info)
-                .enabled_extension_names(&device_extension_names_raw)
-                .enabled_features(&features);
-
-            let device: Device = instance
-                .create_device(pdevice, &device_create_info, None)
-                .unwrap();
-
-            let present_queue = device.get_device_queue(queue_family_index as u32, 0);
+            let (pdevice, queue_family_index) =
+                device::create_physical_device(&instance, &surface, surface_khr);
+            let (device, queue) = device::create_device(queue_family_index, &instance, pdevice);
 
             Self {
                 entry,
@@ -92,7 +40,7 @@ impl VkInstance {
                 physical_device: pdevice,
                 device: device,
                 queue_family_index,
-                present_queue,
+                queue,
             }
         }
     }
@@ -105,6 +53,10 @@ impl VkInstance {
                 .get_physical_device_memory_properties(self.physical_device)
         }
     }
+
+    pub fn wait_idle(&self) -> std::result::Result<(), vk::Result> {
+        unsafe { self.device.device_wait_idle() }
+    }
 }
 
 impl Drop for VkInstance {
@@ -112,7 +64,6 @@ impl Drop for VkInstance {
         unsafe {
             self.device.device_wait_idle().unwrap();
             self.device.destroy_device(None);
-            self.instance.destroy_instance(None);
         }
     }
 }
