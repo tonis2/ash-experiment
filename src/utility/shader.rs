@@ -8,7 +8,6 @@ use ash::util::*;
 use ash::vk;
 
 use ash::version::DeviceV1_0;
-
 use crate::utility::buffer::Buffer;
 use crate::VkInstance;
 
