@@ -4,8 +4,8 @@ use ash::extensions::ext::DebugReport;
 use ash::extensions::khr::Win32Surface;
 #[cfg(target_os = "macos")]
 use ash::extensions::mvk::MacOSSurface;
-use ash::version::{EntryV1_0, InstanceV1_0};
-use ash::{vk, Instance, Entry};
+
+use ash::{vk, Entry, Instance};
 use std::ffi::CStr;
 use std::os::raw::{c_char, c_void};
 
@@ -23,10 +23,7 @@ unsafe extern "system" fn vulkan_debug_callback(
     vk::FALSE
 }
 
-pub unsafe fn create_debugger(
-    entry: &Entry,
-    instance: &Instance,
-) -> vk::DebugReportCallbackEXT {
+pub unsafe fn create_debugger(entry: &Entry, instance: &Instance) -> vk::DebugReportCallbackEXT {
     let debug_info = vk::DebugReportCallbackCreateInfoEXT::builder()
         .flags(
             vk::DebugReportFlagsEXT::ERROR
