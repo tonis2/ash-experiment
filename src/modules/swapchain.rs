@@ -2,7 +2,11 @@ use crate::base::VkInstance;
 use ash::{extensions::khr, vk};
 
 pub struct Swapchain {
-    swapchain: vk::SwapchainKHR,
+    pub swapchain_loader: ash::extensions::khr::Swapchain,
+    pub swapchain: vk::SwapchainKHR,
+    pub swapchain_images: Vec<vk::Image>,
+    pub swapchain_format: vk::Format,
+    pub swapchain_extent: vk::Extent2D,
 }
 
 impl Swapchain {
@@ -80,7 +84,17 @@ impl Swapchain {
                 .create_swapchain(&swapchain_create_info, None)
                 .unwrap();
 
-            Swapchain { swapchain }
+            let swapchain_images = swapchain_loader
+                .get_swapchain_images(swapchain)
+                .expect("Failed to get Swapchain Images.");
+
+            Swapchain {
+                swapchain,
+                swapchain_images,
+                swapchain_loader,
+                swapchain_format: surface_format.format,
+                swapchain_extent: surface_resolution,
+            }
         }
     }
 }

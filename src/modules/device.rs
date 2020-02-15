@@ -4,11 +4,16 @@ use ash::{
     vk, Device, Instance,
 };
 
+pub struct Queue {
+    graphics_queue: vk::Queue,
+    present_queue: vk::Queue,
+}
+
 pub fn create_device(
     queue_index: u32,
     instance: &Instance,
     pdevice: vk::PhysicalDevice,
-) -> (Device, vk::Queue) {
+) -> (Device, Queue) {
     let device_extension_names_raw = [Swapchain::name().as_ptr()];
     let features = vk::PhysicalDeviceFeatures {
         shader_clip_distance: 1,
@@ -31,8 +36,12 @@ pub fn create_device(
             .create_device(pdevice, &device_create_info, None)
             .unwrap();
         let present_queue = device.get_device_queue(queue_index as u32, 0);
+        let queue = Queue {
+            graphics_queue: device.get_device_queue(queue_index as u32, 0),
+            present_queue: device.get_device_queue(queue_index as u32, 0),
+        };
 
-        (device, present_queue)
+        (device, queue)
     }
 }
 

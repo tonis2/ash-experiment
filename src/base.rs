@@ -1,4 +1,8 @@
-use crate::modules::{debug::create_debugger, device, surface};
+use crate::modules::{
+    debug::create_debugger,
+    device::{self, Queue},
+    surface,
+};
 use ash::{
     extensions::khr::Surface,
     version::{DeviceV1_0, InstanceV1_0},
@@ -16,7 +20,7 @@ pub struct VkInstance {
     pub physical_device: vk::PhysicalDevice,
     pub device: Device,
     pub queue_family_index: u32,
-    pub queue: vk::Queue,
+    pub queue: Queue,
 }
 
 impl VkInstance {
@@ -56,6 +60,20 @@ impl VkInstance {
 
     pub fn wait_idle(&self) -> std::result::Result<(), vk::Result> {
         unsafe { self.device.device_wait_idle() }
+    }
+
+    pub fn create_command_buffer() {}
+
+    pub fn create_command_pool(&self) -> vk::CommandPool {
+        unsafe {
+            let pool_create_info = vk::CommandPoolCreateInfo::builder()
+                .flags(vk::CommandPoolCreateFlags::RESET_COMMAND_BUFFER)
+                .queue_family_index(self.queue_family_index);
+
+            self.device
+                .create_command_pool(&pool_create_info, None)
+                .unwrap()
+        }
     }
 }
 
