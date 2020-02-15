@@ -35,7 +35,7 @@ pub fn create_device(
         let device: Device = instance
             .create_device(pdevice, &device_create_info, None)
             .unwrap();
-        let present_queue = device.get_device_queue(queue_index as u32, 0);
+
         let queue = Queue {
             graphics_queue: device.get_device_queue(queue_index as u32, 0),
             present_queue: device.get_device_queue(queue_index as u32, 0),
