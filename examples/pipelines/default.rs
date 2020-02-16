@@ -18,9 +18,9 @@ pub fn create_pipeline(
 ) -> (Vec<vk::Pipeline>, vk::PipelineLayout) {
     unsafe {
         let vertex_input_state_info = vk::PipelineVertexInputStateCreateInfo {
-            vertex_attribute_description_count: vertex_descriptor.descriptor_len as u32,
+            vertex_attribute_description_count: vertex_descriptor.attribute_descriptor.len() as u32,
             p_vertex_attribute_descriptions: vertex_descriptor.attribute_descriptor.as_ptr(),
-            vertex_binding_description_count: vertex_descriptor.binding_len as u32,
+            vertex_binding_description_count: vertex_descriptor.binding_descriptor.len() as u32,
             p_vertex_binding_descriptions: vertex_descriptor.binding_descriptor.as_ptr(),
             ..Default::default()
         };
@@ -97,8 +97,8 @@ pub fn create_pipeline(
             .unwrap();
 
         let (vertex_shader_module, fragment_shader_module) = Shader {
-            vertex_shader: "backend/shaders/spirv/vert.spv",
-            fragment_shader: "backend/shaders/spirv/frag.spv",
+            vertex_shader: "examples/shaders/spv/vert.spv",
+            fragment_shader: "examples/shaders/spv/frag.spv",
         }
         .load(&swapchain.vulkan);
 

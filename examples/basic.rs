@@ -50,8 +50,8 @@ fn main() {
         align: align_of::<Vertex>() as u64,
     };
 
-    // let (pipeline, layout) =
-    //     pipelines::default::create_pipeline(&swapchain, render_pass, &vertex_descriptor);
+    let (pipeline, layout) =
+        pipelines::default::create_pipeline(&swapchain, render_pass, &vertex_descriptor);
 
     {
         let command_buffers = vulkan_base.create_command_buffers(command_pool, 2);
