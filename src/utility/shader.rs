@@ -3,13 +3,13 @@ use std::fs::File;
 use std::io::Read;
 use std::mem::align_of;
 
-use super::helpers::*;
+use super::find_memorytype_index;
 use ash::util::*;
 use ash::vk;
 
-use ash::version::DeviceV1_0;
 use crate::utility::buffer::Buffer;
 use crate::VkInstance;
+use ash::version::DeviceV1_0;
 
 pub struct VertexDescriptor {
     pub binding_len: i32,

@@ -5,10 +5,10 @@ use std::ptr;
 pub struct Swapchain<'a> {
     pub swapchain_loader: ash::extensions::khr::Swapchain,
     pub swapchain: vk::SwapchainKHR,
-    pub swapchain_images: Vec<vk::Image>,
-    pub swapchain_image_views: Vec<vk::ImageView>,
-    pub swapchain_format: vk::Format,
-    pub swapchain_extent: vk::Extent2D,
+    pub images: Vec<vk::Image>,
+    pub image_views: Vec<vk::ImageView>,
+    pub format: vk::Format,
+    pub extent: vk::Extent2D,
     pub vulkan: &'a VkInstance,
 }
 
@@ -106,23 +106,21 @@ impl<'a> Swapchain<'a> {
 
             Swapchain {
                 swapchain,
-                swapchain_images,
+                images: swapchain_images,
                 swapchain_loader,
-                swapchain_format: surface_format.format,
-                swapchain_extent: surface_resolution,
-                swapchain_image_views,
+                format: surface_format.format,
+                extent: surface_resolution,
+                image_views: swapchain_image_views,
                 vulkan,
             }
         }
     }
 
-    pub fn create_frame(&self) {
-        
-    }
+    pub fn create_frame(&self) {}
 
     pub fn create_render_pass(&self) -> vk::RenderPass {
         let color_attachment = vk::AttachmentDescription {
-            format: self.swapchain_format,
+            format: self.format,
             flags: vk::AttachmentDescriptionFlags::empty(),
             samples: vk::SampleCountFlags::TYPE_1,
             load_op: vk::AttachmentLoadOp::CLEAR,
@@ -224,7 +222,7 @@ pub fn create_image_view(
 impl<'a> Drop for Swapchain<'a> {
     fn drop(&mut self) {
         unsafe {
-            for &imageview in self.swapchain_image_views.iter() {
+            for &imageview in self.image_views.iter() {
                 self.vulkan.device.destroy_image_view(imageview, None);
             }
         }

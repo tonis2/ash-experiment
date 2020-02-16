@@ -1,4 +1,7 @@
-use crate::{ExampleBase, Shader, VertexDescriptor};
+use vulkan::{
+    modules::swapchain::Swapchain,
+    utility::shader::{Shader, VertexDescriptor},
+};
 
 pub use ash::version::{DeviceV1_0, EntryV1_0, InstanceV1_0};
 
@@ -9,7 +12,7 @@ use std::ffi::CString;
 //Creates a new pipeline
 
 pub fn create_pipeline(
-    base: &ExampleBase,
+    swapchain: &Swapchain,
     renderpass: vk::RenderPass,
     vertex_descriptor: &VertexDescriptor,
 ) -> (Vec<vk::Pipeline>, vk::PipelineLayout) {
@@ -28,14 +31,14 @@ pub fn create_pipeline(
         let viewports = [vk::Viewport {
             x: 0.0,
             y: 0.0,
-            width: base.surface_resolution.width as f32,
-            height: base.surface_resolution.height as f32,
+            width: swapchain.extent.width as f32,
+            height: swapchain.extent.height as f32,
             min_depth: 0.0,
             max_depth: 1.0,
         }];
         let scissors = [vk::Rect2D {
             offset: vk::Offset2D { x: 0, y: 0 },
-            extent: base.surface_resolution,
+            extent: swapchain.extent,
         }];
         let viewport_state_info = vk::PipelineViewportStateCreateInfo::builder()
             .scissors(&scissors)
@@ -87,7 +90,8 @@ pub fn create_pipeline(
 
         let layout_create_info = vk::PipelineLayoutCreateInfo::default();
 
-        let pipeline_layout = base
+        let pipeline_layout = swapchain
+            .vulkan
             .device
             .create_pipeline_layout(&layout_create_info, None)
             .unwrap();
@@ -96,7 +100,7 @@ pub fn create_pipeline(
             vertex_shader: "backend/shaders/spirv/vert.spv",
             fragment_shader: "backend/shaders/spirv/frag.spv",
         }
-        .load(&base);
+        .load(&swapchain.vulkan);
 
         let shader_entry_name = CString::new("main").unwrap();
         let shaders = &[
@@ -126,7 +130,8 @@ pub fn create_pipeline(
             .dynamic_state(&dynamic_state_info)
             .layout(pipeline_layout)
             .render_pass(renderpass);
-        let pipeline = base
+        let pipeline = swapchain
+            .vulkan
             .device
             .create_graphics_pipelines(
                 vk::PipelineCache::null(),
@@ -136,9 +141,13 @@ pub fn create_pipeline(
             .expect("Unable to create graphics pipeline");
 
         //Destoy shader modules
-        base.device
+        swapchain
+            .vulkan
+            .device
             .destroy_shader_module(vertex_shader_module, None);
-        base.device
+        swapchain
+            .vulkan
+            .device
             .destroy_shader_module(fragment_shader_module, None);
         (pipeline, pipeline_layout)
     }
