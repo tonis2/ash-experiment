@@ -1,16 +1,19 @@
 use crate::base::VkInstance;
-use ash::{extensions::khr, vk};
+use ash::{extensions::khr, version::DeviceV1_0, vk};
+use std::ptr;
 
-pub struct Swapchain {
+pub struct Swapchain<'a> {
     pub swapchain_loader: ash::extensions::khr::Swapchain,
     pub swapchain: vk::SwapchainKHR,
     pub swapchain_images: Vec<vk::Image>,
+    pub swapchain_image_views: Vec<vk::ImageView>,
     pub swapchain_format: vk::Format,
     pub swapchain_extent: vk::Extent2D,
+    pub vulkan: &'a VkInstance,
 }
 
-impl Swapchain {
-    pub fn new(vulkan: &VkInstance, width: u32, height: u32) -> Swapchain {
+impl<'a> Swapchain<'a> {
+    pub fn new(vulkan: &'a VkInstance, width: u32, height: u32) -> Swapchain {
         unsafe {
             let surface_formats = vulkan
                 .surface
@@ -88,13 +91,76 @@ impl Swapchain {
                 .get_swapchain_images(swapchain)
                 .expect("Failed to get Swapchain Images.");
 
+            let swapchain_image_views: Vec<vk::ImageView> = swapchain_images
+                .iter()
+                .map(|&image| {
+                    create_image_view(
+                        &vulkan.device,
+                        image,
+                        surface_format.format,
+                        vk::ImageAspectFlags::COLOR,
+                        1,
+                    )
+                })
+                .collect();
+
             Swapchain {
                 swapchain,
                 swapchain_images,
                 swapchain_loader,
                 swapchain_format: surface_format.format,
                 swapchain_extent: surface_resolution,
+                swapchain_image_views,
+                vulkan,
             }
         }
+    }
+
+    pub fn create_frame(&self) {}
+}
+
+impl<'a> Drop for Swapchain<'a> {
+    fn drop(&mut self) {
+        unsafe {
+            for &imageview in self.swapchain_image_views.iter() {
+                self.vulkan.device.destroy_image_view(imageview, None);
+            }
+        }
+    }
+}
+
+pub fn create_image_view(
+    device: &ash::Device,
+    image: vk::Image,
+    format: vk::Format,
+    aspect_flags: vk::ImageAspectFlags,
+    mip_levels: u32,
+) -> vk::ImageView {
+    let imageview_create_info = vk::ImageViewCreateInfo {
+        s_type: vk::StructureType::IMAGE_VIEW_CREATE_INFO,
+        p_next: ptr::null(),
+        flags: vk::ImageViewCreateFlags::empty(),
+        view_type: vk::ImageViewType::TYPE_2D,
+        format,
+        components: vk::ComponentMapping {
+            r: vk::ComponentSwizzle::IDENTITY,
+            g: vk::ComponentSwizzle::IDENTITY,
+            b: vk::ComponentSwizzle::IDENTITY,
+            a: vk::ComponentSwizzle::IDENTITY,
+        },
+        subresource_range: vk::ImageSubresourceRange {
+            aspect_mask: aspect_flags,
+            base_mip_level: 0,
+            level_count: mip_levels,
+            base_array_layer: 0,
+            layer_count: 1,
+        },
+        image,
+    };
+
+    unsafe {
+        device
+            .create_image_view(&imageview_create_info, None)
+            .expect("Failed to create Image View!")
     }
 }

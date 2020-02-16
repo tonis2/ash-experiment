@@ -30,7 +30,6 @@ use ash::extensions::mvk::MacOSSurface;
 use ash::version::{EntryV1_0, InstanceV1_0};
 use ash::vk;
 
-
 #[cfg(all(unix, not(target_os = "android"), not(target_os = "macos")))]
 pub unsafe fn create_surface<E: EntryV1_0, I: InstanceV1_0>(
     entry: &E,
@@ -133,4 +132,3 @@ pub fn extension_names() -> Vec<*const i8> {
         DebugReport::name().as_ptr(),
     ]
 }
-

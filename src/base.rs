@@ -10,6 +10,7 @@ use ash::{
 };
 use winit::window::Window;
 
+
 #[allow(dead_code)]
 pub struct VkInstance {
     entry: Entry,
@@ -62,7 +63,7 @@ impl VkInstance {
         unsafe { self.device.device_wait_idle() }
     }
 
-    pub fn create_command_buffer() {}
+    pub fn create_command_buffer(&self) {}
 
     pub fn create_command_pool(&self) -> vk::CommandPool {
         unsafe {
