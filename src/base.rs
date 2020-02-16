@@ -8,8 +8,9 @@ use ash::{
     version::{DeviceV1_0, InstanceV1_0},
     vk, Device, Entry, Instance,
 };
-use winit::window::Window;
 
+use std::ptr;
+use winit::window::Window;
 
 #[allow(dead_code)]
 pub struct VkInstance {
@@ -63,7 +64,25 @@ impl VkInstance {
         unsafe { self.device.device_wait_idle() }
     }
 
-    pub fn create_command_buffer(&self) {}
+    pub fn create_command_buffers(
+        &self,
+        command_pool: vk::CommandPool,
+        amount: u32,
+    ) -> Vec<vk::CommandBuffer> {
+        let command_buffer_allocate_info = vk::CommandBufferAllocateInfo {
+            s_type: vk::StructureType::COMMAND_BUFFER_ALLOCATE_INFO,
+            p_next: ptr::null(),
+            command_buffer_count: amount,
+            command_pool,
+            level: vk::CommandBufferLevel::PRIMARY,
+        };
+
+        unsafe {
+            self.device
+                .allocate_command_buffers(&command_buffer_allocate_info)
+                .expect("Failed to allocate Command Buffers!")
+        }
+    }
 
     pub fn create_command_pool(&self) -> vk::CommandPool {
         unsafe {
