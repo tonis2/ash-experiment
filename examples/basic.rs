@@ -53,12 +53,12 @@ fn main() {
     let (pipeline, layout) =
         pipelines::default::create_pipeline(&swapchain, render_pass, &vertex_descriptor);
 
-    {
-        let command_buffers = vulkan_base.create_command_buffers(command_pool, 2);
-    }
+    let command_buffers = vulkan_base.create_command_buffers(command_pool, 2);
+
     unsafe {
         vulkan_base.device.destroy_command_pool(command_pool, None);
         vulkan_base.device.destroy_render_pass(render_pass, None);
-        // vulkan_base.device.destroy_pipeline(pipeline[0], None);
+        vulkan_base.device.destroy_pipeline(pipeline[0], None);
+        vulkan_base.device.destroy_pipeline_layout(layout, None);
     }
 }

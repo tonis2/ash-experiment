@@ -116,7 +116,98 @@ impl<'a> Swapchain<'a> {
         }
     }
 
-    pub fn create_frame(&self) {}
+    pub fn build_next_frame(
+        &self,
+        command_buffers: Vec<vk::CommandBuffer>,
+        render_pass: vk::RenderPass,
+        pipeline: vk::Pipeline,
+    ) -> Vec<vk::CommandBuffer> {
+        let mut framebuffers = vec![];
+
+        for &image_view in self.image_views.iter() {
+            let attachments = [image_view];
+
+            let framebuffer_create_info = vk::FramebufferCreateInfo {
+                s_type: vk::StructureType::FRAMEBUFFER_CREATE_INFO,
+                p_next: ptr::null(),
+                flags: vk::FramebufferCreateFlags::empty(),
+                render_pass,
+                attachment_count: attachments.len() as u32,
+                p_attachments: attachments.as_ptr(),
+                width: self.extent.width,
+                height: self.extent.height,
+                layers: 1,
+            };
+
+            let framebuffer = unsafe {
+                self.vulkan
+                    .device
+                    .create_framebuffer(&framebuffer_create_info, None)
+                    .expect("Failed to create Framebuffer!")
+            };
+
+            framebuffers.push(framebuffer);
+        }
+
+        for (i, &command_buffer) in command_buffers.iter().enumerate() {
+            let command_buffer_begin_info = vk::CommandBufferBeginInfo {
+                s_type: vk::StructureType::COMMAND_BUFFER_BEGIN_INFO,
+                p_next: ptr::null(),
+                p_inheritance_info: ptr::null(),
+                flags: vk::CommandBufferUsageFlags::SIMULTANEOUS_USE,
+            };
+
+            unsafe {
+                self.vulkan
+                    .device
+                    .begin_command_buffer(command_buffer, &command_buffer_begin_info)
+                    .expect("Failed to begin recording Command Buffer at beginning!");
+            }
+
+            let clear_values = [vk::ClearValue {
+                color: vk::ClearColorValue {
+                    float32: [0.0, 0.0, 0.0, 1.0],
+                },
+            }];
+
+            let render_pass_begin_info = vk::RenderPassBeginInfo {
+                s_type: vk::StructureType::RENDER_PASS_BEGIN_INFO,
+                p_next: ptr::null(),
+                render_pass,
+                framebuffer: framebuffers[i],
+                render_area: vk::Rect2D {
+                    offset: vk::Offset2D { x: 0, y: 0 },
+                    extent: self.extent,
+                },
+                clear_value_count: clear_values.len() as u32,
+                p_clear_values: clear_values.as_ptr(),
+            };
+            
+            //Todo create externally
+            unsafe {
+                self.vulkan.device.cmd_begin_render_pass(
+                    command_buffer,
+                    &render_pass_begin_info,
+                    vk::SubpassContents::INLINE,
+                );
+                self.vulkan.device.cmd_bind_pipeline(
+                    command_buffer,
+                    vk::PipelineBindPoint::GRAPHICS,
+                    pipeline,
+                );
+                self.vulkan.device.cmd_draw(command_buffer, 3, 1, 0, 0);
+
+                self.vulkan.device.cmd_end_render_pass(command_buffer);
+
+                self.vulkan
+                    .device
+                    .end_command_buffer(command_buffer)
+                    .expect("Failed to record Command Buffer at Ending!");
+            }
+        }
+
+        command_buffers
+    }
 
     pub fn create_render_pass(&self) -> vk::RenderPass {
         let color_attachment = vk::AttachmentDescription {
