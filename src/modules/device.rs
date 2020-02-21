@@ -4,9 +4,62 @@ use ash::{
     vk, Device, Instance,
 };
 
+const MAX_FRAMES_IN_FLIGHT: usize = 2;
+use std::ptr;
+
 pub struct Queue {
     graphics_queue: vk::Queue,
     present_queue: vk::Queue,
+    image_available_semaphores: Vec<vk::Semaphore>,
+    render_finished_semaphores: Vec<vk::Semaphore>,
+    inflight_fences: Vec<vk::Fence>,
+}
+
+impl Queue {
+    pub fn new<D: DeviceV1_0>(device: &D, queue_index: u32) -> Self {
+        let semaphore_create_info = vk::SemaphoreCreateInfo {
+            s_type: vk::StructureType::SEMAPHORE_CREATE_INFO,
+            p_next: ptr::null(),
+            flags: vk::SemaphoreCreateFlags::empty(),
+        };
+
+        let fence_create_info = vk::FenceCreateInfo {
+            s_type: vk::StructureType::FENCE_CREATE_INFO,
+            p_next: ptr::null(),
+            flags: vk::FenceCreateFlags::SIGNALED,
+        };
+
+        let mut image_available_semaphores = vec![];
+        let mut render_finished_semaphores = vec![];
+        let mut inflight_fences = vec![];
+
+        for _ in 0..MAX_FRAMES_IN_FLIGHT {
+            unsafe {
+                let image_available_semaphore = device
+                    .create_semaphore(&semaphore_create_info, None)
+                    .expect("Failed to create Semaphore Object!");
+                let render_finished_semaphore = device
+                    .create_semaphore(&semaphore_create_info, None)
+                    .expect("Failed to create Semaphore Object!");
+                let inflight_fence = device
+                    .create_fence(&fence_create_info, None)
+                    .expect("Failed to create Fence Object!");
+
+                image_available_semaphores.push(image_available_semaphore);
+                render_finished_semaphores.push(render_finished_semaphore);
+                inflight_fences.push(inflight_fence);
+            }
+        }
+        unsafe {
+            Self {
+                graphics_queue: device.get_device_queue(queue_index as u32, 0),
+                present_queue: device.get_device_queue(queue_index as u32, 0),
+                image_available_semaphores,
+                render_finished_semaphores,
+                inflight_fences,
+            }
+        }
+    }
 }
 
 pub fn create_device(
@@ -36,10 +89,7 @@ pub fn create_device(
             .create_device(pdevice, &device_create_info, None)
             .unwrap();
 
-        let queue = Queue {
-            graphics_queue: device.get_device_queue(queue_index as u32, 0),
-            present_queue: device.get_device_queue(queue_index as u32, 0),
-        };
+        let queue = Queue::new(&device, queue_index);
 
         (device, queue)
     }
