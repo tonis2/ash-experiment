@@ -7,7 +7,7 @@ use super::find_memorytype_index;
 use ash::util::*;
 use ash::vk;
 
-use crate::utility::buffer::Buffer;
+use crate::utility::Buffer;
 use crate::VkInstance;
 use ash::version::DeviceV1_0;
 
@@ -187,7 +187,5 @@ impl Shader {
         }
     }
 
-    pub fn clear() {
-        
-    }
+   
 }

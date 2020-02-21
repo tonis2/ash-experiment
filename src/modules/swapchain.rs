@@ -52,25 +52,26 @@ impl Frame {
                     p_clear_values: clear_values.as_ptr(),
                 };
 
-                //Todo create externally
-
                 device.cmd_begin_render_pass(
                     command_buffer,
                     &render_pass_begin_info,
                     vk::SubpassContents::INLINE,
                 );
-                // self.vulkan.device.cmd_bind_pipeline(
-                //     command_buffer,
-                //     vk::PipelineBindPoint::GRAPHICS,
-                //     pipeline,
-                // );
-                // self.vulkan.device.cmd_draw(command_buffer, 3, 1, 0, 0);
+
                 apply(command_buffer, &device);
                 device.cmd_end_render_pass(command_buffer);
 
                 device
                     .end_command_buffer(command_buffer)
                     .expect("Failed to record Command Buffer at Ending!");
+            }
+        }
+    }
+
+    pub fn destroy(&self, vulkan: &VkInstance) {
+        for &framebuffer in self.frame_buffers.iter() {
+            unsafe {
+                vulkan.device.destroy_framebuffer(framebuffer, None);
             }
         }
     }
@@ -216,6 +217,14 @@ impl Swapchain {
             frame_buffers,
             render_pass,
             extent: self.extent,
+        }
+    }
+
+    pub fn destroy(&self, vulkan: &VkInstance) {
+        for image in self.image_views.iter() {
+            unsafe {
+                vulkan.device.destroy_image_view(*image, None);
+            }
         }
     }
 

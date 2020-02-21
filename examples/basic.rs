@@ -114,8 +114,9 @@ fn main() {
             let frame =
                 swapchain.build_next_frame(command_buffers, render_pass, &vulkan_base.device);
 
-            let index_buffer = create_index_buffer(&indices, &vulkan_base);
-            let vertex_buffer = create_vertex_buffer(&vertices, &vulkan_base, &vertex_descriptor);
+            let mut index_buffer = create_index_buffer(&indices, &vulkan_base);
+            let mut vertex_buffer =
+                create_vertex_buffer(&vertices, &vulkan_base, &vertex_descriptor);
 
             frame.finish(&vulkan_base.device, |command_buffer, device| unsafe {
                 device.cmd_bind_pipeline(
@@ -134,18 +135,25 @@ fn main() {
                 );
                 device.cmd_draw_indexed(command_buffer, index_buffer.size, 1, 0, 0, 1);
             });
+
+            vertex_buffer.destroy(&vulkan_base);
+            index_buffer.destroy(&vulkan_base);
+            frame.destroy(&vulkan_base);
         }
-        Event::LoopDestroyed => {
-            vulkan_base
-                .wait_idle()
-                .expect("Failed to wait device idle!");
-            unsafe {
-                vulkan_base.device.destroy_command_pool(command_pool, None);
-                vulkan_base.device.destroy_render_pass(render_pass, None);
-                vulkan_base.device.destroy_pipeline(pipeline[0], None);
-                vulkan_base.device.destroy_pipeline_layout(layout, None);
-            }
-        }
-        _ => (),
+        Event::LoopDestroyed => unsafe {
+            vulkan_base.device.destroy_command_pool(command_pool, None);
+            vulkan_base.device.destroy_render_pass(render_pass, None);
+            vulkan_base.device.destroy_pipeline(pipeline[0], None);
+            vulkan_base.device.destroy_pipeline_layout(layout, None);
+            swapchain.destroy(&vulkan_base);
+        },
+        _ => {}
     });
+
+    // unsafe {
+    //     vulkan_base.device.destroy_command_pool(command_pool, None);
+    //     vulkan_base.device.destroy_render_pass(render_pass, None);
+    //     vulkan_base.device.destroy_pipeline(pipeline[0], None);
+    //     vulkan_base.device.destroy_pipeline_layout(layout, None);
+    // }
 }
