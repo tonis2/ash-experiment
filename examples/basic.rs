@@ -1,8 +1,10 @@
 mod pipelines;
 use ash::{version::DeviceV1_0, vk};
 use std::mem::{self, align_of};
-use vulkan::{offset_of, Swapchain, VertexDescriptor, VkInstance};
-use winit::event_loop::EventLoop;
+use vulkan::*;
+
+use winit::event::{ElementState, Event, KeyboardInput, VirtualKeyCode, WindowEvent};
+use winit::event_loop::{ControlFlow, EventLoop};
 
 #[derive(Clone, Debug, Copy)]
 pub struct Vertex {
@@ -39,7 +41,7 @@ fn main() {
 
     let swapchain = Swapchain::new(&vulkan_base, 1500, 800);
 
-    let render_pass = swapchain.create_render_pass();
+    let render_pass = swapchain.create_render_pass(&vulkan_base.device);
 
     let vertex_descriptor = VertexDescriptor {
         binding_len: 1,
@@ -67,24 +69,83 @@ fn main() {
         align: align_of::<Vertex>() as u64,
     };
 
-    let (pipeline, layout) =
-        pipelines::default::create_pipeline(&swapchain, render_pass, &vertex_descriptor);
+    let (pipeline, layout) = pipelines::default::create_pipeline(
+        &swapchain,
+        render_pass,
+        &vertex_descriptor,
+        &vulkan_base,
+    );
 
-    let command_buffers = vulkan_base.create_command_buffers(command_pool, 2);
+    let viewports = [vk::Viewport {
+        x: 0.0,
+        y: 0.0,
+        width: swapchain.extent.width as f32,
+        height: swapchain.extent.height as f32,
+        min_depth: 0.0,
+        max_depth: 1.0,
+    }];
+    let scissors = [vk::Rect2D {
+        offset: vk::Offset2D { x: 0, y: 0 },
+        extent: swapchain.extent,
+    }];
 
-    {
-        let frame = swapchain.build_next_frame(command_buffers, render_pass);
+    event_loop.run(move |event, _, control_flow| match event {
+        Event::WindowEvent { event, .. } => match event {
+            WindowEvent::CloseRequested => *control_flow = ControlFlow::Exit,
+            WindowEvent::KeyboardInput { input, .. } => match input {
+                KeyboardInput {
+                    virtual_keycode,
+                    state,
+                    ..
+                } => match (virtual_keycode, state) {
+                    (Some(VirtualKeyCode::Escape), ElementState::Pressed) => {
+                        *control_flow = ControlFlow::Exit
+                    }
+                    _ => {}
+                },
+            },
+            _ => {}
+        },
+        Event::MainEventsCleared => {
+            window.request_redraw();
+        }
+        Event::RedrawRequested(_window_id) => {
+            let command_buffers = vulkan_base.create_command_buffers(command_pool, 2);
+            let frame =
+                swapchain.build_next_frame(command_buffers, render_pass, &vulkan_base.device);
 
-        frame.finish(&vulkan_base.device, |command_buffer, device| unsafe {
-            device.cmd_bind_pipeline(command_buffer, vk::PipelineBindPoint::GRAPHICS, pipeline[0]);
-        });
-    }
+            let index_buffer = create_index_buffer(&indices, &vulkan_base);
+            let vertex_buffer = create_vertex_buffer(&vertices, &vulkan_base, &vertex_descriptor);
 
-    unsafe {
-        vulkan_base.device.destroy_command_pool(command_pool, None);
-        vulkan_base.device.destroy_render_pass(render_pass, None);
-        vulkan_base.device.destroy_pipeline(pipeline[0], None);
-
-        vulkan_base.device.destroy_pipeline_layout(layout, None);
-    }
+            frame.finish(&vulkan_base.device, |command_buffer, device| unsafe {
+                device.cmd_bind_pipeline(
+                    command_buffer,
+                    vk::PipelineBindPoint::GRAPHICS,
+                    pipeline[0],
+                );
+                device.cmd_set_viewport(command_buffer, 0, &viewports);
+                device.cmd_set_scissor(command_buffer, 0, &scissors);
+                device.cmd_bind_vertex_buffers(command_buffer, 0, &[vertex_buffer.buffer], &[0]);
+                device.cmd_bind_index_buffer(
+                    command_buffer,
+                    index_buffer.buffer,
+                    0,
+                    vk::IndexType::UINT32,
+                );
+                device.cmd_draw_indexed(command_buffer, index_buffer.size, 1, 0, 0, 1);
+            });
+        }
+        Event::LoopDestroyed => {
+            vulkan_base
+                .wait_idle()
+                .expect("Failed to wait device idle!");
+            unsafe {
+                vulkan_base.device.destroy_command_pool(command_pool, None);
+                vulkan_base.device.destroy_render_pass(render_pass, None);
+                vulkan_base.device.destroy_pipeline(pipeline[0], None);
+                vulkan_base.device.destroy_pipeline_layout(layout, None);
+            }
+        }
+        _ => (),
+    });
 }

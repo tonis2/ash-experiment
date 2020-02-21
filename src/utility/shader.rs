@@ -186,4 +186,8 @@ impl Shader {
             (vertex_shader_module, fragment_shader_module)
         }
     }
+
+    pub fn clear() {
+        
+    }
 }
