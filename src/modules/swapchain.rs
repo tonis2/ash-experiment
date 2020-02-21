@@ -21,7 +21,7 @@ pub struct Frame<'a> {
 }
 
 impl<'a> Frame<'a> {
-    pub fn finish<D: DeviceV1_0, F: Fn(&vk::CommandBuffer, &D)>(&self, device: &D, apply: F) {
+    pub fn finish<D: DeviceV1_0, F: Fn(vk::CommandBuffer, &D)>(&self, device: &D, apply: F) {
         unsafe {
             for (i, &command_buffer) in self.command_buffers.iter().enumerate() {
                 let command_buffer_begin_info = vk::CommandBufferBeginInfo {
@@ -68,7 +68,7 @@ impl<'a> Frame<'a> {
                 //     pipeline,
                 // );
                 // self.vulkan.device.cmd_draw(command_buffer, 3, 1, 0, 0);
-                apply(&command_buffer, &device);
+                apply(command_buffer, &device);
                 self.vulkan.device.cmd_end_render_pass(command_buffer);
 
                 self.vulkan

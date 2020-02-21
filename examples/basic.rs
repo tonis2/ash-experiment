@@ -75,9 +75,8 @@ fn main() {
     {
         let frame = swapchain.build_next_frame(command_buffers, render_pass);
 
-
-        frame.finish(&vulkan_base.device, |command_buffers, device| {
-
+        frame.finish(&vulkan_base.device, |command_buffer, device| unsafe {
+            device.cmd_bind_pipeline(command_buffer, vk::PipelineBindPoint::GRAPHICS, pipeline[0]);
         });
     }
 
@@ -85,7 +84,6 @@ fn main() {
         vulkan_base.device.destroy_command_pool(command_pool, None);
         vulkan_base.device.destroy_render_pass(render_pass, None);
         vulkan_base.device.destroy_pipeline(pipeline[0], None);
-       
 
         vulkan_base.device.destroy_pipeline_layout(layout, None);
     }
