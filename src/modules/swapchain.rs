@@ -12,6 +12,84 @@ pub struct Swapchain<'a> {
     pub vulkan: &'a VkInstance,
 }
 
+pub struct Frame<'a> {
+    frame_buffers: Vec<vk::Framebuffer>,
+    command_buffers: Vec<vk::CommandBuffer>,
+    vulkan: &'a VkInstance,
+    render_pass: vk::RenderPass,
+    extent: vk::Extent2D,
+}
+
+impl<'a> Frame<'a> {
+    pub fn finish<D: DeviceV1_0, F: Fn(&vk::CommandBuffer, &D)>(&self, device: &D, apply: F) {
+        unsafe {
+            for (i, &command_buffer) in self.command_buffers.iter().enumerate() {
+                let command_buffer_begin_info = vk::CommandBufferBeginInfo {
+                    s_type: vk::StructureType::COMMAND_BUFFER_BEGIN_INFO,
+                    p_next: ptr::null(),
+                    p_inheritance_info: ptr::null(),
+                    flags: vk::CommandBufferUsageFlags::SIMULTANEOUS_USE,
+                };
+
+                self.vulkan
+                    .device
+                    .begin_command_buffer(command_buffer, &command_buffer_begin_info)
+                    .expect("Failed to begin recording Command Buffer at beginning!");
+
+                let clear_values = [vk::ClearValue {
+                    color: vk::ClearColorValue {
+                        float32: [0.0, 0.0, 0.0, 1.0],
+                    },
+                }];
+
+                let render_pass_begin_info = vk::RenderPassBeginInfo {
+                    s_type: vk::StructureType::RENDER_PASS_BEGIN_INFO,
+                    p_next: ptr::null(),
+                    render_pass: self.render_pass,
+                    framebuffer: self.frame_buffers[i],
+                    render_area: vk::Rect2D {
+                        offset: vk::Offset2D { x: 0, y: 0 },
+                        extent: self.extent,
+                    },
+                    clear_value_count: clear_values.len() as u32,
+                    p_clear_values: clear_values.as_ptr(),
+                };
+
+                //Todo create externally
+
+                self.vulkan.device.cmd_begin_render_pass(
+                    command_buffer,
+                    &render_pass_begin_info,
+                    vk::SubpassContents::INLINE,
+                );
+                // self.vulkan.device.cmd_bind_pipeline(
+                //     command_buffer,
+                //     vk::PipelineBindPoint::GRAPHICS,
+                //     pipeline,
+                // );
+                // self.vulkan.device.cmd_draw(command_buffer, 3, 1, 0, 0);
+                apply(&command_buffer, &device);
+                self.vulkan.device.cmd_end_render_pass(command_buffer);
+
+                self.vulkan
+                    .device
+                    .end_command_buffer(command_buffer)
+                    .expect("Failed to record Command Buffer at Ending!");
+            }
+        }
+    }
+}
+
+impl<'a> Drop for Frame<'a> {
+    fn drop(&mut self) {
+        for &framebuffer in self.frame_buffers.iter() {
+            unsafe {
+                self.vulkan.device.destroy_framebuffer(framebuffer, None);
+            }
+        }
+    }
+}
+
 impl<'a> Swapchain<'a> {
     pub fn new(vulkan: &'a VkInstance, width: u32, height: u32) -> Swapchain {
         unsafe {
@@ -120,9 +198,8 @@ impl<'a> Swapchain<'a> {
         &self,
         command_buffers: Vec<vk::CommandBuffer>,
         render_pass: vk::RenderPass,
-        pipeline: vk::Pipeline,
-    ) -> Vec<vk::CommandBuffer> {
-        let mut framebuffers = vec![];
+    ) -> Frame {
+        let mut frame_buffers = vec![];
 
         for &image_view in self.image_views.iter() {
             let attachments = [image_view];
@@ -146,67 +223,16 @@ impl<'a> Swapchain<'a> {
                     .expect("Failed to create Framebuffer!")
             };
 
-            framebuffers.push(framebuffer);
+            frame_buffers.push(framebuffer);
         }
 
-        for (i, &command_buffer) in command_buffers.iter().enumerate() {
-            let command_buffer_begin_info = vk::CommandBufferBeginInfo {
-                s_type: vk::StructureType::COMMAND_BUFFER_BEGIN_INFO,
-                p_next: ptr::null(),
-                p_inheritance_info: ptr::null(),
-                flags: vk::CommandBufferUsageFlags::SIMULTANEOUS_USE,
-            };
-
-            unsafe {
-                self.vulkan
-                    .device
-                    .begin_command_buffer(command_buffer, &command_buffer_begin_info)
-                    .expect("Failed to begin recording Command Buffer at beginning!");
-            }
-
-            let clear_values = [vk::ClearValue {
-                color: vk::ClearColorValue {
-                    float32: [0.0, 0.0, 0.0, 1.0],
-                },
-            }];
-
-            let render_pass_begin_info = vk::RenderPassBeginInfo {
-                s_type: vk::StructureType::RENDER_PASS_BEGIN_INFO,
-                p_next: ptr::null(),
-                render_pass,
-                framebuffer: framebuffers[i],
-                render_area: vk::Rect2D {
-                    offset: vk::Offset2D { x: 0, y: 0 },
-                    extent: self.extent,
-                },
-                clear_value_count: clear_values.len() as u32,
-                p_clear_values: clear_values.as_ptr(),
-            };
-            
-            //Todo create externally
-            unsafe {
-                self.vulkan.device.cmd_begin_render_pass(
-                    command_buffer,
-                    &render_pass_begin_info,
-                    vk::SubpassContents::INLINE,
-                );
-                self.vulkan.device.cmd_bind_pipeline(
-                    command_buffer,
-                    vk::PipelineBindPoint::GRAPHICS,
-                    pipeline,
-                );
-                self.vulkan.device.cmd_draw(command_buffer, 3, 1, 0, 0);
-
-                self.vulkan.device.cmd_end_render_pass(command_buffer);
-
-                self.vulkan
-                    .device
-                    .end_command_buffer(command_buffer)
-                    .expect("Failed to record Command Buffer at Ending!");
-            }
+        Frame {
+            command_buffers,
+            frame_buffers,
+            render_pass,
+            extent: self.extent,
+            vulkan: &self.vulkan,
         }
-
-        command_buffers
     }
 
     pub fn create_render_pass(&self) -> vk::RenderPass {

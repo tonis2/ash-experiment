@@ -9,7 +9,24 @@ pub struct Vertex {
     pub pos: [f32; 4],
     pub color: [f32; 4],
 }
+
 fn main() {
+    let vertices = vec![
+        Vertex {
+            pos: [-1.0, 1.0, 0.0, 1.0],
+            color: [0.0, 1.0, 0.0, 1.0],
+        },
+        Vertex {
+            pos: [1.0, 1.0, 0.0, 1.0],
+            color: [0.0, 0.0, 1.0, 1.0],
+        },
+        Vertex {
+            pos: [0.0, -1.0, 0.0, 1.0],
+            color: [1.0, 0.0, 0.0, 1.0],
+        },
+    ];
+
+    let indices = vec![0, 1, 2];
     let event_loop = EventLoop::new();
     let window = winit::window::WindowBuilder::new()
         .with_title("test")
@@ -55,12 +72,21 @@ fn main() {
 
     let command_buffers = vulkan_base.create_command_buffers(command_pool, 2);
 
-    let buffer = swapchain.build_next_frame(command_buffers, render_pass, pipeline[0]);
+    {
+        let frame = swapchain.build_next_frame(command_buffers, render_pass);
+
+
+        frame.finish(&vulkan_base.device, |command_buffers, device| {
+
+        });
+    }
 
     unsafe {
         vulkan_base.device.destroy_command_pool(command_pool, None);
         vulkan_base.device.destroy_render_pass(render_pass, None);
         vulkan_base.device.destroy_pipeline(pipeline[0], None);
+       
+
         vulkan_base.device.destroy_pipeline_layout(layout, None);
     }
 }
