@@ -15,6 +15,7 @@ pub fn create_pipeline(
     swapchain: &Swapchain,
     renderpass: vk::RenderPass,
     vertex_descriptor: &VertexDescriptor,
+    vulkan: &vulkan::VkInstance,
 ) -> (Vec<vk::Pipeline>, vk::PipelineLayout) {
     unsafe {
         let vertex_input_state_info = vk::PipelineVertexInputStateCreateInfo {
@@ -90,8 +91,7 @@ pub fn create_pipeline(
 
         let layout_create_info = vk::PipelineLayoutCreateInfo::default();
 
-        let pipeline_layout = swapchain
-            .vulkan
+        let pipeline_layout = vulkan
             .device
             .create_pipeline_layout(&layout_create_info, None)
             .unwrap();
@@ -100,7 +100,7 @@ pub fn create_pipeline(
             vertex_shader: "examples/shaders/spv/vert.spv",
             fragment_shader: "examples/shaders/spv/frag.spv",
         }
-        .load(&swapchain.vulkan);
+        .load(&vulkan);
 
         let shader_entry_name = CString::new("main").unwrap();
         let shaders = &[
@@ -130,8 +130,7 @@ pub fn create_pipeline(
             .dynamic_state(&dynamic_state_info)
             .layout(pipeline_layout)
             .render_pass(renderpass);
-        let pipeline = swapchain
-            .vulkan
+        let pipeline = vulkan
             .device
             .create_graphics_pipelines(
                 vk::PipelineCache::null(),
@@ -141,12 +140,10 @@ pub fn create_pipeline(
             .expect("Unable to create graphics pipeline");
 
         //Destoy shader modules
-        swapchain
-            .vulkan
+        vulkan
             .device
             .destroy_shader_module(vertex_shader_module, None);
-        swapchain
-            .vulkan
+        vulkan
             .device
             .destroy_shader_module(fragment_shader_module, None);
         (pipeline, pipeline_layout)

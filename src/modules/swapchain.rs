@@ -2,25 +2,23 @@ use crate::base::VkInstance;
 use ash::{extensions::khr, version::DeviceV1_0, vk};
 use std::ptr;
 
-pub struct Swapchain<'a> {
+pub struct Swapchain {
     pub swapchain_loader: ash::extensions::khr::Swapchain,
     pub swapchain: vk::SwapchainKHR,
     pub images: Vec<vk::Image>,
     pub image_views: Vec<vk::ImageView>,
     pub format: vk::Format,
     pub extent: vk::Extent2D,
-    pub vulkan: &'a VkInstance,
 }
 
-pub struct Frame<'a> {
+pub struct Frame {
     frame_buffers: Vec<vk::Framebuffer>,
     command_buffers: Vec<vk::CommandBuffer>,
-    vulkan: &'a VkInstance,
     render_pass: vk::RenderPass,
     extent: vk::Extent2D,
 }
 
-impl<'a> Frame<'a> {
+impl Frame {
     pub fn finish<D: DeviceV1_0, F: Fn(vk::CommandBuffer, &D)>(&self, device: &D, apply: F) {
         unsafe {
             for (i, &command_buffer) in self.command_buffers.iter().enumerate() {
@@ -31,8 +29,7 @@ impl<'a> Frame<'a> {
                     flags: vk::CommandBufferUsageFlags::SIMULTANEOUS_USE,
                 };
 
-                self.vulkan
-                    .device
+                device
                     .begin_command_buffer(command_buffer, &command_buffer_begin_info)
                     .expect("Failed to begin recording Command Buffer at beginning!");
 
@@ -57,7 +54,7 @@ impl<'a> Frame<'a> {
 
                 //Todo create externally
 
-                self.vulkan.device.cmd_begin_render_pass(
+                device.cmd_begin_render_pass(
                     command_buffer,
                     &render_pass_begin_info,
                     vk::SubpassContents::INLINE,
@@ -69,10 +66,9 @@ impl<'a> Frame<'a> {
                 // );
                 // self.vulkan.device.cmd_draw(command_buffer, 3, 1, 0, 0);
                 apply(command_buffer, &device);
-                self.vulkan.device.cmd_end_render_pass(command_buffer);
+                device.cmd_end_render_pass(command_buffer);
 
-                self.vulkan
-                    .device
+                device
                     .end_command_buffer(command_buffer)
                     .expect("Failed to record Command Buffer at Ending!");
             }
@@ -80,18 +76,8 @@ impl<'a> Frame<'a> {
     }
 }
 
-impl<'a> Drop for Frame<'a> {
-    fn drop(&mut self) {
-        for &framebuffer in self.frame_buffers.iter() {
-            unsafe {
-                self.vulkan.device.destroy_framebuffer(framebuffer, None);
-            }
-        }
-    }
-}
-
-impl<'a> Swapchain<'a> {
-    pub fn new(vulkan: &'a VkInstance, width: u32, height: u32) -> Swapchain {
+impl Swapchain {
+    pub fn new(vulkan: &VkInstance, width: u32, height: u32) -> Swapchain {
         unsafe {
             let surface_formats = vulkan
                 .surface
@@ -189,15 +175,15 @@ impl<'a> Swapchain<'a> {
                 format: surface_format.format,
                 extent: surface_resolution,
                 image_views: swapchain_image_views,
-                vulkan,
             }
         }
     }
 
-    pub fn build_next_frame(
+    pub fn build_next_frame<D: DeviceV1_0>(
         &self,
         command_buffers: Vec<vk::CommandBuffer>,
         render_pass: vk::RenderPass,
+        device: &D,
     ) -> Frame {
         let mut frame_buffers = vec![];
 
@@ -217,8 +203,7 @@ impl<'a> Swapchain<'a> {
             };
 
             let framebuffer = unsafe {
-                self.vulkan
-                    .device
+                device
                     .create_framebuffer(&framebuffer_create_info, None)
                     .expect("Failed to create Framebuffer!")
             };
@@ -231,11 +216,10 @@ impl<'a> Swapchain<'a> {
             frame_buffers,
             render_pass,
             extent: self.extent,
-            vulkan: &self.vulkan,
         }
     }
 
-    pub fn create_render_pass(&self) -> vk::RenderPass {
+    pub fn create_render_pass<D: DeviceV1_0>(&self, device: &D) -> vk::RenderPass {
         let color_attachment = vk::AttachmentDescription {
             format: self.format,
             flags: vk::AttachmentDescriptionFlags::empty(),
@@ -292,8 +276,7 @@ impl<'a> Swapchain<'a> {
         };
 
         unsafe {
-            self.vulkan
-                .device
+            device
                 .create_render_pass(&renderpass_create_info, None)
                 .expect("Failed to create render pass!")
         }
@@ -333,15 +316,5 @@ pub fn create_image_view(
         device
             .create_image_view(&imageview_create_info, None)
             .expect("Failed to create Image View!")
-    }
-}
-
-impl<'a> Drop for Swapchain<'a> {
-    fn drop(&mut self) {
-        unsafe {
-            for &imageview in self.image_views.iter() {
-                self.vulkan.device.destroy_image_view(imageview, None);
-            }
-        }
     }
 }
