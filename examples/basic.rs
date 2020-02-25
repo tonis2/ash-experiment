@@ -88,6 +88,7 @@ fn main() {
         offset: vk::Offset2D { x: 0, y: 0 },
         extent: swapchain.extent,
     }];
+    let command_buffers = vulkan_base.create_command_buffers(command_pool, 3);
 
     event_loop.run(move |event, _, control_flow| match event {
         Event::WindowEvent { event, .. } => match event {
@@ -110,40 +111,49 @@ fn main() {
             window.request_redraw();
         }
         Event::RedrawRequested(_window_id) => {
-            let command_buffers = vulkan_base.create_command_buffers(command_pool, 2);
-            let frame =
-                swapchain.build_next_frame(command_buffers, render_pass, &vulkan_base.device);
+            let frame = swapchain.build_next_frame(render_pass, &vulkan_base);
 
             let mut index_buffer = create_index_buffer(&indices, &vulkan_base);
             let mut vertex_buffer =
                 create_vertex_buffer(&vertices, &vulkan_base, &vertex_descriptor);
 
-            frame.finish(&vulkan_base.device, |command_buffer, device| unsafe {
-                device.cmd_bind_pipeline(
-                    command_buffer,
-                    vk::PipelineBindPoint::GRAPHICS,
-                    pipeline[0],
-                );
-                device.cmd_set_viewport(command_buffer, 0, &viewports);
-                device.cmd_set_scissor(command_buffer, 0, &scissors);
-                device.cmd_bind_vertex_buffers(command_buffer, 0, &[vertex_buffer.buffer], &[0]);
-                device.cmd_bind_index_buffer(
-                    command_buffer,
-                    index_buffer.buffer,
-                    0,
-                    vk::IndexType::UINT32,
-                );
-                device.cmd_draw_indexed(command_buffer, index_buffer.size, 1, 0, 0, 1);
-            });
+            frame.finish(
+                &vulkan_base.device,
+                &command_buffers,
+                |command_buffer, device| unsafe {
+                    device.cmd_bind_pipeline(
+                        command_buffer,
+                        vk::PipelineBindPoint::GRAPHICS,
+                        pipeline[0],
+                    );
+                    device.cmd_set_viewport(command_buffer, 0, &viewports);
+                    device.cmd_set_scissor(command_buffer, 0, &scissors);
+                    device.cmd_bind_vertex_buffers(
+                        command_buffer,
+                        0,
+                        &[vertex_buffer.buffer],
+                        &[0],
+                    );
+                    device.cmd_bind_index_buffer(
+                        command_buffer,
+                        index_buffer.buffer,
+                        0,
+                        vk::IndexType::UINT32,
+                    );
+                    device.cmd_draw_indexed(command_buffer, index_buffer.size, 1, 0, 0, 1);
+                },
+            );
 
-            vulkan_base.draw_frame(frame);
-
+            vulkan_base.draw_frame(frame, &command_buffers);
             vulkan_base.wait_idle().unwrap();
             vertex_buffer.destroy(&vulkan_base);
             index_buffer.destroy(&vulkan_base);
         }
         Event::LoopDestroyed => unsafe {
             vulkan_base.wait_idle().unwrap();
+            vulkan_base
+            .device
+            .free_command_buffers(command_pool, &command_buffers);
             vulkan_base.device.destroy_command_pool(command_pool, None);
             vulkan_base.device.destroy_render_pass(render_pass, None);
             vulkan_base.device.destroy_pipeline(pipeline[0], None);

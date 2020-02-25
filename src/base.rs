@@ -98,7 +98,7 @@ impl VkInstance {
         }
     }
 
-    pub fn draw_frame(&mut self, frame: Frame) {
+    pub fn draw_frame(&mut self, frame: Frame, command_buffers: &Vec<vk::CommandBuffer>) {
         let wait_fences = [self.queue.inflight_fences[self.queue.current_frame]];
 
         let (image_index, _is_sub_optimal) = unsafe {
@@ -121,19 +121,18 @@ impl VkInstance {
         let wait_semaphores = [self.queue.image_available_semaphores[self.queue.current_frame]];
         let wait_stages = [vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT];
         let signal_semaphores = [self.queue.render_finished_semaphores[self.queue.current_frame]];
-
+   
         let submit_infos = [vk::SubmitInfo {
             s_type: vk::StructureType::SUBMIT_INFO,
             p_next: ptr::null(),
             wait_semaphore_count: wait_semaphores.len() as u32,
             p_wait_semaphores: wait_semaphores.as_ptr(),
             p_wait_dst_stage_mask: wait_stages.as_ptr(),
-            command_buffer_count: 2,
-            p_command_buffers: &frame.command_buffers[image_index as usize],
+            command_buffer_count: 1,
+            p_command_buffers: &command_buffers[image_index as usize],
             signal_semaphore_count: signal_semaphores.len() as u32,
             p_signal_semaphores: signal_semaphores.as_ptr(),
         }];
-
         unsafe {
             self.device
                 .reset_fences(&wait_fences)

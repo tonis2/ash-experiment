@@ -12,16 +12,20 @@ pub struct Swapchain {
 }
 
 pub struct Frame<'a> {
-    frame_buffers: Vec<vk::Framebuffer>,
-    render_pass: vk::RenderPass,
-    pub command_buffers: Vec<vk::CommandBuffer>,
+    pub frame_buffers: Vec<vk::Framebuffer>,
+    pub render_pass: vk::RenderPass,
     pub swapchain: &'a Swapchain,
 }
 
 impl<'a> Frame<'a> {
-    pub fn finish<D: DeviceV1_0, F: Fn(vk::CommandBuffer, &D)>(&self, device: &D, apply: F) {
+    pub fn finish<D: DeviceV1_0, F: Fn(vk::CommandBuffer, &D)>(
+        &self,
+        device: &D,
+        command_buffers: &Vec<vk::CommandBuffer>,
+        apply: F,
+    ) {
         unsafe {
-            for (i, &command_buffer) in self.command_buffers.iter().enumerate() {
+            for (i, &command_buffer) in command_buffers.iter().enumerate() {
                 let command_buffer_begin_info = vk::CommandBufferBeginInfo {
                     s_type: vk::StructureType::COMMAND_BUFFER_BEGIN_INFO,
                     p_next: ptr::null(),
@@ -204,12 +208,7 @@ impl Swapchain {
         }
     }
 
-    pub fn build_next_frame<D: DeviceV1_0>(
-        &self,
-        command_buffers: Vec<vk::CommandBuffer>,
-        render_pass: vk::RenderPass,
-        device: &D,
-    ) -> Frame {
+    pub fn build_next_frame(&self, render_pass: vk::RenderPass, vulkan: &VkInstance) -> Frame {
         let mut frame_buffers = vec![];
 
         for &image_view in self.image_views.iter() {
@@ -228,7 +227,8 @@ impl Swapchain {
             };
 
             let framebuffer = unsafe {
-                device
+                vulkan
+                    .device
                     .create_framebuffer(&framebuffer_create_info, None)
                     .expect("Failed to create Framebuffer!")
             };
@@ -237,7 +237,6 @@ impl Swapchain {
         }
 
         Frame {
-            command_buffers,
             frame_buffers,
             render_pass,
             swapchain: &self,
