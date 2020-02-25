@@ -11,14 +11,14 @@ pub struct Swapchain {
     pub extent: vk::Extent2D,
 }
 
-pub struct Frame {
+pub struct Frame<'a> {
     frame_buffers: Vec<vk::Framebuffer>,
-    command_buffers: Vec<vk::CommandBuffer>,
     render_pass: vk::RenderPass,
-    extent: vk::Extent2D,
+    pub command_buffers: Vec<vk::CommandBuffer>,
+    pub swapchain: &'a Swapchain,
 }
 
-impl Frame {
+impl<'a> Frame<'a> {
     pub fn finish<D: DeviceV1_0, F: Fn(vk::CommandBuffer, &D)>(&self, device: &D, apply: F) {
         unsafe {
             for (i, &command_buffer) in self.command_buffers.iter().enumerate() {
@@ -46,7 +46,7 @@ impl Frame {
                     framebuffer: self.frame_buffers[i],
                     render_area: vk::Rect2D {
                         offset: vk::Offset2D { x: 0, y: 0 },
-                        extent: self.extent,
+                        extent: self.swapchain.extent,
                     },
                     clear_value_count: clear_values.len() as u32,
                     p_clear_values: clear_values.as_ptr(),
@@ -59,6 +59,7 @@ impl Frame {
                 );
 
                 apply(command_buffer, &device);
+
                 device.cmd_end_render_pass(command_buffer);
 
                 device
@@ -84,6 +85,7 @@ impl Swapchain {
                 .surface
                 .get_physical_device_surface_formats(vulkan.physical_device, vulkan.surface_khr)
                 .unwrap();
+
             let surface_format = surface_formats
                 .iter()
                 .map(|sfmt| match sfmt.format {
@@ -95,6 +97,7 @@ impl Swapchain {
                 })
                 .nth(0)
                 .expect("Unable to find suitable surface format.");
+
             let surface_capabilities = vulkan
                 .surface
                 .get_physical_device_surface_capabilities(
@@ -102,16 +105,19 @@ impl Swapchain {
                     vulkan.surface_khr,
                 )
                 .unwrap();
-            let mut desired_image_count = surface_capabilities.min_image_count + 1;
-            if surface_capabilities.max_image_count > 0
-                && desired_image_count > surface_capabilities.max_image_count
-            {
-                desired_image_count = surface_capabilities.max_image_count;
-            }
+
+            let image_count = surface_capabilities.min_image_count + 1;
+            let image_count = if surface_capabilities.max_image_count > 0 {
+                image_count.min(surface_capabilities.max_image_count)
+            } else {
+                image_count
+            };
+
             let surface_resolution = match surface_capabilities.current_extent.width {
                 std::u32::MAX => vk::Extent2D { width, height },
                 _ => surface_capabilities.current_extent,
             };
+
             let pre_transform = if surface_capabilities
                 .supported_transforms
                 .contains(vk::SurfaceTransformFlagsKHR::IDENTITY)
@@ -120,6 +126,7 @@ impl Swapchain {
             } else {
                 surface_capabilities.current_transform
             };
+
             let present_modes = vulkan
                 .surface
                 .get_physical_device_surface_present_modes(
@@ -127,21 +134,23 @@ impl Swapchain {
                     vulkan.surface_khr,
                 )
                 .unwrap();
+
             let present_mode = present_modes
                 .iter()
                 .cloned()
                 .find(|&mode| mode == vk::PresentModeKHR::MAILBOX)
                 .unwrap_or(vk::PresentModeKHR::FIFO);
+
             let swapchain_loader = khr::Swapchain::new(&vulkan.instance, &vulkan.device);
 
             let swapchain_create_info = vk::SwapchainCreateInfoKHR::builder()
                 .surface(vulkan.surface_khr)
-                .min_image_count(desired_image_count)
+                .min_image_count(image_count)
                 .image_color_space(surface_format.color_space)
                 .image_format(surface_format.format)
                 .image_extent(surface_resolution)
                 .image_usage(vk::ImageUsageFlags::COLOR_ATTACHMENT)
-                .image_sharing_mode(vk::SharingMode::EXCLUSIVE)
+                .image_sharing_mode(vk::SharingMode::CONCURRENT)
                 .pre_transform(pre_transform)
                 .composite_alpha(vk::CompositeAlphaFlagsKHR::OPAQUE)
                 .present_mode(present_mode)
@@ -216,7 +225,7 @@ impl Swapchain {
             command_buffers,
             frame_buffers,
             render_pass,
-            extent: self.extent,
+            swapchain: &self,
         }
     }
 

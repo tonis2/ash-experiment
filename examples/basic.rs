@@ -36,7 +36,7 @@ fn main() {
         .build(&event_loop)
         .expect("Failed to create window.");
 
-    let vulkan_base = VkInstance::new(&window);
+    let mut vulkan_base = VkInstance::new(&window);
     let command_pool = vulkan_base.create_command_pool();
 
     let swapchain = Swapchain::new(&vulkan_base, 1500, 800);
@@ -136,11 +136,14 @@ fn main() {
                 device.cmd_draw_indexed(command_buffer, index_buffer.size, 1, 0, 0, 1);
             });
 
+            vulkan_base.draw_frame(frame);
+
+            vulkan_base.wait_idle().unwrap();
             vertex_buffer.destroy(&vulkan_base);
             index_buffer.destroy(&vulkan_base);
-            frame.destroy(&vulkan_base);
         }
         Event::LoopDestroyed => unsafe {
+            vulkan_base.wait_idle().unwrap();
             vulkan_base.device.destroy_command_pool(command_pool, None);
             vulkan_base.device.destroy_render_pass(render_pass, None);
             vulkan_base.device.destroy_pipeline(pipeline[0], None);
@@ -149,11 +152,4 @@ fn main() {
         },
         _ => {}
     });
-
-    // unsafe {
-    //     vulkan_base.device.destroy_command_pool(command_pool, None);
-    //     vulkan_base.device.destroy_render_pass(render_pass, None);
-    //     vulkan_base.device.destroy_pipeline(pipeline[0], None);
-    //     vulkan_base.device.destroy_pipeline_layout(layout, None);
-    // }
 }
