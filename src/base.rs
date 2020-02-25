@@ -1,6 +1,6 @@
 use crate::modules::{
     debug::create_debugger,
-    device::{self, Queue, QueueFamilyIndices},
+    device::{self, Queue},
     surface,
     swapchain::Frame,
 };
@@ -118,63 +118,63 @@ impl VkInstance {
                 .expect("Failed to acquire next image.")
         };
 
-        // let wait_semaphores = [self.queue.image_available_semaphores[self.queue.current_frame]];
-        // let wait_stages = [vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT];
-        // let signal_semaphores = [self.queue.render_finished_semaphores[self.queue.current_frame]];
+        let wait_semaphores = [self.queue.image_available_semaphores[self.queue.current_frame]];
+        let wait_stages = [vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT];
+        let signal_semaphores = [self.queue.render_finished_semaphores[self.queue.current_frame]];
 
-        // let submit_infos = [vk::SubmitInfo {
-        //     s_type: vk::StructureType::SUBMIT_INFO,
-        //     p_next: ptr::null(),
-        //     wait_semaphore_count: wait_semaphores.len() as u32,
-        //     p_wait_semaphores: wait_semaphores.as_ptr(),
-        //     p_wait_dst_stage_mask: wait_stages.as_ptr(),
-        //     command_buffer_count: 1,
-        //     p_command_buffers: &frame.command_buffers[image_index as usize],
-        //     signal_semaphore_count: signal_semaphores.len() as u32,
-        //     p_signal_semaphores: signal_semaphores.as_ptr(),
-        // }];
+        let submit_infos = [vk::SubmitInfo {
+            s_type: vk::StructureType::SUBMIT_INFO,
+            p_next: ptr::null(),
+            wait_semaphore_count: wait_semaphores.len() as u32,
+            p_wait_semaphores: wait_semaphores.as_ptr(),
+            p_wait_dst_stage_mask: wait_stages.as_ptr(),
+            command_buffer_count: 2,
+            p_command_buffers: &frame.command_buffers[image_index as usize],
+            signal_semaphore_count: signal_semaphores.len() as u32,
+            p_signal_semaphores: signal_semaphores.as_ptr(),
+        }];
 
-        // unsafe {
-        //     self.device
-        //         .reset_fences(&wait_fences)
-        //         .expect("Failed to reset Fence!");
+        unsafe {
+            self.device
+                .reset_fences(&wait_fences)
+                .expect("Failed to reset Fence!");
 
-        //     self.device
-        //         .queue_submit(
-        //             self.queue.graphics_queue,
-        //             &submit_infos,
-        //             self.queue.inflight_fences[self.queue.current_frame],
-        //         )
-        //         .expect("Failed to execute queue submit.");
-        // }
+            self.device
+                .queue_submit(
+                    self.queue.graphics_queue,
+                    &submit_infos,
+                    self.queue.inflight_fences[self.queue.current_frame],
+                )
+                .expect("Failed to execute queue submit.");
+        }
 
-        // let swapchains = [frame.swapchain.swapchain];
+        let swapchains = [frame.swapchain.swapchain];
 
-        // let present_info = vk::PresentInfoKHR {
-        //     s_type: vk::StructureType::PRESENT_INFO_KHR,
-        //     p_next: ptr::null(),
-        //     wait_semaphore_count: 1,
-        //     p_wait_semaphores: signal_semaphores.as_ptr(),
-        //     swapchain_count: 1,
-        //     p_swapchains: swapchains.as_ptr(),
-        //     p_image_indices: &image_index,
-        //     p_results: ptr::null_mut(),
-        // };
+        let present_info = vk::PresentInfoKHR {
+            s_type: vk::StructureType::PRESENT_INFO_KHR,
+            p_next: ptr::null(),
+            wait_semaphore_count: 1,
+            p_wait_semaphores: signal_semaphores.as_ptr(),
+            swapchain_count: 1,
+            p_swapchains: swapchains.as_ptr(),
+            p_image_indices: &image_index,
+            p_results: ptr::null_mut(),
+        };
 
-        // let result = unsafe {
-        //     frame
-        //         .swapchain
-        //         .swapchain_loader
-        //         .queue_present(self.queue.present_queue, &present_info)
-        // };
+        let result = unsafe {
+            frame
+                .swapchain
+                .swapchain_loader
+                .queue_present(self.queue.present_queue, &present_info)
+        };
 
-        // let _is_resized = match result {
-        //     Ok(_) => false,
-        //     Err(vk_result) => match vk_result {
-        //         vk::Result::ERROR_OUT_OF_DATE_KHR | vk::Result::SUBOPTIMAL_KHR => true,
-        //         _ => panic!("Failed to execute queue present."),
-        //     },
-        // };
+        let _is_resized = match result {
+            Ok(_) => false,
+            Err(vk_result) => match vk_result {
+                vk::Result::ERROR_OUT_OF_DATE_KHR | vk::Result::SUBOPTIMAL_KHR => true,
+                _ => panic!("Failed to execute queue present."),
+            },
+        };
 
         self.queue.current_frame = (self.queue.current_frame + 1) % MAX_FRAMES_IN_FLIGHT;
 

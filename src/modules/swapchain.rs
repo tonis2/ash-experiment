@@ -142,6 +142,20 @@ impl Swapchain {
                 .unwrap_or(vk::PresentModeKHR::FIFO);
 
             let swapchain_loader = khr::Swapchain::new(&vulkan.instance, &vulkan.device);
+            let queue_family = &vulkan.queue.queue_family_indices;
+
+            let (image_sharing_mode, queue_family_indices) =
+                if queue_family.graphics_family != queue_family.present_family {
+                    (
+                        vk::SharingMode::CONCURRENT,
+                        vec![
+                            queue_family.graphics_family.unwrap(),
+                            queue_family.present_family.unwrap(),
+                        ],
+                    )
+                } else {
+                    (vk::SharingMode::EXCLUSIVE, vec![])
+                };
 
             let swapchain_create_info = vk::SwapchainCreateInfoKHR::builder()
                 .surface(vulkan.surface_khr)
@@ -150,8 +164,9 @@ impl Swapchain {
                 .image_format(surface_format.format)
                 .image_extent(surface_resolution)
                 .image_usage(vk::ImageUsageFlags::COLOR_ATTACHMENT)
-                .image_sharing_mode(vk::SharingMode::CONCURRENT)
+                .image_sharing_mode(image_sharing_mode)
                 .pre_transform(pre_transform)
+                .queue_family_indices(&queue_family_indices[..queue_family_indices.len()])
                 .composite_alpha(vk::CompositeAlphaFlagsKHR::OPAQUE)
                 .present_mode(present_mode)
                 .clipped(true)

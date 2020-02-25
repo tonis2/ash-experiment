@@ -9,7 +9,6 @@ use std::collections::HashSet;
 
 use std::ptr;
 
-
 pub struct QueueFamilyIndices {
     pub graphics_family: Option<u32>,
     pub present_family: Option<u32>,
@@ -74,8 +73,10 @@ impl Queue {
         }
         unsafe {
             Self {
-                graphics_queue: device.get_device_queue(queue_family_indices.graphics_family.unwrap(), 0),
-                present_queue: device.get_device_queue(queue_family_indices.present_family.unwrap(), 0),
+                graphics_queue: device
+                    .get_device_queue(queue_family_indices.graphics_family.unwrap(), 0),
+                present_queue: device
+                    .get_device_queue(queue_family_indices.present_family.unwrap(), 0),
                 queue_family_indices,
                 image_available_semaphores,
                 render_finished_semaphores,
@@ -106,7 +107,6 @@ pub fn create_device(
         shader_clip_distance: 1,
         ..Default::default()
     };
-    let priorities = [1.0];
 
     let mut queue_create_infos = vec![];
 
@@ -149,11 +149,10 @@ pub fn create_physical_device(
     surface_khr: vk::SurfaceKHR,
 ) -> (vk::PhysicalDevice, QueueFamilyIndices) {
     unsafe {
-        let mut unique_queue_families: HashSet<u32> = HashSet::new();
         let pdevices = instance
             .enumerate_physical_devices()
             .expect("Physical device error");
-        let (pdevice, queue_family_index) = pdevices
+        let pdevice = pdevices
             .iter()
             .map(|pdevice| {
                 instance
@@ -171,7 +170,7 @@ pub fn create_physical_device(
                                     )
                                     .unwrap();
                         if supports_graphic_and_surface {
-                            Some((*pdevice, index))
+                            Some(*pdevice)
                         } else {
                             None
                         }
@@ -181,10 +180,8 @@ pub fn create_physical_device(
             .filter_map(|v| v)
             .nth(0)
             .expect("Couldn't find suitable device.");
-        let queue_family_index = queue_family_index as u32;
 
-        let queue_families =
-        unsafe { instance.get_physical_device_queue_family_properties(pdevice) };
+        let queue_families = instance.get_physical_device_queue_family_properties(pdevice);
 
         let mut queue_family_indices = QueueFamilyIndices::new();
 
@@ -196,26 +193,20 @@ pub fn create_physical_device(
             {
                 queue_family_indices.graphics_family = Some(index);
             }
-    
-            let is_present_support = unsafe {
-                surface
-                    .get_physical_device_surface_support(
-                        pdevice,
-                        index as u32,
-                        surface_khr,
-                    )
-            };
+
+            let is_present_support =
+                surface.get_physical_device_surface_support(pdevice, index as u32, surface_khr);
             if queue_family.queue_count > 0 && is_present_support.unwrap() {
                 queue_family_indices.present_family = Some(index);
             }
-    
+
             if queue_family_indices.is_complete() {
                 break;
             }
-    
+
             index += 1;
         }
-        
+
         (pdevice, queue_family_indices)
     }
 }
