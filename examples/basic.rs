@@ -101,7 +101,7 @@ fn main() {
         },
     }];
 
-    vulkan_base.begin_frame(
+    vulkan_base.start_frame(
         &command_buffers,
         &frame_buffers,
         &render_pass,
@@ -143,7 +143,7 @@ fn main() {
             window.request_redraw();
         }
         Event::RedrawRequested(_window_id) => {
-            vulkan_base.draw_frame(&swapchain, &command_buffers);
+            vulkan_base.finish_frame(&swapchain, &command_buffers);
         }
         Event::LoopDestroyed => unsafe {
             vulkan_base.wait_idle().unwrap();
