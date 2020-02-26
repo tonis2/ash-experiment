@@ -21,34 +21,9 @@ impl<'a> Frame<'a> {
         &self,
         vulkan: &VkInstance,
         command_buffers: &Vec<vk::CommandBuffer>,
+        frame_buffers: &Vec<vk::Framebuffer>,
         apply: F,
     ) {
-        let mut frame_buffers = vec![];
-
-        for &image_view in self.swapchain.image_views.iter() {
-            let attachments = [image_view];
-
-            let framebuffer_create_info = vk::FramebufferCreateInfo {
-                s_type: vk::StructureType::FRAMEBUFFER_CREATE_INFO,
-                p_next: ptr::null(),
-                flags: vk::FramebufferCreateFlags::empty(),
-                render_pass: self.render_pass,
-                attachment_count: attachments.len() as u32,
-                p_attachments: attachments.as_ptr(),
-                width: self.swapchain.extent.width,
-                height: self.swapchain.extent.height,
-                layers: 1,
-            };
-
-            let framebuffer = unsafe {
-                vulkan
-                    .device
-                    .create_framebuffer(&framebuffer_create_info, None)
-                    .expect("Failed to create Framebuffer!")
-            };
-
-            frame_buffers.push(framebuffer);
-        }
         unsafe {
             for (i, &command_buffer) in command_buffers.iter().enumerate() {
                 let command_buffer_begin_info = vk::CommandBufferBeginInfo {
@@ -87,7 +62,7 @@ impl<'a> Frame<'a> {
                     &render_pass_begin_info,
                     vk::SubpassContents::INLINE,
                 );
-         
+
                 apply(command_buffer, &vulkan);
 
                 vulkan.device.cmd_end_render_pass(command_buffer);
@@ -96,12 +71,6 @@ impl<'a> Frame<'a> {
                     .device
                     .end_command_buffer(command_buffer)
                     .expect("Failed to record Command Buffer at Ending!");
-            }
-            // vulkan
-            //     .device
-            //     .wait_for_fences(&vulkan.queue.inflight_fences, true, 0);
-            for &framebuffer in frame_buffers.iter() {
-                vulkan.device.destroy_framebuffer(framebuffer, None);
             }
         }
     }
@@ -233,11 +202,45 @@ impl Swapchain {
         }
     }
 
-    pub fn build_next_frame(&self, render_pass: vk::RenderPass) -> Frame {
+    pub fn start_next_frame(&self, render_pass: vk::RenderPass) -> Frame {
         Frame {
             render_pass,
             swapchain: &self,
         }
+    }
+
+    pub fn create_frame_buffers(
+        &self,
+        render_pass: &vk::RenderPass,
+        vulkan: &VkInstance,
+    ) -> Vec<vk::Framebuffer> {
+        let mut frame_buffers = vec![];
+
+        for &image_view in self.image_views.iter() {
+            let attachments = [image_view];
+
+            let framebuffer_create_info = vk::FramebufferCreateInfo {
+                s_type: vk::StructureType::FRAMEBUFFER_CREATE_INFO,
+                p_next: ptr::null(),
+                flags: vk::FramebufferCreateFlags::empty(),
+                render_pass: *render_pass,
+                attachment_count: attachments.len() as u32,
+                p_attachments: attachments.as_ptr(),
+                width: self.extent.width,
+                height: self.extent.height,
+                layers: 1,
+            };
+
+            let framebuffer = unsafe {
+                vulkan
+                    .device
+                    .create_framebuffer(&framebuffer_create_info, None)
+                    .expect("Failed to create Framebuffer!")
+            };
+
+            frame_buffers.push(framebuffer);
+        }
+        frame_buffers
     }
 
     pub fn destroy(&self, vulkan: &VkInstance) {

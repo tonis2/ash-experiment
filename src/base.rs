@@ -69,12 +69,12 @@ impl VkInstance {
     pub fn create_command_buffers(
         &self,
         command_pool: vk::CommandPool,
-        amount: u32,
+        amount: usize,
     ) -> Vec<vk::CommandBuffer> {
         let command_buffer_allocate_info = vk::CommandBufferAllocateInfo {
             s_type: vk::StructureType::COMMAND_BUFFER_ALLOCATE_INFO,
             p_next: ptr::null(),
-            command_buffer_count: amount,
+            command_buffer_count: amount as u32,
             command_pool,
             level: vk::CommandBufferLevel::PRIMARY,
         };
@@ -133,6 +133,7 @@ impl VkInstance {
             signal_semaphore_count: signal_semaphores.len() as u32,
             p_signal_semaphores: signal_semaphores.as_ptr(),
         }];
+
         unsafe {
             self.device
                 .reset_fences(&wait_fences)
@@ -185,6 +186,7 @@ impl Drop for VkInstance {
             self.device.device_wait_idle().unwrap();
             self.queue.destroy(&self.device);
             self.device.destroy_device(None);
+            
         }
     }
 }

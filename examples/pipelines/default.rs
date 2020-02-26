@@ -17,11 +17,13 @@ pub fn create_pipeline(
     vertex_descriptor: &VertexDescriptor,
     vulkan: &vulkan::VkInstance,
 ) -> (Vec<vk::Pipeline>, vk::PipelineLayout) {
+    let descriptor_len = vertex_descriptor.attribute_descriptor.len() as u32;
+    let binding_len = vertex_descriptor.binding_descriptor.len() as u32;
     unsafe {
         let vertex_input_state_info = vk::PipelineVertexInputStateCreateInfo {
-            vertex_attribute_description_count: vertex_descriptor.descriptor_len as u32,
+            vertex_attribute_description_count: descriptor_len,
             p_vertex_attribute_descriptions: vertex_descriptor.attribute_descriptor.as_ptr(),
-            vertex_binding_description_count: vertex_descriptor.binding_len as u32,
+            vertex_binding_description_count: binding_len,
             p_vertex_binding_descriptions: vertex_descriptor.binding_descriptor.as_ptr(),
             ..Default::default()
         };

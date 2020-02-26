@@ -42,8 +42,6 @@ fn main() {
     let swapchain = Swapchain::new(&vulkan_base, 1500, 800);
 
     let vertex_descriptor = VertexDescriptor {
-        binding_len: 1,
-        descriptor_len: 2,
         binding_descriptor: vec![vk::VertexInputBindingDescription {
             binding: 0,
             stride: mem::size_of::<Vertex>() as u32,
@@ -68,26 +66,17 @@ fn main() {
     };
 
     let render_pass = swapchain.create_render_pass(&vulkan_base.device);
+    let frame_buffers = swapchain.create_frame_buffers(&render_pass, &vulkan_base);
+    let command_buffers =
+        vulkan_base.create_command_buffers(command_pool, swapchain.image_views.len());
+
+    //Create pipeline
     let (pipeline, layout) = pipelines::default::create_pipeline(
         &swapchain,
         render_pass,
         &vertex_descriptor,
         &vulkan_base,
     );
-
-    let viewports = [vk::Viewport {
-        x: 0.0,
-        y: 0.0,
-        width: swapchain.extent.width as f32,
-        height: swapchain.extent.height as f32,
-        min_depth: 0.0,
-        max_depth: 1.0,
-    }];
-    let scissors = [vk::Rect2D {
-        offset: vk::Offset2D { x: 0, y: 0 },
-        extent: swapchain.extent,
-    }];
-    let command_buffers = vulkan_base.create_command_buffers(command_pool, 3);
 
     let mut index_buffer = create_index_buffer(&indices, &vulkan_base);
     let mut vertex_buffer = create_vertex_buffer(&vertices, &vulkan_base, &vertex_descriptor);
@@ -113,10 +102,24 @@ fn main() {
             window.request_redraw();
         }
         Event::RedrawRequested(_window_id) => {
-            let frame = swapchain.build_next_frame(render_pass);
+            let frame = swapchain.start_next_frame(render_pass);
+
+            let viewports = [vk::Viewport {
+                x: 0.0,
+                y: 0.0,
+                width: swapchain.extent.width as f32,
+                height: swapchain.extent.height as f32,
+                min_depth: 0.0,
+                max_depth: 1.0,
+            }];
+            let scissors = [vk::Rect2D {
+                offset: vk::Offset2D { x: 0, y: 0 },
+                extent: swapchain.extent,
+            }];
             frame.finish(
                 &vulkan_base,
                 &command_buffers,
+                &frame_buffers,
                 |command_buffer, vulkan| unsafe {
                     vulkan.device.cmd_bind_pipeline(
                         command_buffer,
@@ -146,10 +149,12 @@ fn main() {
             );
 
             vulkan_base.draw_frame(&frame, &command_buffers);
-            // frame.destroy(&vulkan_base);
         }
         Event::LoopDestroyed => unsafe {
             vulkan_base.wait_idle().unwrap();
+            for &framebuffer in frame_buffers.iter() {
+                vulkan_base.device.destroy_framebuffer(framebuffer, None);
+            }
             vulkan_base
                 .device
                 .free_command_buffers(command_pool, &command_buffers);

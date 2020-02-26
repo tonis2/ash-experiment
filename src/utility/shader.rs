@@ -12,8 +12,6 @@ use crate::VkInstance;
 use ash::version::DeviceV1_0;
 
 pub struct VertexDescriptor {
-    pub binding_len: i32,
-    pub descriptor_len: i32,
     pub binding_descriptor: Vec<vk::VertexInputBindingDescription>,
     pub attribute_descriptor: Vec<vk::VertexInputAttributeDescription>,
     pub size: u64,
