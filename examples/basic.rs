@@ -81,6 +81,47 @@ fn main() {
     let mut index_buffer = create_index_buffer(&indices, &vulkan_base);
     let mut vertex_buffer = create_vertex_buffer(&vertices, &vulkan_base, &vertex_descriptor);
 
+    let viewports = [vk::Viewport {
+        x: 0.0,
+        y: 0.0,
+        width: swapchain.extent.width as f32,
+        height: swapchain.extent.height as f32,
+        min_depth: 0.0,
+        max_depth: 1.0,
+    }];
+
+    let extent = vec![vk::Rect2D {
+        offset: vk::Offset2D { x: 0, y: 0 },
+        extent: swapchain.extent,
+    }];
+
+    let clear_values = vec![vk::ClearValue {
+        color: vk::ClearColorValue {
+            float32: [0.0, 0.0, 0.0, 1.0],
+        },
+    }];
+
+    vulkan_base.begin_frame(
+        &command_buffers,
+        &frame_buffers,
+        &render_pass,
+        extent[0],
+        clear_values,
+        |command_buffer, device| unsafe {
+            device.cmd_bind_pipeline(command_buffer, vk::PipelineBindPoint::GRAPHICS, pipeline[0]);
+            device.cmd_set_viewport(command_buffer, 0, &viewports);
+            device.cmd_set_scissor(command_buffer, 0, &extent);
+            device.cmd_bind_vertex_buffers(command_buffer, 0, &[vertex_buffer.buffer], &[0]);
+            device.cmd_bind_index_buffer(
+                command_buffer,
+                index_buffer.buffer,
+                0,
+                vk::IndexType::UINT32,
+            );
+            device.cmd_draw_indexed(command_buffer, index_buffer.size, 1, 0, 0, 1);
+        },
+    );
+
     event_loop.run(move |event, _, control_flow| match event {
         Event::WindowEvent { event, .. } => match event {
             WindowEvent::CloseRequested => *control_flow = ControlFlow::Exit,
@@ -102,53 +143,7 @@ fn main() {
             window.request_redraw();
         }
         Event::RedrawRequested(_window_id) => {
-            let frame = swapchain.start_next_frame(render_pass);
-
-            let viewports = [vk::Viewport {
-                x: 0.0,
-                y: 0.0,
-                width: swapchain.extent.width as f32,
-                height: swapchain.extent.height as f32,
-                min_depth: 0.0,
-                max_depth: 1.0,
-            }];
-            let scissors = [vk::Rect2D {
-                offset: vk::Offset2D { x: 0, y: 0 },
-                extent: swapchain.extent,
-            }];
-            frame.finish(
-                &vulkan_base,
-                &command_buffers,
-                &frame_buffers,
-                |command_buffer, vulkan| unsafe {
-                    vulkan.device.cmd_bind_pipeline(
-                        command_buffer,
-                        vk::PipelineBindPoint::GRAPHICS,
-                        pipeline[0],
-                    );
-                    vulkan
-                        .device
-                        .cmd_set_viewport(command_buffer, 0, &viewports);
-                    vulkan.device.cmd_set_scissor(command_buffer, 0, &scissors);
-                    vulkan.device.cmd_bind_vertex_buffers(
-                        command_buffer,
-                        0,
-                        &[vertex_buffer.buffer],
-                        &[0],
-                    );
-                    vulkan.device.cmd_bind_index_buffer(
-                        command_buffer,
-                        index_buffer.buffer,
-                        0,
-                        vk::IndexType::UINT32,
-                    );
-                    vulkan
-                        .device
-                        .cmd_draw_indexed(command_buffer, index_buffer.size, 1, 0, 0, 1);
-                },
-            );
-
-            vulkan_base.draw_frame(&frame, &command_buffers);
+            vulkan_base.draw_frame(&swapchain, &command_buffers);
         }
         Event::LoopDestroyed => unsafe {
             vulkan_base.wait_idle().unwrap();
