@@ -151,7 +151,7 @@ impl VkInstance {
         }
     }
 
-    pub fn finish_frame(&mut self, swapchain: &Swapchain, command_buffers: &Vec<vk::CommandBuffer>) {
+    pub fn render_frame(&mut self, swapchain: &Swapchain, command_buffers: &Vec<vk::CommandBuffer>) {
         let wait_fences = [self.queue.inflight_fences[self.queue.current_frame]];
 
         let (image_index, _is_sub_optimal) = unsafe {

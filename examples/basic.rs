@@ -143,7 +143,7 @@ fn main() {
             window.request_redraw();
         }
         Event::RedrawRequested(_window_id) => {
-            vulkan_base.finish_frame(&swapchain, &command_buffers);
+            vulkan_base.render_frame(&swapchain, &command_buffers);
         }
         Event::LoopDestroyed => unsafe {
             vulkan_base.wait_idle().unwrap();
