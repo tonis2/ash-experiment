@@ -8,22 +8,22 @@ use winit::event_loop::{ControlFlow, EventLoop};
 
 #[derive(Clone, Debug, Copy)]
 pub struct Vertex {
-    pub pos: [f32; 4],
+    pub pos: [f32; 2],
     pub color: [f32; 4],
 }
 
 fn main() {
     let vertices = vec![
         Vertex {
-            pos: [-1.0, 1.0, 0.0, 1.0],
+            pos: [-1.0, 1.0],
             color: [0.0, 1.0, 0.0, 1.0],
         },
         Vertex {
-            pos: [1.0, 1.0, 0.0, 1.0],
+            pos: [1.0, 1.0],
             color: [0.0, 0.0, 1.0, 1.0],
         },
         Vertex {
-            pos: [0.0, -1.0, 0.0, 1.0],
+            pos: [0.0, -1.0],
             color: [1.0, 0.0, 0.0, 1.0],
         },
     ];
