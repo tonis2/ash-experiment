@@ -47,7 +47,7 @@ impl VkInstance {
                 surface,
                 surface_khr,
                 physical_device: pdevice,
-                device: device,
+                device,
                 queue,
             }
         }
@@ -98,7 +98,7 @@ impl VkInstance {
         }
     }
 
-    pub fn draw_frame(&mut self, frame: Frame, command_buffers: &Vec<vk::CommandBuffer>) {
+    pub fn draw_frame(&mut self, frame: &Frame, command_buffers: &Vec<vk::CommandBuffer>) {
         let wait_fences = [self.queue.inflight_fences[self.queue.current_frame]];
 
         let (image_index, _is_sub_optimal) = unsafe {
@@ -121,7 +121,7 @@ impl VkInstance {
         let wait_semaphores = [self.queue.image_available_semaphores[self.queue.current_frame]];
         let wait_stages = [vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT];
         let signal_semaphores = [self.queue.render_finished_semaphores[self.queue.current_frame]];
-   
+     
         let submit_infos = [vk::SubmitInfo {
             s_type: vk::StructureType::SUBMIT_INFO,
             p_next: ptr::null(),
@@ -176,9 +176,6 @@ impl VkInstance {
         };
 
         self.queue.current_frame = (self.queue.current_frame + 1) % MAX_FRAMES_IN_FLIGHT;
-
-        self.wait_idle().unwrap();
-        frame.destroy(self);
     }
 }
 

@@ -41,8 +41,6 @@ fn main() {
 
     let swapchain = Swapchain::new(&vulkan_base, 1500, 800);
 
-    let render_pass = swapchain.create_render_pass(&vulkan_base.device);
-
     let vertex_descriptor = VertexDescriptor {
         binding_len: 1,
         descriptor_len: 2,
@@ -69,6 +67,7 @@ fn main() {
         align: align_of::<Vertex>() as u64,
     };
 
+    let render_pass = swapchain.create_render_pass(&vulkan_base.device);
     let (pipeline, layout) = pipelines::default::create_pipeline(
         &swapchain,
         render_pass,
@@ -89,6 +88,9 @@ fn main() {
         extent: swapchain.extent,
     }];
     let command_buffers = vulkan_base.create_command_buffers(command_pool, 3);
+
+    let mut index_buffer = create_index_buffer(&indices, &vulkan_base);
+    let mut vertex_buffer = create_vertex_buffer(&vertices, &vulkan_base, &vertex_descriptor);
 
     event_loop.run(move |event, _, control_flow| match event {
         Event::WindowEvent { event, .. } => match event {
@@ -111,53 +113,52 @@ fn main() {
             window.request_redraw();
         }
         Event::RedrawRequested(_window_id) => {
-            let frame = swapchain.build_next_frame(render_pass, &vulkan_base);
-
-            let mut index_buffer = create_index_buffer(&indices, &vulkan_base);
-            let mut vertex_buffer =
-                create_vertex_buffer(&vertices, &vulkan_base, &vertex_descriptor);
-
+            let frame = swapchain.build_next_frame(render_pass);
             frame.finish(
-                &vulkan_base.device,
+                &vulkan_base,
                 &command_buffers,
-                |command_buffer, device| unsafe {
-                    device.cmd_bind_pipeline(
+                |command_buffer, vulkan| unsafe {
+                    vulkan.device.cmd_bind_pipeline(
                         command_buffer,
                         vk::PipelineBindPoint::GRAPHICS,
                         pipeline[0],
                     );
-                    device.cmd_set_viewport(command_buffer, 0, &viewports);
-                    device.cmd_set_scissor(command_buffer, 0, &scissors);
-                    device.cmd_bind_vertex_buffers(
+                    vulkan
+                        .device
+                        .cmd_set_viewport(command_buffer, 0, &viewports);
+                    vulkan.device.cmd_set_scissor(command_buffer, 0, &scissors);
+                    vulkan.device.cmd_bind_vertex_buffers(
                         command_buffer,
                         0,
                         &[vertex_buffer.buffer],
                         &[0],
                     );
-                    device.cmd_bind_index_buffer(
+                    vulkan.device.cmd_bind_index_buffer(
                         command_buffer,
                         index_buffer.buffer,
                         0,
                         vk::IndexType::UINT32,
                     );
-                    device.cmd_draw_indexed(command_buffer, index_buffer.size, 1, 0, 0, 1);
+                    vulkan
+                        .device
+                        .cmd_draw_indexed(command_buffer, index_buffer.size, 1, 0, 0, 1);
                 },
             );
 
-            vulkan_base.draw_frame(frame, &command_buffers);
-            vulkan_base.wait_idle().unwrap();
-            vertex_buffer.destroy(&vulkan_base);
-            index_buffer.destroy(&vulkan_base);
+            vulkan_base.draw_frame(&frame, &command_buffers);
+            // frame.destroy(&vulkan_base);
         }
         Event::LoopDestroyed => unsafe {
             vulkan_base.wait_idle().unwrap();
             vulkan_base
-            .device
-            .free_command_buffers(command_pool, &command_buffers);
+                .device
+                .free_command_buffers(command_pool, &command_buffers);
             vulkan_base.device.destroy_command_pool(command_pool, None);
             vulkan_base.device.destroy_render_pass(render_pass, None);
             vulkan_base.device.destroy_pipeline(pipeline[0], None);
             vulkan_base.device.destroy_pipeline_layout(layout, None);
+            vertex_buffer.destroy(&vulkan_base);
+            index_buffer.destroy(&vulkan_base);
             swapchain.destroy(&vulkan_base);
         },
         _ => {}
