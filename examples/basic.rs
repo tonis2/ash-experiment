@@ -67,8 +67,6 @@ fn main() {
 
     let render_pass = swapchain.create_render_pass(&vulkan_base.device);
     let frame_buffers = swapchain.create_frame_buffers(&render_pass, &vulkan_base);
-    let command_buffers =
-        vulkan_base.create_command_buffers(command_pool, swapchain.image_views.len());
 
     //Create pipeline
     let (pipeline, layout) = pipelines::default::create_pipeline(
@@ -89,6 +87,9 @@ fn main() {
         min_depth: 0.0,
         max_depth: 1.0,
     }];
+
+    let command_buffers =
+        vulkan_base.create_command_buffers(command_pool, swapchain.image_views.len());
 
     event_loop.run(move |event, _, control_flow| match event {
         Event::WindowEvent { event, .. } => match event {
@@ -152,7 +153,6 @@ fn main() {
                     device.cmd_draw_indexed(command_buffer, index_buffer.size, 1, 0, 0, 1);
                 },
             );
-
             vulkan_base.render_frame(frame, &swapchain);
         }
         Event::LoopDestroyed => unsafe {
@@ -160,9 +160,7 @@ fn main() {
             for &framebuffer in frame_buffers.iter() {
                 vulkan_base.device.destroy_framebuffer(framebuffer, None);
             }
-            vulkan_base
-                .device
-                .free_command_buffers(command_pool, &command_buffers);
+
             vulkan_base.device.destroy_command_pool(command_pool, None);
             vulkan_base.device.destroy_render_pass(render_pass, None);
             vulkan_base.device.destroy_pipeline(pipeline[0], None);
