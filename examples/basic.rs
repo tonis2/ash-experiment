@@ -101,7 +101,7 @@ fn main() {
         },
     }];
 
-    vulkan_base.start_frame(
+    vulkan_base.build_frame(
         &command_buffers,
         &frame_buffers,
         &render_pass,

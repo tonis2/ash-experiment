@@ -100,7 +100,7 @@ impl VkInstance {
         }
     }
 
-    pub fn start_frame<F: Fn(vk::CommandBuffer, &ash::Device)>(
+    pub fn build_frame<F: Fn(vk::CommandBuffer, &ash::Device)>(
         &self,
         command_buffers: &Vec<vk::CommandBuffer>,
         frame_buffers: &Vec<vk::Framebuffer>,
