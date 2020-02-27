@@ -99,8 +99,8 @@ pub fn create_pipeline(
             .unwrap();
 
         let (vertex_shader_module, fragment_shader_module) = Shader {
-            vertex_shader: "examples/shaders/spv/triangle.vert.spv",
-            fragment_shader: "examples/shaders/spv/triangle.frag.spv",
+            vertex_shader: "examples/triangle/shaders/spv/triangle.vert.spv",
+            fragment_shader: "examples/triangle/shaders/spv/triangle.frag.spv",
         }
         .load(&vulkan);
 
