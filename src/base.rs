@@ -1,6 +1,7 @@
 use crate::modules::{
     debug::create_debugger,
     device::{self, Queue},
+    frame::Frame,
     surface,
     swapchain::Swapchain,
 };
@@ -106,55 +107,13 @@ impl VkInstance {
         frame_buffers: &Vec<vk::Framebuffer>,
         renderpass: &vk::RenderPass,
         render_area: vk::Rect2D,
+        swapchain: &Swapchain,
         clear_values: Vec<vk::ClearValue>,
         apply: F,
-    ) {
-        {
-            let command_buffer_begin_info = vk::CommandBufferBeginInfo {
-                s_type: vk::StructureType::COMMAND_BUFFER_BEGIN_INFO,
-                p_next: ptr::null(),
-                p_inheritance_info: ptr::null(),
-                flags: vk::CommandBufferUsageFlags::SIMULTANEOUS_USE,
-            };
+    ) -> Frame {
+        let wait_fences = vec![self.queue.inflight_fences[self.queue.current_frame]];
 
-            unsafe {
-                for (i, &command_buffer) in command_buffers.iter().enumerate() {
-                    self.device
-                        .begin_command_buffer(command_buffer, &command_buffer_begin_info)
-                        .expect("Failed to begin recording Command Buffer at beginning!");
-
-                    let render_pass_begin_info = vk::RenderPassBeginInfo {
-                        s_type: vk::StructureType::RENDER_PASS_BEGIN_INFO,
-                        p_next: ptr::null(),
-                        render_pass: *renderpass,
-                        framebuffer: frame_buffers[i],
-                        render_area: render_area,
-                        clear_value_count: clear_values.len() as u32,
-                        p_clear_values: clear_values.as_ptr(),
-                    };
-
-                    self.device.cmd_begin_render_pass(
-                        command_buffer,
-                        &render_pass_begin_info,
-                        vk::SubpassContents::INLINE,
-                    );
-
-                    apply(command_buffer, &self.device);
-
-                    self.device.cmd_end_render_pass(command_buffer);
-
-                    self.device
-                        .end_command_buffer(command_buffer)
-                        .expect("Failed to record Command Buffer at Ending!");
-                }
-            }
-        }
-    }
-
-    pub fn render_frame(&mut self, swapchain: &Swapchain, command_buffers: &Vec<vk::CommandBuffer>) {
-        let wait_fences = [self.queue.inflight_fences[self.queue.current_frame]];
-
-        let (image_index, _is_sub_optimal) = unsafe {
+        let (image_index, is_sub_optimal) = unsafe {
             self.device
                 .wait_for_fences(&wait_fences, true, std::u64::MAX)
                 .expect("Failed to wait for Fence!");
@@ -170,11 +129,12 @@ impl VkInstance {
                 .expect("Failed to acquire next image.")
         };
 
-        let wait_semaphores = [self.queue.image_available_semaphores[self.queue.current_frame]];
-        let wait_stages = [vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT];
-        let signal_semaphores = [self.queue.render_finished_semaphores[self.queue.current_frame]];
+        let wait_semaphores = vec![self.queue.image_available_semaphores[self.queue.current_frame]];
+        let wait_stages = vec![vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT];
+        let signal_semaphores =
+            vec![self.queue.render_finished_semaphores[self.queue.current_frame]];
 
-        let submit_infos = [vk::SubmitInfo {
+        let submit_infos = vec![vk::SubmitInfo {
             s_type: vk::StructureType::SUBMIT_INFO,
             p_next: ptr::null(),
             wait_semaphore_count: wait_semaphores.len() as u32,
@@ -186,15 +146,66 @@ impl VkInstance {
             p_signal_semaphores: signal_semaphores.as_ptr(),
         }];
 
+        let command_buffer_begin_info = vk::CommandBufferBeginInfo {
+            s_type: vk::StructureType::COMMAND_BUFFER_BEGIN_INFO,
+            p_next: ptr::null(),
+            p_inheritance_info: ptr::null(),
+            flags: vk::CommandBufferUsageFlags::SIMULTANEOUS_USE,
+        };
+
         unsafe {
             self.device
                 .reset_fences(&wait_fences)
                 .expect("Failed to reset Fence!");
 
+            for (i, &command_buffer) in command_buffers.iter().enumerate() {
+                self.device
+                    .begin_command_buffer(command_buffer, &command_buffer_begin_info)
+                    .expect("Failed to begin recording Command Buffer at beginning!");
+
+                let render_pass_begin_info = vk::RenderPassBeginInfo {
+                    s_type: vk::StructureType::RENDER_PASS_BEGIN_INFO,
+                    p_next: ptr::null(),
+                    render_pass: *renderpass,
+                    framebuffer: frame_buffers[i],
+                    render_area: render_area,
+                    clear_value_count: clear_values.len() as u32,
+                    p_clear_values: clear_values.as_ptr(),
+                };
+
+                self.device.cmd_begin_render_pass(
+                    command_buffer,
+                    &render_pass_begin_info,
+                    vk::SubpassContents::INLINE,
+                );
+
+                apply(command_buffer, &self.device);
+
+                self.device.cmd_end_render_pass(command_buffer);
+
+                self.device
+                    .end_command_buffer(command_buffer)
+                    .expect("Failed to record Command Buffer at Ending!");
+            }
+        }
+
+        Frame {
+            wait_fences,
+            wait_semaphores,
+            wait_stages,
+            signal_semaphores,
+            is_sub_optimal,
+            image_index,
+            submit_infos,
+        }
+    }
+
+    pub fn render_frame(&mut self, frame: Frame, swapchain: &Swapchain) {
+        unsafe {
             self.device
                 .queue_submit(
                     self.queue.graphics_queue,
-                    &submit_infos,
+                    &frame.submit_infos,
                     self.queue.inflight_fences[self.queue.current_frame],
                 )
                 .expect("Failed to execute queue submit.");
@@ -206,26 +217,19 @@ impl VkInstance {
             s_type: vk::StructureType::PRESENT_INFO_KHR,
             p_next: ptr::null(),
             wait_semaphore_count: 1,
-            p_wait_semaphores: signal_semaphores.as_ptr(),
+            p_wait_semaphores: frame.signal_semaphores.as_ptr(),
             swapchain_count: 1,
             p_swapchains: swapchains.as_ptr(),
-            p_image_indices: &image_index,
+            p_image_indices: &frame.image_index,
             p_results: ptr::null_mut(),
         };
 
-        let result = unsafe {
+        unsafe {
             swapchain
                 .swapchain_loader
                 .queue_present(self.queue.present_queue, &present_info)
-        };
-
-        let _is_resized = match result {
-            Ok(_) => false,
-            Err(vk_result) => match vk_result {
-                vk::Result::ERROR_OUT_OF_DATE_KHR | vk::Result::SUBOPTIMAL_KHR => true,
-                _ => panic!("Failed to execute queue present."),
-            },
-        };
+                .expect("Failed to execute queue present.");
+        }
 
         self.queue.current_frame = (self.queue.current_frame + 1) % MAX_FRAMES_IN_FLIGHT;
     }
