@@ -39,11 +39,8 @@ fn main() {
     let frame_buffers = swapchain.create_frame_buffers(&render_pass, &vulkan_base);
 
     //Create pipeline
-    let (pipeline, layout, vertex_descriptor) = pipelines::default::create_pipeline(
-        &swapchain,
-        render_pass,
-        &vulkan_base,
-    );
+    let (pipeline, layout, vertex_descriptor) =
+        pipelines::create_pipeline(&swapchain, render_pass, &vulkan_base);
 
     let mut index_buffer = create_index_buffer(&indices, &vulkan_base);
     let mut vertex_buffer = create_vertex_buffer(&vertices, &vulkan_base, &vertex_descriptor);
@@ -103,7 +100,7 @@ fn main() {
                     device.cmd_bind_pipeline(
                         command_buffer,
                         vk::PipelineBindPoint::GRAPHICS,
-                        pipeline[0],
+                        pipeline,
                     );
                     device.cmd_set_viewport(command_buffer, 0, &viewports);
                     device.cmd_set_scissor(command_buffer, 0, &extent);
@@ -132,7 +129,7 @@ fn main() {
 
             vulkan_base.device.destroy_command_pool(command_pool, None);
             vulkan_base.device.destroy_render_pass(render_pass, None);
-            vulkan_base.device.destroy_pipeline(pipeline[0], None);
+            vulkan_base.device.destroy_pipeline(pipeline, None);
             vulkan_base.device.destroy_pipeline_layout(layout, None);
             vertex_buffer.destroy(&vulkan_base);
             index_buffer.destroy(&vulkan_base);
