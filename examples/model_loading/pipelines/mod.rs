@@ -2,11 +2,17 @@ use vulkan::{
     modules::swapchain::Swapchain,
     offset_of,
     utility::shader::{Shader, VertexDescriptor},
+    DescriptorInfo, VkInstance,
 };
 
+use ash::util::Align;
+use ash::version::DeviceV1_0;
+use ash::vk;
+use cgmath::{Deg, Matrix4, Point3, SquareMatrix, Vector3};
+use std::default::Default;
+use std::ffi::CString;
 use std::mem::{self, align_of};
-
-pub use ash::version::{DeviceV1_0, EntryV1_0, InstanceV1_0};
+use std::ptr;
 
 #[derive(Clone, Debug, Copy)]
 pub struct Vertex {
@@ -14,17 +20,26 @@ pub struct Vertex {
     pub color: [f32; 4],
 }
 
-use ash::vk;
-use std::default::Default;
-use std::ffi::CString;
+#[repr(C)]
+#[derive(Clone, Debug, Copy)]
+pub struct UniformBufferObject {
+    model: Matrix4<f32>,
+    view: Matrix4<f32>,
+    proj: Matrix4<f32>,
+}
 
 //Creates a new pipeline
 
 pub fn create_pipeline(
     swapchain: &Swapchain,
     renderpass: vk::RenderPass,
-    vulkan: &vulkan::VkInstance,
-) -> (vk::Pipeline, vk::PipelineLayout, VertexDescriptor) {
+    vulkan: &VkInstance,
+) -> (
+    vk::Pipeline,
+    vk::PipelineLayout,
+    VertexDescriptor,
+    DescriptorInfo,
+) {
     let vertex_descriptor = VertexDescriptor {
         binding_descriptor: vec![vk::VertexInputBindingDescription {
             binding: 0,
@@ -174,6 +189,52 @@ pub fn create_pipeline(
             )
             .expect("Unable to create graphics pipeline");
 
+        let uniform_descriptor = DescriptorInfo::new(
+            vk::BufferCreateInfo {
+                size: std::mem::size_of::<UniformBufferObject>() as u64,
+                usage: vk::BufferUsageFlags::UNIFORM_BUFFER,
+                sharing_mode: vk::SharingMode::EXCLUSIVE,
+                ..Default::default()
+            },
+            vec![vk::DescriptorSetLayoutBinding {
+                binding: 0,
+                descriptor_type: vk::DescriptorType::UNIFORM_BUFFER,
+                descriptor_count: 1,
+                stage_flags: vk::ShaderStageFlags::VERTEX,
+                p_immutable_samplers: ptr::null(),
+            }],
+            &vulkan,
+        );
+        let uniform_data = create_uniform_buffer(&swapchain);
+        let ubos = [uniform_data];
+
+        let buffer_size = (std::mem::size_of::<UniformBufferObject>() * ubos.len()) as u64;
+
+        //Put data on the uniform descriptor
+
+        // let index_ptr = vulkan
+        //     .device
+        //     .map_memory(
+        //         uniform_descriptor.buffer.memory,
+        //         0,
+        //         uniform_descriptor.buffer.memory_requirements.size,
+        //         vk::MemoryMapFlags::empty(),
+        //     )
+        //     .unwrap();
+        // let mut index_slice = Align::new(index_ptr, align_of::<u32>() as u64, buffer_size);
+
+        // index_slice.copy_from_slice(&ubos);
+
+        // vulkan.device.unmap_memory(uniform_descriptor.buffer.memory);
+        // vulkan
+        //     .device
+        //     .bind_buffer_memory(
+        //         uniform_descriptor.buffer.buffer,
+        //         uniform_descriptor.buffer.memory,
+        //         0,
+        //     )
+        //     .unwrap();
+
         //Destoy shader modules
         vulkan
             .device
@@ -181,6 +242,28 @@ pub fn create_pipeline(
         vulkan
             .device
             .destroy_shader_module(fragment_shader_module, None);
-        (pipeline[0], pipeline_layout, vertex_descriptor)
+        (
+            pipeline[0],
+            pipeline_layout,
+            vertex_descriptor,
+            uniform_descriptor,
+        )
+    }
+}
+
+pub fn create_uniform_buffer(swapchain: &Swapchain) -> UniformBufferObject {
+    UniformBufferObject {
+        model: Matrix4::<f32>::identity(),
+        view: Matrix4::look_at(
+            Point3::new(2.0, 2.0, 2.0),
+            Point3::new(0.0, 0.0, 0.0),
+            Vector3::new(0.0, 0.0, 1.0),
+        ),
+        proj: cgmath::perspective(
+            Deg(45.0),
+            swapchain.extent.width as f32 / swapchain.extent.height as f32,
+            0.1,
+            10.0,
+        ),
     }
 }

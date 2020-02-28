@@ -17,7 +17,7 @@ pub struct VertexDescriptor {
     pub align: u64,
 }
 
-pub fn create_index_buffer(indices: &Vec<u16>, base: &VkInstance) -> Buffer {
+pub fn create_index_buffer(indices: &Vec<u16>, vulkan: &VkInstance) -> Buffer {
     unsafe {
         let indices_slice = &indices[..];
         let index_input_buffer_info = vk::BufferCreateInfo {
@@ -26,9 +26,9 @@ pub fn create_index_buffer(indices: &Vec<u16>, base: &VkInstance) -> Buffer {
             sharing_mode: vk::SharingMode::EXCLUSIVE,
             ..Default::default()
         };
-        let mut buffer = base.create_buffer(index_input_buffer_info);
+        let mut buffer = vulkan.create_buffer(index_input_buffer_info);
 
-        let index_ptr = base
+        let index_ptr = vulkan
             .device
             .map_memory(
                 buffer.memory,
@@ -45,8 +45,8 @@ pub fn create_index_buffer(indices: &Vec<u16>, base: &VkInstance) -> Buffer {
 
         index_slice.copy_from_slice(&indices);
 
-        base.device.unmap_memory(buffer.memory);
-        base.device
+        vulkan.device.unmap_memory(buffer.memory);
+        vulkan.device
             .bind_buffer_memory(buffer.buffer, buffer.memory, 0)
             .unwrap();
         buffer.size = indices.len() as u32;

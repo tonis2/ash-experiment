@@ -32,27 +32,21 @@ fn main() {
 
     let mut vulkan_base = VkInstance::new(&window);
     let command_pool = vulkan_base.create_command_pool();
-
     let swapchain = Swapchain::new(&vulkan_base, 1500, 800);
+
+    let descriptor_pool = vulkan_base.create_descriptor_pool(3);
 
     let render_pass = swapchain.create_render_pass(&vulkan_base.device);
     let frame_buffers = swapchain.create_frame_buffers(&render_pass, &vulkan_base);
 
     //Create pipeline
-    let (pipeline, layout, vertex_descriptor) =
+    let (pipeline, layout, vertex_descriptor, uniform_descriptor) =
         pipelines::create_pipeline(&swapchain, render_pass, &vulkan_base);
 
     let mut index_buffer = create_index_buffer(&indices, &vulkan_base);
     let mut vertex_buffer = create_vertex_buffer(&vertices, &vulkan_base, &vertex_descriptor);
 
-    let viewports = [vk::Viewport {
-        x: 0.0,
-        y: 0.0,
-        width: swapchain.extent.width as f32,
-        height: swapchain.extent.height as f32,
-        min_depth: 0.0,
-        max_depth: 1.0,
-    }];
+    let uniform_descriptor_sets = uniform_descriptor.build(&vulkan_base, &descriptor_pool, 1);
 
     let command_buffers =
         vulkan_base.create_command_buffers(command_pool, swapchain.image_views.len());
@@ -89,6 +83,15 @@ fn main() {
                 },
             }];
 
+            let viewports = [vk::Viewport {
+                x: 0.0,
+                y: 0.0,
+                width: swapchain.extent.width as f32,
+                height: swapchain.extent.height as f32,
+                min_depth: 0.0,
+                max_depth: 1.0,
+            }];
+
             let frame = vulkan_base.build_frame(
                 &command_buffers,
                 &frame_buffers,
@@ -115,6 +118,14 @@ fn main() {
                         index_buffer.buffer,
                         0,
                         vk::IndexType::UINT32,
+                    );
+                    device.cmd_bind_descriptor_sets(
+                        command_buffer,
+                        vk::PipelineBindPoint::GRAPHICS,
+                        layout,
+                        0,
+                        &uniform_descriptor_sets,
+                        &[],
                     );
                     device.cmd_draw_indexed(command_buffer, index_buffer.size, 1, 0, 0, 1);
                 },

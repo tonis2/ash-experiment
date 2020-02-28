@@ -1,4 +1,5 @@
 pub mod shader;
+pub mod descriptors;
 
 use ash::vk;
 

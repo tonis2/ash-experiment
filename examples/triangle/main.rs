@@ -45,15 +45,6 @@ fn main() {
     let mut index_buffer = create_index_buffer(&indices, &vulkan_base);
     let mut vertex_buffer = create_vertex_buffer(&vertices, &vulkan_base, &vertex_descriptor);
 
-    let viewports = [vk::Viewport {
-        x: 0.0,
-        y: 0.0,
-        width: swapchain.extent.width as f32,
-        height: swapchain.extent.height as f32,
-        min_depth: 0.0,
-        max_depth: 1.0,
-    }];
-
     let command_buffers =
         vulkan_base.create_command_buffers(command_pool, swapchain.image_views.len());
 
@@ -87,6 +78,15 @@ fn main() {
                 color: vk::ClearColorValue {
                     float32: [0.0, 0.0, 0.0, 1.0],
                 },
+            }];
+
+            let viewports = [vk::Viewport {
+                x: 0.0,
+                y: 0.0,
+                width: swapchain.extent.width as f32,
+                height: swapchain.extent.height as f32,
+                min_depth: 0.0,
+                max_depth: 1.0,
             }];
 
             let frame = vulkan_base.build_frame(

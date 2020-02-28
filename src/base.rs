@@ -200,31 +200,6 @@ impl VkInstance {
         }
     }
 
-    pub fn create_descriptor_pool(
-        device: &ash::Device,
-        amount: usize,
-    ) -> vk::DescriptorPool {
-        let pool_sizes = [vk::DescriptorPoolSize {
-            ty: vk::DescriptorType::UNIFORM_BUFFER,
-            descriptor_count: amount as u32,
-        }];
-
-        let descriptor_pool_create_info = vk::DescriptorPoolCreateInfo {
-            s_type: vk::StructureType::DESCRIPTOR_POOL_CREATE_INFO,
-            p_next: ptr::null(),
-            flags: vk::DescriptorPoolCreateFlags::empty(),
-            max_sets: amount as u32,
-            pool_size_count: pool_sizes.len() as u32,
-            p_pool_sizes: pool_sizes.as_ptr(),
-        };
-
-        unsafe {
-            device
-                .create_descriptor_pool(&descriptor_pool_create_info, None)
-                .expect("Failed to create Descriptor Pool!")
-        }
-    }
-
     pub fn render_frame(&mut self, frame: Frame, swapchain: &Swapchain) {
         unsafe {
             self.device
@@ -259,31 +234,51 @@ impl VkInstance {
         self.queue.current_frame = (self.queue.current_frame + 1) % MAX_FRAMES_IN_FLIGHT;
     }
 
-    pub fn create_descriptor_set_layout(
-        &self,
-        bindings: Vec<vk::DescriptorSetLayoutBinding>,
-    ) -> vk::DescriptorSetLayout {
-        let ubo_layout_create_info = vk::DescriptorSetLayoutCreateInfo {
-            s_type: vk::StructureType::DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
+    pub fn update_buffer(&self, from_buffer: Buffer, to_buffer: Buffer) {
+        // unsafe {
+        //     let data_ptr =
+        //         self.device
+        //             .map_memory(
+        //                 from_buffer.memory,
+        //                 0,
+        //                 from_buffer.size as u64,
+        //                 vk::MemoryMapFlags::empty(),
+        //             )
+        //             .expect("Failed to Map Memory");
+
+        //     data_ptr.copy_from_nonoverlapping(ubos.as_ptr(), ubos.len());
+
+        //     self.device
+        //         .unmap_memory(self.uniform_buffers_memory[current_image]);
+        // }
+    }
+
+    pub fn create_descriptor_pool(&self, amount: usize) -> vk::DescriptorPool {
+        let pool_sizes = [vk::DescriptorPoolSize {
+            ty: vk::DescriptorType::UNIFORM_BUFFER,
+            descriptor_count: amount as u32,
+        }];
+
+        let descriptor_pool_create_info = vk::DescriptorPoolCreateInfo {
+            s_type: vk::StructureType::DESCRIPTOR_POOL_CREATE_INFO,
             p_next: ptr::null(),
-            flags: vk::DescriptorSetLayoutCreateFlags::empty(),
-            binding_count: bindings.len() as u32,
-            p_bindings: bindings.as_ptr(),
+            flags: vk::DescriptorPoolCreateFlags::empty(),
+            max_sets: amount as u32,
+            pool_size_count: pool_sizes.len() as u32,
+            p_pool_sizes: pool_sizes.as_ptr(),
         };
 
         unsafe {
             self.device
-                .create_descriptor_set_layout(&ubo_layout_create_info, None)
-                .expect("Failed to create Descriptor Set Layout!")
+                .create_descriptor_pool(&descriptor_pool_create_info, None)
+                .expect("Failed to create Descriptor Pool!")
         }
     }
 
     pub fn create_buffer(&self, info: vk::BufferCreateInfo) -> Buffer {
         unsafe {
             let buffer = self.device.create_buffer(&info, None).unwrap();
-
             let memory_requirements = self.device.get_buffer_memory_requirements(buffer);
-
             let memory_index = find_memorytype_index(
                 &memory_requirements,
                 &self.get_physical_device_memory_properties(),
@@ -303,10 +298,10 @@ impl VkInstance {
                 .unwrap();
 
             Buffer {
-                size:0,
+                size: 0,
                 buffer,
                 memory: device_memory,
-                memory_requirements
+                memory_requirements,
             }
         }
     }
