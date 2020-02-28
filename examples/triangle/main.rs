@@ -1,16 +1,10 @@
 mod pipelines;
 use ash::{version::DeviceV1_0, vk};
-use std::mem::{self, align_of};
 use vulkan::*;
 
+use pipelines::Vertex;
 use winit::event::{ElementState, Event, KeyboardInput, VirtualKeyCode, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop};
-
-#[derive(Clone, Debug, Copy)]
-pub struct Vertex {
-    pub pos: [f32; 2],
-    pub color: [f32; 4],
-}
 
 fn main() {
     let vertices = vec![
@@ -41,38 +35,13 @@ fn main() {
 
     let swapchain = Swapchain::new(&vulkan_base, 1500, 800);
 
-    let vertex_descriptor = VertexDescriptor {
-        binding_descriptor: vec![vk::VertexInputBindingDescription {
-            binding: 0,
-            stride: mem::size_of::<Vertex>() as u32,
-            input_rate: vk::VertexInputRate::VERTEX,
-        }],
-        attribute_descriptor: vec![
-            vk::VertexInputAttributeDescription {
-                location: 0,
-                binding: 0,
-                format: vk::Format::R32G32B32A32_SFLOAT,
-                offset: offset_of!(Vertex, pos) as u32,
-            },
-            vk::VertexInputAttributeDescription {
-                location: 1,
-                binding: 0,
-                format: vk::Format::R32G32B32A32_SFLOAT,
-                offset: offset_of!(Vertex, color) as u32,
-            },
-        ],
-        size: 3 * std::mem::size_of::<Vertex>() as u64,
-        align: align_of::<Vertex>() as u64,
-    };
-
     let render_pass = swapchain.create_render_pass(&vulkan_base.device);
     let frame_buffers = swapchain.create_frame_buffers(&render_pass, &vulkan_base);
 
     //Create pipeline
-    let (pipeline, layout) = pipelines::default::create_pipeline(
+    let (pipeline, layout, vertex_descriptor) = pipelines::default::create_pipeline(
         &swapchain,
         render_pass,
-        &vertex_descriptor,
         &vulkan_base,
     );
 

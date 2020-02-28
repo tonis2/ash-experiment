@@ -1,9 +1,14 @@
 use vulkan::{
     modules::swapchain::Swapchain,
     utility::shader::{Shader, VertexDescriptor},
+    offset_of
 };
 
+use std::mem::{self, align_of};
+
 pub use ash::version::{DeviceV1_0, EntryV1_0, InstanceV1_0};
+
+use super::Vertex;
 
 use ash::vk;
 use std::default::Default;
@@ -14,11 +19,36 @@ use std::ffi::CString;
 pub fn create_pipeline(
     swapchain: &Swapchain,
     renderpass: vk::RenderPass,
-    vertex_descriptor: &VertexDescriptor,
     vulkan: &vulkan::VkInstance,
-) -> (Vec<vk::Pipeline>, vk::PipelineLayout) {
+) -> (Vec<vk::Pipeline>, vk::PipelineLayout, VertexDescriptor) {
+
+    let vertex_descriptor = VertexDescriptor {
+        binding_descriptor: vec![vk::VertexInputBindingDescription {
+            binding: 0,
+            stride: mem::size_of::<Vertex>() as u32,
+            input_rate: vk::VertexInputRate::VERTEX,
+        }],
+        attribute_descriptor: vec![
+            vk::VertexInputAttributeDescription {
+                location: 0,
+                binding: 0,
+                format: vk::Format::R32G32B32A32_SFLOAT,
+                offset: offset_of!(Vertex, pos) as u32,
+            },
+            vk::VertexInputAttributeDescription {
+                location: 1,
+                binding: 0,
+                format: vk::Format::R32G32B32A32_SFLOAT,
+                offset: offset_of!(Vertex, color) as u32,
+            },
+        ],
+        size: 3 * std::mem::size_of::<Vertex>() as u64,
+        align: align_of::<Vertex>() as u64,
+    };
+
     let descriptor_len = vertex_descriptor.attribute_descriptor.len() as u32;
     let binding_len = vertex_descriptor.binding_descriptor.len() as u32;
+
     unsafe {
         let vertex_input_state_info = vk::PipelineVertexInputStateCreateInfo {
             vertex_attribute_description_count: descriptor_len,
@@ -148,6 +178,6 @@ pub fn create_pipeline(
         vulkan
             .device
             .destroy_shader_module(fragment_shader_module, None);
-        (pipeline, pipeline_layout)
+        (pipeline, pipeline_layout, vertex_descriptor)
     }
 }
