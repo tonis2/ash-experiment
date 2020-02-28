@@ -13,6 +13,7 @@ use ash::{
 };
 
 use crate::definitions::MAX_FRAMES_IN_FLIGHT;
+use crate::utility::{find_memorytype_index, Buffer};
 
 use std::ptr;
 use winit::window::Window;
@@ -231,6 +232,58 @@ impl VkInstance {
         }
 
         self.queue.current_frame = (self.queue.current_frame + 1) % MAX_FRAMES_IN_FLIGHT;
+    }
+
+    pub fn create_descriptor_set_layout(
+        &self,
+        bindings: Vec<vk::DescriptorSetLayoutBinding>,
+    ) -> vk::DescriptorSetLayout {
+        let ubo_layout_create_info = vk::DescriptorSetLayoutCreateInfo {
+            s_type: vk::StructureType::DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
+            p_next: ptr::null(),
+            flags: vk::DescriptorSetLayoutCreateFlags::empty(),
+            binding_count: bindings.len() as u32,
+            p_bindings: bindings.as_ptr(),
+        };
+
+        unsafe {
+            self.device
+                .create_descriptor_set_layout(&ubo_layout_create_info, None)
+                .expect("Failed to create Descriptor Set Layout!")
+        }
+    }
+
+    pub fn create_buffer(&self, info: vk::BufferCreateInfo) -> Buffer {
+        unsafe {
+            let buffer = self.device.create_buffer(&info, None).unwrap();
+
+            let memory_requirements = self.device.get_buffer_memory_requirements(buffer);
+
+            let memory_index = find_memorytype_index(
+                &memory_requirements,
+                &self.get_physical_device_memory_properties(),
+                vk::MemoryPropertyFlags::HOST_VISIBLE | vk::MemoryPropertyFlags::HOST_COHERENT,
+            )
+            .expect("Unable to find suitable memorytype for the index buffer.");
+
+            let buffer_memory_allocate = vk::MemoryAllocateInfo {
+                allocation_size: memory_requirements.size,
+                memory_type_index: memory_index,
+                ..Default::default()
+            };
+
+            let device_memory = self
+                .device
+                .allocate_memory(&buffer_memory_allocate, None)
+                .unwrap();
+
+            Buffer {
+                size:0,
+                buffer,
+                memory: device_memory,
+                memory_requirements
+            }
+        }
     }
 
     pub fn begin_single_time_command(
