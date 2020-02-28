@@ -1,4 +1,4 @@
 # ash-experiment
 
 
-To run example use `cargo run --example basic`
+To run example use `cargo run --example triangle`
