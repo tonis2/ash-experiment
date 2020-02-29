@@ -1,101 +1,14 @@
 use ash::{
     extensions::khr::{Surface, Swapchain},
-    version::{DeviceV1_0, InstanceV1_0},
+    version::{InstanceV1_0},
     vk, Device, Instance,
 };
 
-use crate::definitions::MAX_FRAMES_IN_FLIGHT;
-use std::collections::HashSet;
 
+use std::collections::HashSet;
+use crate::modules::queue::{Queue,QueueFamilyIndices};
 use std::ptr;
 
-pub struct QueueFamilyIndices {
-    pub graphics_family: Option<u32>,
-    pub present_family: Option<u32>,
-}
-
-impl QueueFamilyIndices {
-    pub fn new() -> QueueFamilyIndices {
-        QueueFamilyIndices {
-            graphics_family: None,
-            present_family: None,
-        }
-    }
-
-    pub fn is_complete(&self) -> bool {
-        self.graphics_family.is_some() && self.present_family.is_some()
-    }
-}
-pub struct Queue {
-    pub graphics_queue: vk::Queue,
-    pub present_queue: vk::Queue,
-    pub queue_family_indices: QueueFamilyIndices,
-    pub image_available_semaphores: Vec<vk::Semaphore>,
-    pub render_finished_semaphores: Vec<vk::Semaphore>,
-    pub inflight_fences: Vec<vk::Fence>,
-    pub current_frame: usize,
-}
-
-impl Queue {
-    pub fn new<D: DeviceV1_0>(device: &D, queue_family_indices: QueueFamilyIndices) -> Self {
-        let semaphore_create_info = vk::SemaphoreCreateInfo {
-            s_type: vk::StructureType::SEMAPHORE_CREATE_INFO,
-            p_next: ptr::null(),
-            flags: vk::SemaphoreCreateFlags::empty(),
-        };
-
-        let fence_create_info = vk::FenceCreateInfo {
-            s_type: vk::StructureType::FENCE_CREATE_INFO,
-            p_next: ptr::null(),
-            flags: vk::FenceCreateFlags::SIGNALED,
-        };
-
-        let mut image_available_semaphores = vec![];
-        let mut render_finished_semaphores = vec![];
-        let mut inflight_fences = vec![];
-
-        for _ in 0..MAX_FRAMES_IN_FLIGHT {
-            unsafe {
-                let image_available_semaphore = device
-                    .create_semaphore(&semaphore_create_info, None)
-                    .expect("Failed to create Semaphore Object!");
-                let render_finished_semaphore = device
-                    .create_semaphore(&semaphore_create_info, None)
-                    .expect("Failed to create Semaphore Object!");
-                let inflight_fence = device
-                    .create_fence(&fence_create_info, None)
-                    .expect("Failed to create Fence Object!");
-
-                image_available_semaphores.push(image_available_semaphore);
-                render_finished_semaphores.push(render_finished_semaphore);
-                inflight_fences.push(inflight_fence);
-            }
-        }
-        unsafe {
-            Self {
-                graphics_queue: device
-                    .get_device_queue(queue_family_indices.graphics_family.unwrap(), 0),
-                present_queue: device
-                    .get_device_queue(queue_family_indices.present_family.unwrap(), 0),
-                queue_family_indices,
-                image_available_semaphores,
-                render_finished_semaphores,
-                inflight_fences,
-                current_frame: 0,
-            }
-        }
-    }
-
-    pub fn destroy(&self, device: &ash::Device) {
-        unsafe {
-            for i in 0..MAX_FRAMES_IN_FLIGHT {
-                device.destroy_semaphore(self.image_available_semaphores[i], None);
-                device.destroy_semaphore(self.render_finished_semaphores[i], None);
-                device.destroy_fence(self.inflight_fences[i], None);
-            }
-        }
-    }
-}
 
 pub fn create_device(
     queue_family: QueueFamilyIndices,

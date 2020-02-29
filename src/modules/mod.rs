@@ -2,7 +2,7 @@ pub mod debug;
 pub mod device;
 pub mod surface;
 pub mod swapchain;
-pub mod frame;
+pub mod queue;
 
 use crate::modules::surface::extension_names;
 use ash::version::EntryV1_0;
