@@ -3,34 +3,28 @@ use ash::{version::DeviceV1_0, vk};
 use std::ptr;
 
 pub struct DescriptorInfo {
-    pub create_info: vk::BufferCreateInfo,
-    pub bindings: Vec<vk::DescriptorSetLayoutBinding>,
-    pub descriptor_layouts: Vec<vk::DescriptorSetLayout>,
-    pub descriptor_info: Vec<vk::DescriptorBufferInfo>,
+    pub layouts: Vec<vk::DescriptorSetLayout>,
+    pub buffer_info: Vec<vk::DescriptorBufferInfo>,
     pub buffer: Buffer,
 }
 
 impl DescriptorInfo {
     pub fn new(
-        create_info: vk::BufferCreateInfo,
         bindings: Vec<vk::DescriptorSetLayoutBinding>,
+        buffer: Buffer,
         vulkan: &VkInstance,
     ) -> DescriptorInfo {
-        let descriptor_buffer = vulkan.create_buffer(create_info);
         let descriptor_layouts = Self::create_descriptor_set_layout(&vulkan, bindings.clone());
-
-        let descriptor_info = vec![vk::DescriptorBufferInfo {
-            buffer: descriptor_buffer.buffer,
+        let buffer_info = vec![vk::DescriptorBufferInfo {
+            buffer: buffer.buffer,
             offset: 0,
-            range: create_info.size,
+            range: buffer.size as u64,
         }];
 
         DescriptorInfo {
-            create_info,
-            bindings,
-            descriptor_layouts,
-            descriptor_info,
-            buffer: descriptor_buffer,
+            layouts: descriptor_layouts,
+            buffer_info,
+            buffer,
         }
     }
 
@@ -40,10 +34,10 @@ impl DescriptorInfo {
     ) -> Vec<vk::DescriptorSetLayout> {
         let ubo_layout_create_info = vk::DescriptorSetLayoutCreateInfo {
             s_type: vk::StructureType::DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
-            p_next: ptr::null(),
             flags: vk::DescriptorSetLayoutCreateFlags::empty(),
             binding_count: bindings.len() as u32,
             p_bindings: bindings.as_ptr(),
+            ..Default::default()
         };
 
         unsafe {
@@ -61,10 +55,10 @@ impl DescriptorInfo {
     ) -> Vec<vk::DescriptorSet> {
         let descriptor_set_allocate_info = vk::DescriptorSetAllocateInfo {
             s_type: vk::StructureType::DESCRIPTOR_SET_ALLOCATE_INFO,
-            p_next: ptr::null(),
             descriptor_pool: *descriptor_pool,
             descriptor_set_count: amount as u32,
-            p_set_layouts: self.descriptor_layouts.as_ptr(),
+            p_set_layouts: self.layouts.as_ptr(),
+            ..Default::default()
         };
 
         let descriptor_sets = unsafe {
@@ -76,15 +70,13 @@ impl DescriptorInfo {
 
         let descriptor_write_sets = [vk::WriteDescriptorSet {
             s_type: vk::StructureType::WRITE_DESCRIPTOR_SET,
-            p_next: ptr::null(),
             dst_set: descriptor_sets[0],
             dst_binding: 0,
-            dst_array_element: 0,
             descriptor_count: 1,
             descriptor_type: vk::DescriptorType::UNIFORM_BUFFER,
             p_image_info: ptr::null(),
-            p_buffer_info: self.descriptor_info.as_ptr(),
-            p_texel_buffer_view: ptr::null(),
+            p_buffer_info: self.buffer_info.as_ptr(),
+            ..Default::default()
         }];
 
         unsafe {

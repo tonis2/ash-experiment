@@ -139,13 +139,6 @@ pub fn create_pipeline(
         let dynamic_state_info =
             vk::PipelineDynamicStateCreateInfo::builder().dynamic_states(&dynamic_state);
 
-        let layout_create_info = vk::PipelineLayoutCreateInfo::default();
-
-        let pipeline_layout = vulkan
-            .device
-            .create_pipeline_layout(&layout_create_info, None)
-            .unwrap();
-
         let (vertex_shader_module, fragment_shader_module) = Shader {
             vertex_shader: "examples/triangle/shaders/spv/triangle.vert.spv",
             fragment_shader: "examples/triangle/shaders/spv/triangle.frag.spv",
@@ -168,6 +161,62 @@ pub fn create_pipeline(
                 ..Default::default()
             },
         ];
+
+        let uniform_data = create_uniform_data(&swapchain);
+
+        let buffer_create_info = vk::BufferCreateInfo {
+            size: std::mem::size_of_val(&uniform_data) as u64,
+            usage: vk::BufferUsageFlags::UNIFORM_BUFFER,
+            sharing_mode: vk::SharingMode::EXCLUSIVE,
+            ..Default::default()
+        };
+
+        let mut uniform_buffer = vulkan.create_buffer(buffer_create_info);
+
+        let uniform_ptr = vulkan
+            .device
+            .map_memory(
+                uniform_buffer.memory,
+                0,
+                uniform_buffer.memory_requirements.size,
+                vk::MemoryMapFlags::empty(),
+            )
+            .unwrap();
+
+        let mut uniform_aligned_slice = Align::new(
+            uniform_ptr,
+            align_of::<UniformBufferObject>() as u64,
+            uniform_buffer.memory_requirements.size,
+        );
+        uniform_aligned_slice.copy_from_slice(&[uniform_data]);
+        vulkan.device.unmap_memory(uniform_buffer.memory);
+        vulkan
+            .device
+            .bind_buffer_memory(uniform_buffer.buffer, uniform_buffer.memory, 0)
+            .unwrap();
+
+        uniform_buffer.size = buffer_create_info.size as u32;
+
+        let uniform_descriptor = DescriptorInfo::new(
+            vec![vk::DescriptorSetLayoutBinding {
+                binding: 0,
+                descriptor_type: vk::DescriptorType::UNIFORM_BUFFER,
+                descriptor_count: 1,
+                stage_flags: vk::ShaderStageFlags::VERTEX,
+                p_immutable_samplers: ptr::null(),
+            }],
+            uniform_buffer,
+            &vulkan,
+        );
+
+        let layout_create_info =
+            vk::PipelineLayoutCreateInfo::builder().set_layouts(&uniform_descriptor.layouts);
+
+        let pipeline_layout = vulkan
+            .device
+            .create_pipeline_layout(&layout_create_info, None)
+            .unwrap();
+            
         let graphic_pipeline_info = vk::GraphicsPipelineCreateInfo::builder()
             .stages(shaders)
             .vertex_input_state(&vertex_input_state_info)
@@ -180,6 +229,7 @@ pub fn create_pipeline(
             .dynamic_state(&dynamic_state_info)
             .layout(pipeline_layout)
             .render_pass(renderpass);
+
         let pipeline = vulkan
             .device
             .create_graphics_pipelines(
@@ -188,52 +238,6 @@ pub fn create_pipeline(
                 None,
             )
             .expect("Unable to create graphics pipeline");
-
-        let uniform_descriptor = DescriptorInfo::new(
-            vk::BufferCreateInfo {
-                size: std::mem::size_of::<UniformBufferObject>() as u64,
-                usage: vk::BufferUsageFlags::UNIFORM_BUFFER,
-                sharing_mode: vk::SharingMode::EXCLUSIVE,
-                ..Default::default()
-            },
-            vec![vk::DescriptorSetLayoutBinding {
-                binding: 0,
-                descriptor_type: vk::DescriptorType::UNIFORM_BUFFER,
-                descriptor_count: 1,
-                stage_flags: vk::ShaderStageFlags::VERTEX,
-                p_immutable_samplers: ptr::null(),
-            }],
-            &vulkan,
-        );
-        let uniform_data = create_uniform_buffer(&swapchain);
-        let ubos = [uniform_data];
-
-        let buffer_size = (std::mem::size_of::<UniformBufferObject>() * ubos.len()) as u64;
-
-        //Put data on the uniform descriptor
-
-        // let index_ptr = vulkan
-        //     .device
-        //     .map_memory(
-        //         uniform_descriptor.buffer.memory,
-        //         0,
-        //         uniform_descriptor.buffer.memory_requirements.size,
-        //         vk::MemoryMapFlags::empty(),
-        //     )
-        //     .unwrap();
-        // let mut index_slice = Align::new(index_ptr, align_of::<u32>() as u64, buffer_size);
-
-        // index_slice.copy_from_slice(&ubos);
-
-        // vulkan.device.unmap_memory(uniform_descriptor.buffer.memory);
-        // vulkan
-        //     .device
-        //     .bind_buffer_memory(
-        //         uniform_descriptor.buffer.buffer,
-        //         uniform_descriptor.buffer.memory,
-        //         0,
-        //     )
-        //     .unwrap();
 
         //Destoy shader modules
         vulkan
@@ -251,7 +255,7 @@ pub fn create_pipeline(
     }
 }
 
-pub fn create_uniform_buffer(swapchain: &Swapchain) -> UniformBufferObject {
+pub fn create_uniform_data(swapchain: &Swapchain) -> UniformBufferObject {
     UniformBufferObject {
         model: Matrix4::<f32>::identity(),
         view: Matrix4::look_at(
