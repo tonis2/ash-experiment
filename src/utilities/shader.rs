@@ -6,7 +6,7 @@ use std::mem::align_of;
 use ash::util::*;
 use ash::vk;
 
-use crate::utility::Buffer;
+use crate::utilities::buffer::Buffer;
 use crate::VkInstance;
 use ash::version::DeviceV1_0;
 

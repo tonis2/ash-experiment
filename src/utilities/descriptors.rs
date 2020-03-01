@@ -1,4 +1,5 @@
-use crate::{Buffer, VkInstance};
+use super::{buffer::Buffer};
+use crate::VkInstance;
 use ash::{version::DeviceV1_0, vk};
 use std::ptr;
 

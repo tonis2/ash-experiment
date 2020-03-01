@@ -1,61 +1,60 @@
-use crate::modules::{
-    debug::create_debugger,
-    device,
-    queue::Queue,
-    surface,
-    swapchain::Swapchain,
-};
-
 use ash::{
-    extensions::khr::Surface,
-    version::{DeviceV1_0, InstanceV1_0},
+    version::{DeviceV1_0, EntryV1_0, InstanceV1_0},
     vk, Device, Entry, Instance,
 };
 
-use crate::definitions::MAX_FRAMES_IN_FLIGHT;
-use crate::utility::{find_memorytype_index, Buffer};
-
+use std::ffi::CString;
 use std::ptr;
 use winit::window::Window;
 
-#[allow(dead_code)]
+use super::{
+    debug::create_debugger,
+    device,
+    queue::{Frame, Queue},
+    surface::VkSurface,
+    swapchain::Swapchain,
+};
+use crate::constants::*;
+use crate::utilities::{buffer::Buffer, platform::extension_names, tools::find_memorytype_index};
+
 pub struct VkInstance {
-    entry: Entry,
-    debugger: vk::DebugReportCallbackEXT,
+    _entry: Entry,
+    _debugger: vk::DebugReportCallbackEXT,
     pub instance: Instance,
-    pub surface: Surface,
-    pub surface_khr: vk::SurfaceKHR,
+    pub surface: VkSurface,
     pub physical_device: vk::PhysicalDevice,
     pub device: Device,
     pub queue: Queue,
 }
 
 impl VkInstance {
-    pub fn new(window: &Window) -> Self {
+    pub fn new(window: &Window) -> VkInstance {
         unsafe {
-            let (entry, instance) = crate::modules::create_entry();
+            let (entry, instance) = create_entry();
             let debugger = create_debugger(&entry, &instance);
-            let surface = Surface::new(&entry, &instance);
-            let surface_khr = surface::create_surface(&entry, &instance, &window).unwrap();
+            let surface = VkSurface::new(&window, &instance, &entry);
+            let physical_device =
+                device::pick_physical_device(&instance, &surface, &DEVICE_EXTENSIONS);
+            let (device, queue) = device::create_logical_device(
+                &instance,
+                physical_device,
+                &VALIDATION,
+                &DEVICE_EXTENSIONS,
+                &surface,
+            );
 
-            let (pdevice, queue_family) =
-                device::create_physical_device(&instance, &surface, surface_khr);
-            let (device, queue) = device::create_device(queue_family, &instance, pdevice);
-
-            Self {
-                entry,
-                debugger,
+            VkInstance {
+                _entry: entry,
                 instance,
+                _debugger: debugger,
                 surface,
-                surface_khr,
-                physical_device: pdevice,
+                physical_device,
                 device,
                 queue,
             }
         }
     }
 }
-
 impl VkInstance {
     pub fn get_physical_device_memory_properties(&self) -> vk::PhysicalDeviceMemoryProperties {
         unsafe {
@@ -104,6 +103,7 @@ impl VkInstance {
 
     pub fn build_frame<F: Fn(vk::CommandBuffer, &ash::Device)>(
         &self,
+        frame: &Frame,
         command_buffers: &Vec<vk::CommandBuffer>,
         frame_buffers: &Vec<vk::Framebuffer>,
         renderpass: &vk::RenderPass,
@@ -118,45 +118,46 @@ impl VkInstance {
             flags: vk::CommandBufferUsageFlags::SIMULTANEOUS_USE,
         };
         unsafe {
-            for (i, &command_buffer) in command_buffers.iter().enumerate() {
-                self.device
-                    .begin_command_buffer(command_buffer, &command_buffer_begin_info)
-                    .expect("Failed to begin recording Command Buffer at beginning!");
+            self.device
+                .begin_command_buffer(
+                    command_buffers[frame.image_index],
+                    &command_buffer_begin_info,
+                )
+                .expect("Failed to begin recording Command Buffer at beginning!");
 
-                let render_pass_begin_info = vk::RenderPassBeginInfo {
-                    s_type: vk::StructureType::RENDER_PASS_BEGIN_INFO,
-                    p_next: ptr::null(),
-                    render_pass: *renderpass,
-                    framebuffer: frame_buffers[i as usize],
-                    render_area: render_area,
-                    clear_value_count: clear_values.len() as u32,
-                    p_clear_values: clear_values.as_ptr(),
-                };
+            let render_pass_begin_info = vk::RenderPassBeginInfo {
+                s_type: vk::StructureType::RENDER_PASS_BEGIN_INFO,
+                p_next: ptr::null(),
+                render_pass: *renderpass,
+                framebuffer: frame_buffers[frame.image_index],
+                render_area: render_area,
+                clear_value_count: clear_values.len() as u32,
+                p_clear_values: clear_values.as_ptr(),
+            };
 
-                self.device.cmd_begin_render_pass(
-                    command_buffer,
-                    &render_pass_begin_info,
-                    vk::SubpassContents::INLINE,
-                );
+            self.device.cmd_begin_render_pass(
+                command_buffers[frame.image_index],
+                &render_pass_begin_info,
+                vk::SubpassContents::INLINE,
+            );
 
-                apply(command_buffer, &self.device);
+            apply(command_buffers[frame.image_index], &self.device);
 
-                self.device.cmd_end_render_pass(command_buffer);
+            self.device
+                .cmd_end_render_pass(command_buffers[frame.image_index]);
 
-                self.device
-                    .end_command_buffer(command_buffer)
-                    .expect("Failed to record Command Buffer at Ending!");
-            }
+            self.device
+                .end_command_buffer(command_buffers[frame.image_index])
+                .expect("Failed to record Command Buffer at Ending!");
         }
     }
 
     pub fn render_frame(
         &mut self,
+        frame: Frame,
         swapchain: &Swapchain,
         command_buffers: &Vec<vk::CommandBuffer>,
     ) {
-        let frame = self.queue.next_frame(self, &swapchain);
-        
         let submit_infos = vec![vk::SubmitInfo {
             s_type: vk::StructureType::SUBMIT_INFO,
             p_next: ptr::null(),
@@ -183,7 +184,7 @@ impl VkInstance {
         }
 
         let swapchains = [swapchain.swapchain];
-
+        let image_index = frame.image_index as u32;
         let present_info = vk::PresentInfoKHR {
             s_type: vk::StructureType::PRESENT_INFO_KHR,
             p_next: ptr::null(),
@@ -191,7 +192,7 @@ impl VkInstance {
             p_wait_semaphores: frame.signal_semaphores.as_ptr(),
             swapchain_count: 1,
             p_swapchains: swapchains.as_ptr(),
-            p_image_indices: &frame.image_index,
+            p_image_indices: &image_index,
             p_results: ptr::null_mut(),
         };
 
@@ -257,14 +258,130 @@ impl VkInstance {
             }
         }
     }
+
+    pub fn copy_buffer(
+        device: &ash::Device,
+        submit_queue: vk::Queue,
+        command_pool: vk::CommandPool,
+        src_buffer: vk::Buffer,
+        dst_buffer: vk::Buffer,
+        size: vk::DeviceSize,
+    ) {
+        let command_buffer = Self::begin_single_time_command(device, command_pool);
+
+        let copy_regions = [vk::BufferCopy {
+            src_offset: 0,
+            dst_offset: 0,
+            size,
+        }];
+
+        unsafe {
+            device.cmd_copy_buffer(command_buffer, src_buffer, dst_buffer, &copy_regions);
+        }
+
+        Self::end_single_time_command(device, command_pool, submit_queue, command_buffer);
+    }
+
+    pub fn begin_single_time_command(
+        device: &ash::Device,
+        command_pool: vk::CommandPool,
+    ) -> vk::CommandBuffer {
+        let command_buffer_allocate_info = vk::CommandBufferAllocateInfo {
+            s_type: vk::StructureType::COMMAND_BUFFER_ALLOCATE_INFO,
+            p_next: ptr::null(),
+            command_buffer_count: 1,
+            command_pool,
+            level: vk::CommandBufferLevel::PRIMARY,
+        };
+
+        let command_buffer = unsafe {
+            device
+                .allocate_command_buffers(&command_buffer_allocate_info)
+                .expect("Failed to allocate Command Buffers!")
+        }[0];
+
+        let command_buffer_begin_info = vk::CommandBufferBeginInfo {
+            s_type: vk::StructureType::COMMAND_BUFFER_BEGIN_INFO,
+            p_next: ptr::null(),
+            p_inheritance_info: ptr::null(),
+            flags: vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT,
+        };
+
+        unsafe {
+            device
+                .begin_command_buffer(command_buffer, &command_buffer_begin_info)
+                .expect("Failed to begin recording Command Buffer at beginning!");
+        }
+
+        command_buffer
+    }
+
+    pub fn end_single_time_command(
+        device: &ash::Device,
+        command_pool: vk::CommandPool,
+        submit_queue: vk::Queue,
+        command_buffer: vk::CommandBuffer,
+    ) {
+        unsafe {
+            device
+                .end_command_buffer(command_buffer)
+                .expect("Failed to record Command Buffer at Ending!");
+        }
+
+        let buffers_to_submit = [command_buffer];
+
+        let sumbit_infos = [vk::SubmitInfo {
+            s_type: vk::StructureType::SUBMIT_INFO,
+            p_next: ptr::null(),
+            wait_semaphore_count: 0,
+            p_wait_semaphores: ptr::null(),
+            p_wait_dst_stage_mask: ptr::null(),
+            command_buffer_count: 1,
+            p_command_buffers: buffers_to_submit.as_ptr(),
+            signal_semaphore_count: 0,
+            p_signal_semaphores: ptr::null(),
+        }];
+
+        unsafe {
+            device
+                .queue_submit(submit_queue, &sumbit_infos, vk::Fence::null())
+                .expect("Failed to Queue Submit!");
+            device
+                .queue_wait_idle(submit_queue)
+                .expect("Failed to wait Queue idle!");
+            device.free_command_buffers(command_pool, &buffers_to_submit);
+        }
+    }
 }
 
-impl Drop for VkInstance {
-    fn drop(&mut self) {
-        unsafe {
-            self.device.device_wait_idle().unwrap();
-            self.queue.destroy(&self.device);
-            self.device.destroy_device(None);
-        }
+pub fn create_entry() -> (Entry, Instance) {
+    let entry = Entry::new().unwrap();
+    let app_name = CString::new(APP_NAME).unwrap();
+
+    let layer_names = [CString::new("VK_LAYER_LUNARG_standard_validation").unwrap()];
+    let layers_names_raw: Vec<*const i8> = layer_names
+        .iter()
+        .map(|raw_name| raw_name.as_ptr())
+        .collect();
+
+    let extension_names_raw = extension_names();
+
+    let appinfo = vk::ApplicationInfo::builder()
+        .application_name(&app_name)
+        .application_version(API_VERSION)
+        .engine_name(&app_name)
+        .engine_version(ENGINE_VERSION)
+        .api_version(APPLICATION_VERSION);
+
+    let create_info = vk::InstanceCreateInfo::builder()
+        .application_info(&appinfo)
+        .enabled_layer_names(&layers_names_raw)
+        .enabled_extension_names(&extension_names_raw);
+    unsafe {
+        let instance: Instance = entry
+            .create_instance(&create_info, None)
+            .expect("Instance creation error");
+
+        (entry, instance)
     }
 }

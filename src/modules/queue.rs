@@ -1,19 +1,14 @@
-use ash::{
-    version::{DeviceV1_0},
-    vk,
-};
+use ash::{version::DeviceV1_0, vk};
 
-use crate::definitions::MAX_FRAMES_IN_FLIGHT;
-
-
+use super::swapchain::Swapchain;
+use crate::constants::MAX_FRAMES_IN_FLIGHT;
 use std::ptr;
-
 
 pub struct Frame {
     pub wait_fences: Vec<vk::Fence>,
     pub signal_semaphores: Vec<vk::Semaphore>,
     pub wait_semaphores: Vec<vk::Semaphore>,
-    pub image_index: u32,
+    pub image_index: usize,
     pub is_sub_optimal: bool,
     pub wait_stages: Vec<vk::PipelineStageFlags>,
 }
@@ -21,6 +16,16 @@ pub struct Frame {
 pub struct QueueFamilyIndices {
     pub graphics_family: Option<u32>,
     pub present_family: Option<u32>,
+}
+
+pub struct Queue {
+    pub graphics_queue: vk::Queue,
+    pub present_queue: vk::Queue,
+    pub queue_family_indices: QueueFamilyIndices,
+    pub image_available_semaphores: Vec<vk::Semaphore>,
+    pub render_finished_semaphores: Vec<vk::Semaphore>,
+    pub inflight_fences: Vec<vk::Fence>,
+    pub current_frame: usize,
 }
 
 impl QueueFamilyIndices {
@@ -34,15 +39,6 @@ impl QueueFamilyIndices {
     pub fn is_complete(&self) -> bool {
         self.graphics_family.is_some() && self.present_family.is_some()
     }
-}
-pub struct Queue {
-    pub graphics_queue: vk::Queue,
-    pub present_queue: vk::Queue,
-    pub queue_family_indices: QueueFamilyIndices,
-    pub image_available_semaphores: Vec<vk::Semaphore>,
-    pub render_finished_semaphores: Vec<vk::Semaphore>,
-    pub inflight_fences: Vec<vk::Fence>,
-    pub current_frame: usize,
 }
 
 impl Queue {
@@ -95,11 +91,12 @@ impl Queue {
         }
     }
 
-    pub fn next_frame(&self, vulkan: &crate::VkInstance, swapchain: &crate::Swapchain) -> Frame {
+    pub fn next_frame(&self, vulkan: &crate::VkInstance, swapchain: &Swapchain) -> Frame {
         let wait_fences = vec![self.inflight_fences[self.current_frame]];
 
         let (image_index, is_sub_optimal) = unsafe {
-            vulkan.device
+            vulkan
+                .device
                 .wait_for_fences(&wait_fences, true, std::u64::MAX)
                 .expect("Failed to wait for Fence!");
 
@@ -116,17 +113,16 @@ impl Queue {
 
         let wait_semaphores = vec![self.image_available_semaphores[self.current_frame]];
         let wait_stages = vec![vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT];
-        let signal_semaphores =
-            vec![self.render_finished_semaphores[self.current_frame]];
+        let signal_semaphores = vec![self.render_finished_semaphores[self.current_frame]];
 
-            Frame {
-                wait_fences,
-                image_index,
-                wait_semaphores,
-                wait_stages,
-                is_sub_optimal,
-                signal_semaphores
-            }
+        Frame {
+            wait_fences,
+            image_index: image_index as usize,
+            wait_semaphores,
+            wait_stages,
+            is_sub_optimal,
+            signal_semaphores,
+        }
     }
 
     pub fn destroy(&self, device: &ash::Device) {

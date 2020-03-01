@@ -1,20 +1,23 @@
 [package]
 name = "vulkan"
-version = "0.0.1"
+version = "1.0.0"
 edition = "2018"
-authors = ["tonis.anton18@gmail.com"]
+authors = ["tonis"]
 
 [dependencies]
-winit = "0.20.0"
-ash = { git = "https://github.com/MaikKlein/ash" }
-log = "0.4"
-env_logger = "0.7.1"
-cgmath = "0.17.0"
+winit     = "0.20.0"
+ash       = "0.29.0"
+cgmath    = "0.17.0"
+memoffset = "0.5.1"
+num       = "0.2"
 
-[target.'cfg(windows)'.dependencies]
-winapi = { version = "0.3.4", features = ["windef", "winuser"] }
+[dependencies.bitflags]
+version = ">= 1.0.4"
 
 [target.'cfg(target_os = "macos")'.dependencies]
-metal = "0.17.1"
-cocoa = "0.20.0"
-objc = "0.2.7"
+metal = "0.17.0"
+cocoa = "0.18.4"
+objc  = "0.2.5"
+
+[target.'cfg(target_os = "windows")'.dependencies]
+winapi = { version = "0.3.5", features = ["windef", "libloaderapi"] }

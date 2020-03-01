@@ -37,3 +37,8 @@ pub unsafe fn create_debugger(entry: &Entry, instance: &Instance) -> vk::DebugRe
         .create_debug_report_callback(&debug_info, None)
         .unwrap()
 }
+
+pub struct ValidationInfo {
+    pub is_enable: bool,
+    pub required_validation_layers: [&'static str; 1],
+}
