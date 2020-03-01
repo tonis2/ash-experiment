@@ -1,10 +1,10 @@
 use vulkan::{
     modules::swapchain::Swapchain,
     offset_of,
-    utilities::{Shader, VertexDescriptor, DescriptorInfo}, VkInstance,
+    utilities::{DescriptorInfo, Shader, VertexDescriptor},
+    VkInstance,
 };
 
-use ash::util::Align;
 use ash::version::DeviceV1_0;
 use ash::vk;
 use cgmath::{Deg, Matrix4, Point3, SquareMatrix, Vector3};
@@ -171,30 +171,12 @@ pub fn create_pipeline(
         };
 
         let mut uniform_buffer = vulkan.create_buffer(buffer_create_info);
-
-        let uniform_ptr = vulkan
-            .device
-            .map_memory(
-                uniform_buffer.memory,
-                0,
-                uniform_buffer.memory_requirements.size,
-                vk::MemoryMapFlags::empty(),
-            )
-            .unwrap();
-
-        let mut uniform_aligned_slice = Align::new(
-            uniform_ptr,
+        
+        uniform_buffer.copy_to_buffer(
             align_of::<UniformBufferObject>() as u64,
-            uniform_buffer.memory_requirements.size,
+            &[uniform_data],
+            &vulkan,
         );
-        uniform_aligned_slice.copy_from_slice(&[uniform_data]);
-        vulkan.device.unmap_memory(uniform_buffer.memory);
-        vulkan
-            .device
-            .bind_buffer_memory(uniform_buffer.buffer, uniform_buffer.memory, 0)
-            .unwrap();
-
-        uniform_buffer.size = buffer_create_info.size as u32;
 
         let uniform_descriptor = DescriptorInfo::new(
             vec![vk::DescriptorSetLayoutBinding {
@@ -215,7 +197,7 @@ pub fn create_pipeline(
             .device
             .create_pipeline_layout(&layout_create_info, None)
             .unwrap();
-            
+
         let graphic_pipeline_info = vk::GraphicsPipelineCreateInfo::builder()
             .stages(shaders)
             .vertex_input_state(&vertex_input_state_info)
