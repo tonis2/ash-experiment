@@ -41,8 +41,7 @@ fn main() {
     let (pipeline, layout, vertex_descriptor) = create_pipeline(&swapchain, render_pass, &vulkan);
 
     let mut index_buffer = shader::create_index_buffer(&indices, &vulkan);
-    let mut vertex_buffer =
-        shader::create_vertex_buffer(&vertices, &vulkan, &vertex_descriptor, &vulkan);
+    let mut vertex_buffer = shader::create_vertex_buffer(&vertices, &vulkan, &vertex_descriptor);
 
     let command_buffers = vulkan.create_command_buffers(swapchain.image_views.len());
 
@@ -122,7 +121,7 @@ fn main() {
         }
         Event::LoopDestroyed => unsafe {
             vulkan.wait_idle().unwrap();
-         
+
             for &framebuffer in frame_buffers.iter() {
                 vulkan.device.destroy_framebuffer(framebuffer, None);
             }

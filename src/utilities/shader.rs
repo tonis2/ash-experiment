@@ -33,9 +33,8 @@ pub fn create_index_buffer(indices: &Vec<u16>, vulkan: &VkInstance) -> Buffer {
 
 pub fn create_vertex_buffer<A: Copy>(
     vertices: &[A],
-    base: &VkInstance,
-    vertex: &VertexDescriptor,
     vulkan: &VkInstance,
+    vertex: &VertexDescriptor,
 ) -> Buffer {
     let vertex_input_buffer_info = vk::BufferCreateInfo {
         size: vertex.size,
@@ -43,7 +42,7 @@ pub fn create_vertex_buffer<A: Copy>(
         sharing_mode: vk::SharingMode::EXCLUSIVE,
         ..Default::default()
     };
-    let mut buffer = base.create_buffer(vertex_input_buffer_info);
+    let mut buffer = vulkan.create_buffer(vertex_input_buffer_info);
     buffer.copy_to_buffer(vertex.align, &vertices, &vulkan);
     buffer
 }

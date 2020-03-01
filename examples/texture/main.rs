@@ -42,8 +42,7 @@ fn main() {
         create_pipeline(&swapchain, render_pass, &vulkan);
 
     let mut index_buffer = shader::create_index_buffer(&indices, &vulkan);
-    let mut vertex_buffer =
-        shader::create_vertex_buffer(&vertices, &vulkan, &vertex_descriptor, &vulkan);
+    let mut vertex_buffer = shader::create_vertex_buffer(&vertices, &vulkan, &vertex_descriptor);
 
     let descriptor_pool = vulkan.create_descriptor_pool(swapchain.image_views.len());
     let command_buffers = vulkan.create_command_buffers(swapchain.image_views.len());
