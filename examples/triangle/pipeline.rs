@@ -12,7 +12,7 @@ use vulkan::{
 };
 
 use std::mem::{self, align_of};
-use ash::version::{DeviceV1_0};
+use ash::version::DeviceV1_0;
 
 use ash::vk;
 use std::default::Default;

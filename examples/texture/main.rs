@@ -134,16 +134,16 @@ fn main() {
         }
         Event::LoopDestroyed => unsafe {
             vulkan.wait_idle().unwrap();
+
             for &framebuffer in frame_buffers.iter() {
                 vulkan.device.destroy_framebuffer(framebuffer, None);
             }
-
+            swapchain.destroy(&vulkan);
             vulkan.device.destroy_render_pass(render_pass, None);
             vulkan.device.destroy_pipeline(pipeline, None);
             vulkan.device.destroy_pipeline_layout(layout, None);
             vertex_buffer.destroy(&vulkan);
             index_buffer.destroy(&vulkan);
-            swapchain.destroy(&vulkan);
         },
         _ => {}
     });
