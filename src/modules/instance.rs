@@ -256,12 +256,11 @@ impl VkInstance {
 
     pub fn copy_buffer(
         &self,
-        device: &ash::Device,
         src_buffer: vk::Buffer,
         dst_buffer: vk::Buffer,
         size: vk::DeviceSize,
     ) {
-        let command_buffer = Self::begin_single_time_command(device, self.command_pool);
+        let command_buffer = self.begin_single_time_command();
 
         let copy_regions = [vk::BufferCopy {
             src_offset: 0,
@@ -270,31 +269,24 @@ impl VkInstance {
         }];
 
         unsafe {
-            device.cmd_copy_buffer(command_buffer, src_buffer, dst_buffer, &copy_regions);
+            self.device
+                .cmd_copy_buffer(command_buffer, src_buffer, dst_buffer, &copy_regions);
         }
 
-        Self::end_single_time_command(
-            device,
-            self.command_pool,
-            self.queue.present_queue,
-            command_buffer,
-        );
+        self.end_single_time_command(command_buffer);
     }
 
-    pub fn begin_single_time_command(
-        device: &ash::Device,
-        command_pool: vk::CommandPool,
-    ) -> vk::CommandBuffer {
+    pub fn begin_single_time_command(&self) -> vk::CommandBuffer {
         let command_buffer_allocate_info = vk::CommandBufferAllocateInfo {
             s_type: vk::StructureType::COMMAND_BUFFER_ALLOCATE_INFO,
             p_next: ptr::null(),
             command_buffer_count: 1,
-            command_pool,
+            command_pool: self.command_pool,
             level: vk::CommandBufferLevel::PRIMARY,
         };
 
         let command_buffer = unsafe {
-            device
+            self.device
                 .allocate_command_buffers(&command_buffer_allocate_info)
                 .expect("Failed to allocate Command Buffers!")
         }[0];
@@ -307,7 +299,7 @@ impl VkInstance {
         };
 
         unsafe {
-            device
+            self.device
                 .begin_command_buffer(command_buffer, &command_buffer_begin_info)
                 .expect("Failed to begin recording Command Buffer at beginning!");
         }
@@ -315,14 +307,9 @@ impl VkInstance {
         command_buffer
     }
 
-    pub fn end_single_time_command(
-        device: &ash::Device,
-        command_pool: vk::CommandPool,
-        submit_queue: vk::Queue,
-        command_buffer: vk::CommandBuffer,
-    ) {
+    pub fn end_single_time_command(&self, command_buffer: vk::CommandBuffer) {
         unsafe {
-            device
+            self.device
                 .end_command_buffer(command_buffer)
                 .expect("Failed to record Command Buffer at Ending!");
         }
@@ -342,17 +329,75 @@ impl VkInstance {
         }];
 
         unsafe {
-            device
-                .queue_submit(submit_queue, &sumbit_infos, vk::Fence::null())
+            self.device
+                .queue_submit(self.queue.present_queue, &sumbit_infos, vk::Fence::null())
                 .expect("Failed to Queue Submit!");
-            device
-                .queue_wait_idle(submit_queue)
+            self.device
+                .queue_wait_idle(self.queue.present_queue)
                 .expect("Failed to wait Queue idle!");
-            device.free_command_buffers(command_pool, &buffers_to_submit);
+            self.device
+                .free_command_buffers(self.command_pool, &buffers_to_submit);
+        }
+    }
+
+    pub fn copy_buffer_to_image(
+        &self,
+        buffer: vk::Buffer,
+        image: vk::Image,
+        width: u32,
+        height: u32,
+    ) {
+        let command_buffer = self.begin_single_time_command();
+
+        let buffer_image_regions = [vk::BufferImageCopy {
+            image_subresource: vk::ImageSubresourceLayers {
+                aspect_mask: vk::ImageAspectFlags::COLOR,
+                mip_level: 0,
+                base_array_layer: 0,
+                layer_count: 1,
+            },
+            image_extent: vk::Extent3D {
+                width,
+                height,
+                depth: 1,
+            },
+            buffer_offset: 0,
+            buffer_image_height: 0,
+            buffer_row_length: 0,
+            image_offset: vk::Offset3D { x: 0, y: 0, z: 0 },
+        }];
+
+        unsafe {
+            self.device.cmd_copy_buffer_to_image(
+                command_buffer,
+                buffer,
+                image,
+                vk::ImageLayout::TRANSFER_DST_OPTIMAL,
+                &buffer_image_regions,
+            );
+        }
+
+        self.end_single_time_command(command_buffer);
+    }
+}
+
+impl Drop for VkInstance {
+    fn drop(&mut self) {
+        unsafe {
+            self.wait_idle().unwrap();
+            self.surface
+                .surface_loader
+                .destroy_surface(self.surface.surface, None);
+            self.device.destroy_command_pool(self.command_pool, None);
+            self.queue.destroy(&self.device);
+            self.device.destroy_device(None);
+            // self._debugger.destroy();
+            // self.instance.destroy_instance(None);
         }
     }
 }
 
+//Create vulkan entry
 pub fn create_entry() -> (Entry, Instance) {
     let entry = Entry::new().unwrap();
     let app_name = CString::new(APP_NAME).unwrap();
@@ -382,21 +427,5 @@ pub fn create_entry() -> (Entry, Instance) {
             .expect("Instance creation error");
 
         (entry, instance)
-    }
-}
-
-impl Drop for VkInstance {
-    fn drop(&mut self) {
-        unsafe {
-            self.wait_idle().unwrap();
-            self.surface
-                .surface_loader
-                .destroy_surface(self.surface.surface, None);
-            self.device.destroy_command_pool(self.command_pool, None);
-            self.queue.destroy(&self.device);
-            self.device.destroy_device(None);
-            // self._debugger.destroy();
-            // self.instance.destroy_instance(None);
-        }
     }
 }
