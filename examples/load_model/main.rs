@@ -45,8 +45,7 @@ fn main() {
     let mut vertex_buffer = shader::create_vertex_buffer(&vertices, &vulkan, &vertex_descriptor);
 
     let descriptor_pool = vulkan.create_descriptor_pool(swapchain.image_views.len());
-    let command_buffers =
-        vulkan.create_command_buffers(vulkan.command_pool, swapchain.image_views.len());
+    let command_buffers = vulkan.create_command_buffers(swapchain.image_views.len());
     let uniform_descriptor_sets = descriptors.build(&vulkan, &descriptor_pool, 1);
 
     event_loop.run(move |event, _, control_flow| match event {

@@ -54,7 +54,7 @@ impl VkInstance {
                 physical_device,
                 device,
                 queue,
-                command_pool
+                command_pool,
             }
         }
     }
@@ -71,16 +71,12 @@ impl VkInstance {
         unsafe { self.device.device_wait_idle() }
     }
 
-    pub fn create_command_buffers(
-        &self,
-        command_pool: vk::CommandPool,
-        amount: usize,
-    ) -> Vec<vk::CommandBuffer> {
+    pub fn create_command_buffers(&self, amount: usize) -> Vec<vk::CommandBuffer> {
         let command_buffer_allocate_info = vk::CommandBufferAllocateInfo {
             s_type: vk::StructureType::COMMAND_BUFFER_ALLOCATE_INFO,
             p_next: ptr::null(),
             command_buffer_count: amount as u32,
-            command_pool,
+            command_pool: self.command_pool,
             level: vk::CommandBufferLevel::PRIMARY,
         };
 
@@ -262,14 +258,13 @@ impl VkInstance {
     }
 
     pub fn copy_buffer(
+        &self,
         device: &ash::Device,
-        submit_queue: vk::Queue,
-        command_pool: vk::CommandPool,
         src_buffer: vk::Buffer,
         dst_buffer: vk::Buffer,
         size: vk::DeviceSize,
     ) {
-        let command_buffer = Self::begin_single_time_command(device, command_pool);
+        let command_buffer = Self::begin_single_time_command(device, self.command_pool);
 
         let copy_regions = [vk::BufferCopy {
             src_offset: 0,
@@ -281,7 +276,12 @@ impl VkInstance {
             device.cmd_copy_buffer(command_buffer, src_buffer, dst_buffer, &copy_regions);
         }
 
-        Self::end_single_time_command(device, command_pool, submit_queue, command_buffer);
+        Self::end_single_time_command(
+            device,
+            self.command_pool,
+            self.queue.present_queue,
+            command_buffer,
+        );
     }
 
     pub fn begin_single_time_command(
