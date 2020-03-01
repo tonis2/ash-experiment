@@ -25,6 +25,7 @@ pub struct VkInstance {
     pub physical_device: vk::PhysicalDevice,
     pub device: Device,
     pub queue: Queue,
+    pub command_pool: vk::CommandPool,
 }
 
 impl VkInstance {
@@ -43,14 +44,17 @@ impl VkInstance {
                 &surface,
             );
 
+            let command_pool = Self::create_command_pool(&device, &queue);
+
             VkInstance {
                 _entry: entry,
-                instance,
                 _debugger: debugger,
+                instance,
                 surface,
                 physical_device,
                 device,
                 queue,
+                command_pool
             }
         }
     }
@@ -89,15 +93,13 @@ impl VkInstance {
         }
     }
 
-    pub fn create_command_pool(&self) -> vk::CommandPool {
+    pub fn create_command_pool(device: &ash::Device, queue: &Queue) -> vk::CommandPool {
         unsafe {
             let pool_create_info = vk::CommandPoolCreateInfo::builder()
                 .flags(vk::CommandPoolCreateFlags::RESET_COMMAND_BUFFER)
-                .queue_family_index(self.queue.queue_family_indices.graphics_family.unwrap());
+                .queue_family_index(queue.queue_family_indices.graphics_family.unwrap());
 
-            self.device
-                .create_command_pool(&pool_create_info, None)
-                .unwrap()
+            device.create_command_pool(&pool_create_info, None).unwrap()
         }
     }
 

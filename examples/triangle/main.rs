@@ -33,7 +33,7 @@ fn main() {
         .expect("Failed to create window.");
 
     let mut vulkan = VkInstance::new(&window);
-    let command_pool = vulkan.create_command_pool();
+
     let swapchain = Swapchain::new(&vulkan, &window);
     let render_pass = swapchain.create_render_pass(&vulkan.device);
     let frame_buffers = swapchain.create_frame_buffers(&render_pass, &vulkan);
@@ -43,7 +43,7 @@ fn main() {
     let mut index_buffer = shader::create_index_buffer(&indices, &vulkan);
     let mut vertex_buffer = shader::create_vertex_buffer(&vertices, &vulkan, &vertex_descriptor);
 
-    let command_buffers = vulkan.create_command_buffers(command_pool, swapchain.image_views.len());
+    let command_buffers = vulkan.create_command_buffers(vulkan.command_pool, swapchain.image_views.len());
 
     event_loop.run(move |event, _, control_flow| match event {
         Event::WindowEvent { event, .. } => match event {
@@ -125,7 +125,7 @@ fn main() {
                 vulkan.device.destroy_framebuffer(framebuffer, None);
             }
 
-            vulkan.device.destroy_command_pool(command_pool, None);
+          
             vulkan.device.destroy_render_pass(render_pass, None);
             vulkan.device.destroy_pipeline(pipeline, None);
             vulkan.device.destroy_pipeline_layout(layout, None);
