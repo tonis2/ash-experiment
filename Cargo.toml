@@ -11,6 +11,7 @@ cgmath    = "0.17.0"
 memoffset = "0.5.1"
 num       = "0.2"
 tobj      = "0.1.10"
+image     = "0.22"
 
 [dependencies.bitflags]
 version = ">= 1.0.4"
