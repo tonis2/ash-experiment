@@ -135,14 +135,6 @@ impl Swapchain {
         frame_buffers
     }
 
-    pub fn destroy(&self, vulkan: &VkInstance) {
-        for image in self.image_views.iter() {
-            unsafe {
-                vulkan.device.destroy_image_view(*image, None);
-            }
-        }
-    }
-
     pub fn create_render_pass<D: DeviceV1_0>(&self, device: &D) -> vk::RenderPass {
         let color_attachment = vk::AttachmentDescription {
             format: self.format,
@@ -205,6 +197,92 @@ impl Swapchain {
                 .expect("Failed to create render pass!")
         }
     }
+
+    pub fn destroy(&self, vulkan: &VkInstance) {
+        unsafe {
+            for image in self.image_views.iter() {
+                vulkan.device.destroy_image_view(*image, None);
+            }
+            self.swapchain_loader
+                .destroy_swapchain(self.swapchain, None);
+        }
+    }
+}
+
+pub struct SwapchainSupport {
+    pub capabilities: vk::SurfaceCapabilitiesKHR,
+    pub formats: Vec<vk::SurfaceFormatKHR>,
+    pub present_modes: Vec<vk::PresentModeKHR>,
+}
+
+impl SwapchainSupport {
+    pub fn query_swapchain_support(
+        physical_device: vk::PhysicalDevice,
+        surface_stuff: &super::surface::VkSurface,
+    ) -> SwapchainSupport {
+        unsafe {
+            let capabilities = surface_stuff
+                .surface_loader
+                .get_physical_device_surface_capabilities(physical_device, surface_stuff.surface)
+                .expect("Failed to query for surface capabilities.");
+            let formats = surface_stuff
+                .surface_loader
+                .get_physical_device_surface_formats(physical_device, surface_stuff.surface)
+                .expect("Failed to query for surface formats.");
+            let present_modes = surface_stuff
+                .surface_loader
+                .get_physical_device_surface_present_modes(physical_device, surface_stuff.surface)
+                .expect("Failed to query for surface present mode.");
+
+            SwapchainSupport {
+                capabilities,
+                formats,
+                present_modes,
+            }
+        }
+    }
+}
+
+pub fn choose_swapchain_present_mode(
+    available_present_modes: &Vec<vk::PresentModeKHR>,
+) -> vk::PresentModeKHR {
+    for &available_present_mode in available_present_modes.iter() {
+        if available_present_mode == vk::PresentModeKHR::MAILBOX {
+            return available_present_mode;
+        }
+    }
+
+    vk::PresentModeKHR::FIFO
+}
+
+pub fn choose_swapchain_extent(
+    capabilities: &vk::SurfaceCapabilitiesKHR,
+    window: &winit::window::Window,
+) -> vk::Extent2D {
+    if capabilities.current_extent.width != u32::max_value() {
+        capabilities.current_extent
+    } else {
+        use num::clamp;
+
+        let window_size = window.inner_size();
+        println!(
+            "\t\tInner Window Size: ({}, {})",
+            window_size.width, window_size.height
+        );
+
+        vk::Extent2D {
+            width: clamp(
+                window_size.width as u32,
+                capabilities.min_image_extent.width,
+                capabilities.max_image_extent.width,
+            ),
+            height: clamp(
+                window_size.height as u32,
+                capabilities.min_image_extent.height,
+                capabilities.max_image_extent.height,
+            ),
+        }
+    }
 }
 
 pub fn choose_swapchain_format(
@@ -254,81 +332,5 @@ pub fn create_image_view(
         device
             .create_image_view(&imageview_create_info, None)
             .expect("Failed to create Image View!")
-    }
-}
-
-pub fn choose_swapchain_present_mode(
-    available_present_modes: &Vec<vk::PresentModeKHR>,
-) -> vk::PresentModeKHR {
-    for &available_present_mode in available_present_modes.iter() {
-        if available_present_mode == vk::PresentModeKHR::MAILBOX {
-            return available_present_mode;
-        }
-    }
-
-    vk::PresentModeKHR::FIFO
-}
-
-pub fn choose_swapchain_extent(
-    capabilities: &vk::SurfaceCapabilitiesKHR,
-    window: &winit::window::Window,
-) -> vk::Extent2D {
-    if capabilities.current_extent.width != u32::max_value() {
-        capabilities.current_extent
-    } else {
-        use num::clamp;
-
-        let window_size = window.inner_size();
-        println!(
-            "\t\tInner Window Size: ({}, {})",
-            window_size.width, window_size.height
-        );
-
-        vk::Extent2D {
-            width: clamp(
-                window_size.width as u32,
-                capabilities.min_image_extent.width,
-                capabilities.max_image_extent.width,
-            ),
-            height: clamp(
-                window_size.height as u32,
-                capabilities.min_image_extent.height,
-                capabilities.max_image_extent.height,
-            ),
-        }
-    }
-}
-
-pub struct SwapchainSupport {
-    pub capabilities: vk::SurfaceCapabilitiesKHR,
-    pub formats: Vec<vk::SurfaceFormatKHR>,
-    pub present_modes: Vec<vk::PresentModeKHR>,
-}
-
-impl SwapchainSupport {
-    pub fn query_swapchain_support(
-        physical_device: vk::PhysicalDevice,
-        surface_stuff: &super::surface::VkSurface,
-    ) -> SwapchainSupport {
-        unsafe {
-            let capabilities = surface_stuff
-                .surface_loader
-                .get_physical_device_surface_capabilities(physical_device, surface_stuff.surface)
-                .expect("Failed to query for surface capabilities.");
-            let formats = surface_stuff
-                .surface_loader
-                .get_physical_device_surface_formats(physical_device, surface_stuff.surface)
-                .expect("Failed to query for surface formats.");
-            let present_modes = surface_stuff
-                .surface_loader
-                .get_physical_device_surface_present_modes(physical_device, surface_stuff.surface)
-                .expect("Failed to query for surface present mode.");
-
-            SwapchainSupport {
-                capabilities,
-                formats,
-                present_modes,
-            }
-        }
     }
 }

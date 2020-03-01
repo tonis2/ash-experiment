@@ -8,7 +8,7 @@ use std::ptr;
 use winit::window::Window;
 
 use super::{
-    debug::create_debugger,
+    debug::Debugger,
     device,
     queue::{Frame, Queue},
     surface::VkSurface,
@@ -19,7 +19,7 @@ use crate::utilities::{buffer::Buffer, platform::extension_names, tools::find_me
 
 pub struct VkInstance {
     _entry: Entry,
-    _debugger: vk::DebugReportCallbackEXT,
+    _debugger: Debugger,
     pub instance: Instance,
     pub surface: VkSurface,
     pub physical_device: vk::PhysicalDevice,
@@ -30,32 +30,29 @@ pub struct VkInstance {
 
 impl VkInstance {
     pub fn new(window: &Window) -> VkInstance {
-        unsafe {
-            let (entry, instance) = create_entry();
-            let debugger = create_debugger(&entry, &instance);
-            let surface = VkSurface::new(&window, &instance, &entry);
-            let physical_device =
-                device::pick_physical_device(&instance, &surface, &DEVICE_EXTENSIONS);
-            let (device, queue) = device::create_logical_device(
-                &instance,
-                physical_device,
-                &VALIDATION,
-                &DEVICE_EXTENSIONS,
-                &surface,
-            );
+        let (entry, instance) = create_entry();
+        let debugger = Debugger::new(&entry, &instance);
+        let surface = VkSurface::new(&window, &instance, &entry);
+        let physical_device = device::pick_physical_device(&instance, &surface, &DEVICE_EXTENSIONS);
+        let (device, queue) = device::create_logical_device(
+            &instance,
+            physical_device,
+            &VALIDATION,
+            &DEVICE_EXTENSIONS,
+            &surface,
+        );
 
-            let command_pool = Self::create_command_pool(&device, &queue);
+        let command_pool = Self::create_command_pool(&device, &queue);
 
-            VkInstance {
-                _entry: entry,
-                _debugger: debugger,
-                instance,
-                surface,
-                physical_device,
-                device,
-                queue,
-                command_pool,
-            }
+        VkInstance {
+            _entry: entry,
+            _debugger: debugger,
+            instance,
+            surface,
+            physical_device,
+            device,
+            queue,
+            command_pool,
         }
     }
 }
@@ -385,5 +382,21 @@ pub fn create_entry() -> (Entry, Instance) {
             .expect("Instance creation error");
 
         (entry, instance)
+    }
+}
+
+impl Drop for VkInstance {
+    fn drop(&mut self) {
+        unsafe {
+            self.wait_idle().unwrap();
+            self.surface
+                .surface_loader
+                .destroy_surface(self.surface.surface, None);
+            self.device.destroy_command_pool(self.command_pool, None);
+            self.queue.destroy(&self.device);
+            self.device.destroy_device(None);
+            // self._debugger.destroy();
+            // self.instance.destroy_instance(None);
+        }
     }
 }
