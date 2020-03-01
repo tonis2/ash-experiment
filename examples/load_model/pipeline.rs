@@ -139,8 +139,8 @@ pub fn create_pipeline(
             vk::PipelineDynamicStateCreateInfo::builder().dynamic_states(&dynamic_state);
 
         let (vertex_shader_module, fragment_shader_module) = Shader {
-            vertex_shader: "examples/triangle/shaders/spv/triangle.vert.spv",
-            fragment_shader: "examples/triangle/shaders/spv/triangle.frag.spv",
+            vertex_shader: "examples/load_model/shaders/spv/shader-ubo.vert.spv",
+            fragment_shader: "examples/load_model/shaders/spv/shader-ubo.frag.spv",
         }
         .load(&vulkan);
 
