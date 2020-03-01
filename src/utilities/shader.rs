@@ -18,76 +18,34 @@ pub struct VertexDescriptor {
 }
 
 pub fn create_index_buffer(indices: &Vec<u16>, vulkan: &VkInstance) -> Buffer {
-    unsafe {
-        let indices_slice = &indices[..];
-        let index_input_buffer_info = vk::BufferCreateInfo {
-            size: std::mem::size_of_val(&indices_slice) as u64,
-            usage: vk::BufferUsageFlags::INDEX_BUFFER,
-            sharing_mode: vk::SharingMode::EXCLUSIVE,
-            ..Default::default()
-        };
-        let mut buffer = vulkan.create_buffer(index_input_buffer_info);
+    let indices_slice = &indices[..];
+    let index_input_buffer_info = vk::BufferCreateInfo {
+        size: std::mem::size_of_val(&indices_slice) as u64,
+        usage: vk::BufferUsageFlags::INDEX_BUFFER,
+        sharing_mode: vk::SharingMode::EXCLUSIVE,
+        ..Default::default()
+    };
+    let mut buffer = vulkan.create_buffer(index_input_buffer_info);
 
-        let index_ptr = vulkan
-            .device
-            .map_memory(
-                buffer.memory,
-                0,
-                buffer.memory_requirements.size,
-                vk::MemoryMapFlags::empty(),
-            )
-            .unwrap();
-        let mut index_slice = Align::new(
-            index_ptr,
-            align_of::<u32>() as u64,
-            buffer.memory_requirements.size,
-        );
-
-        index_slice.copy_from_slice(&indices);
-
-        vulkan.device.unmap_memory(buffer.memory);
-        vulkan.device
-            .bind_buffer_memory(buffer.buffer, buffer.memory, 0)
-            .unwrap();
-        buffer.size = indices.len() as u32;
-        buffer
-    }
+    buffer.copy_to_buffer(align_of::<u32>() as u64, &indices, &vulkan);
+    buffer
 }
 
 pub fn create_vertex_buffer<A: Copy>(
     vertices: &[A],
     base: &VkInstance,
     vertex: &VertexDescriptor,
+    vulkan: &VkInstance,
 ) -> Buffer {
-    unsafe {
-        let vertex_input_buffer_info = vk::BufferCreateInfo {
-            size: vertex.size,
-            usage: vk::BufferUsageFlags::VERTEX_BUFFER,
-            sharing_mode: vk::SharingMode::EXCLUSIVE,
-            ..Default::default()
-        };
-        let mut buffer = base.create_buffer(vertex_input_buffer_info);
-        let vert_ptr = base
-            .device
-            .map_memory(
-                buffer.memory,
-                0,
-                buffer.memory_requirements.size,
-                vk::MemoryMapFlags::empty(),
-            )
-            .unwrap();
-
-        let mut vert_align = Align::new(vert_ptr, vertex.align, buffer.memory_requirements.size);
-
-        vert_align.copy_from_slice(&vertices);
-
-        base.device.unmap_memory(buffer.memory);
-        base.device
-            .bind_buffer_memory(buffer.buffer, buffer.memory, 0)
-            .unwrap();
-        buffer.size = vertices.len() as u32;
-        buffer
-    }
+    let vertex_input_buffer_info = vk::BufferCreateInfo {
+        size: vertex.size,
+        usage: vk::BufferUsageFlags::VERTEX_BUFFER,
+        sharing_mode: vk::SharingMode::EXCLUSIVE,
+        ..Default::default()
+    };
+    let mut buffer = base.create_buffer(vertex_input_buffer_info);
+    buffer.copy_to_buffer(vertex.align, &vertices, &vulkan);
+    buffer
 }
 
 pub struct Shader {
