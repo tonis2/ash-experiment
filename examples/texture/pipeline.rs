@@ -178,7 +178,7 @@ pub fn create_pipeline(
 
     let mut uniform_buffer = vulkan.create_buffer(buffer_create_info);
 
-    uniform_buffer.copy_to_buffer(
+    uniform_buffer.copy_to_buffer_dynamic(
         align_of::<UniformBufferObject>() as u64,
         &[uniform_data],
         &vulkan,
@@ -358,7 +358,7 @@ pub fn create_texture(image_path: &Path, vulkan: &VkInstance) -> Image {
     };
 
     let mut buffer = vulkan.create_buffer(image_buffer);
-    buffer.copy_to_buffer(image_size, &image_data[..], &vulkan);
+    buffer.copy_buffer::<u8>(image_size, &image_data, &vulkan);
 
     let image_create_info = vk::ImageCreateInfo {
         s_type: vk::StructureType::IMAGE_CREATE_INFO,

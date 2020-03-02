@@ -12,7 +12,8 @@ pub struct Buffer {
 }
 
 impl Buffer {
-    pub fn copy_to_buffer<D: Copy>(&mut self, align: u64, data: &[D], vulkan: &VkInstance) {
+    //Copy to buffer when size can be dynamic
+    pub fn copy_to_buffer_dynamic<D: Copy>(&mut self, align: u64, data: &[D], vulkan: &VkInstance) {
         unsafe {
             let index_ptr = vulkan
                 .device
@@ -28,13 +29,27 @@ impl Buffer {
             data_slice.copy_from_slice(data);
 
             vulkan.device.unmap_memory(self.memory);
-            vulkan
-                .device
-                .bind_buffer_memory(self.buffer, self.memory, 0)
-                .unwrap();
+
             self.size = data.len() as u32;
         }
     }
+
+    //copy to buffer with fixed size
+    pub fn copy_buffer<T>(&mut self, size: u64, data: &Vec<T>, vulkan: &VkInstance) {
+        unsafe {
+            let data_ptr = vulkan
+                .device
+                .map_memory(self.memory, 0, size, vk::MemoryMapFlags::empty())
+                .expect("Failed to Map Memory") as *mut T;
+
+            data_ptr.copy_from_nonoverlapping(data[..].as_ptr(), data.len());
+
+            vulkan.device.unmap_memory(self.memory);
+
+            self.size = data.len() as u32;
+        }
+    }
+
     pub fn destroy(&mut self, vulkan: &VkInstance) {
         unsafe {
             vulkan.device.destroy_buffer(self.buffer, None);

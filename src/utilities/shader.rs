@@ -26,8 +26,7 @@ pub fn create_index_buffer(indices: &Vec<u16>, vulkan: &VkInstance) -> Buffer {
         ..Default::default()
     };
     let mut buffer = vulkan.create_buffer(index_input_buffer_info);
-
-    buffer.copy_to_buffer(align_of::<u32>() as u64, &indices, &vulkan);
+    buffer.copy_to_buffer_dynamic(align_of::<u32>() as u64, &indices, &vulkan);
     buffer
 }
 
@@ -43,7 +42,7 @@ pub fn create_vertex_buffer<A: Copy>(
         ..Default::default()
     };
     let mut buffer = vulkan.create_buffer(vertex_input_buffer_info);
-    buffer.copy_to_buffer(vertex.align, &vertices, &vulkan);
+    buffer.copy_to_buffer_dynamic(vertex.align, &vertices, &vulkan);
     buffer
 }
 

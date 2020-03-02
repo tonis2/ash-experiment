@@ -244,15 +244,19 @@ impl VkInstance {
                 ..Default::default()
             };
 
-            let device_memory = self
+            let buffer_memory = self
                 .device
                 .allocate_memory(&buffer_memory_allocate, None)
                 .unwrap();
 
+            self.device
+                .bind_buffer_memory(buffer, buffer_memory, 0)
+                .expect("Failed to bind Buffer");
+
             Buffer {
                 size: 0,
                 buffer,
-                memory: device_memory,
+                memory: buffer_memory,
                 memory_requirements,
             }
         }
