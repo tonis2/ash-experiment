@@ -17,7 +17,8 @@ use std::ptr;
 #[derive(Clone, Debug, Copy)]
 pub struct Vertex {
     pub pos: [f32; 2],
-    pub color: [f32; 4],
+    pub color: [f32; 3],
+    pub tex_coord: [f32; 2],
 }
 
 #[repr(C)]
@@ -32,7 +33,6 @@ pub struct UniformBufferObject {
 pub fn create_pipeline(
     swapchain: &Swapchain,
     renderpass: vk::RenderPass,
-    descriptor_pool: &vk::DescriptorPool,
     vulkan: &VkInstance,
 ) -> (
     vk::Pipeline,
@@ -48,16 +48,22 @@ pub fn create_pipeline(
         }],
         attribute_descriptor: vec![
             vk::VertexInputAttributeDescription {
-                location: 0,
                 binding: 0,
-                format: vk::Format::R32G32B32A32_SFLOAT,
+                location: 0,
+                format: vk::Format::R32G32_SFLOAT,
                 offset: offset_of!(Vertex, pos) as u32,
             },
             vk::VertexInputAttributeDescription {
-                location: 1,
                 binding: 0,
-                format: vk::Format::R32G32B32A32_SFLOAT,
+                location: 1,
+                format: vk::Format::R32G32B32_SFLOAT,
                 offset: offset_of!(Vertex, color) as u32,
+            },
+            vk::VertexInputAttributeDescription {
+                binding: 0,
+                location: 2,
+                format: vk::Format::R32G32_SFLOAT,
+                offset: offset_of!(Vertex, tex_coord) as u32,
             },
         ],
         size: 3 * std::mem::size_of::<Vertex>() as u64,
@@ -139,8 +145,8 @@ pub fn create_pipeline(
         vk::PipelineDynamicStateCreateInfo::builder().dynamic_states(&dynamic_state);
 
     let (vertex_shader_module, fragment_shader_module) = Shader {
-        vertex_shader: "examples/texture/shaders/spv/shader-ubo.vert.spv",
-        fragment_shader: "examples/texture/shaders/spv/shader-ubo.frag.spv",
+        vertex_shader: "examples/texture/shaders/spv/shader-textures.vert.spv",
+        fragment_shader: "examples/texture/shaders/spv/shader-textures.frag.spv",
     }
     .load(&vulkan);
 
@@ -187,14 +193,14 @@ pub fn create_pipeline(
             stage_flags: vk::ShaderStageFlags::VERTEX,
             p_immutable_samplers: ptr::null(),
         },
-        // vk::DescriptorSetLayoutBinding {
-        //     // sampler uniform
-        //     binding: 1,
-        //     descriptor_type: vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
-        //     descriptor_count: 1,
-        //     stage_flags: vk::ShaderStageFlags::FRAGMENT,
-        //     p_immutable_samplers: ptr::null(),
-        // },
+        vk::DescriptorSetLayoutBinding {
+            // sampler uniform
+            binding: 1,
+            descriptor_type: vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
+            descriptor_count: 1,
+            stage_flags: vk::ShaderStageFlags::FRAGMENT,
+            p_immutable_samplers: ptr::null(),
+        },
     ];
 
     //Create texture image
@@ -244,8 +250,16 @@ pub fn create_pipeline(
             .expect("Failed to create Image View!")
     };
     //Create uniform buffer
-    let (descriptor_set, descriptor_layout) =
-        create_descriptors(descriptor_info, uniform_buffer, &descriptor_pool, &vulkan);
+
+    let descriptor_pool = create_descriptor_pool(&vulkan, swapchain.image_views.len() as u32);
+    let (descriptor_set, descriptor_layout) = create_descriptors(
+        descriptor_info,
+        uniform_buffer,
+        sampler,
+        image_view,
+        &descriptor_pool,
+        &vulkan,
+    );
 
     let layout_create_info =
         vk::PipelineLayoutCreateInfo::builder().set_layouts(&descriptor_layout);
@@ -392,6 +406,8 @@ pub fn create_texture(image_path: &Path, vulkan: &VkInstance) -> Image {
 fn create_descriptors(
     bindings: Vec<vk::DescriptorSetLayoutBinding>,
     buffer: Buffer,
+    sampler: vk::Sampler,
+    image_view: vk::ImageView,
     descriptor_pool: &vk::DescriptorPool,
     vulkan: &VkInstance,
 ) -> (Vec<vk::DescriptorSet>, Vec<vk::DescriptorSetLayout>) {
@@ -424,11 +440,11 @@ fn create_descriptors(
             .expect("Failed to allocate descriptor sets!")
     };
 
-    // let descriptor_image_infos = [vk::DescriptorImageInfo {
-    //     sampler: sampler,
-    //     image_view: image_view,
-    //     image_layout: vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
-    // }];
+    let descriptor_image_infos = [vk::DescriptorImageInfo {
+        sampler: sampler,
+        image_view: image_view,
+        image_layout: vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
+    }];
 
     let buffer_info = vec![vk::DescriptorBufferInfo {
         buffer: buffer.buffer,
@@ -450,19 +466,19 @@ fn create_descriptors(
             p_buffer_info: buffer_info.as_ptr(),
             p_texel_buffer_view: ptr::null(),
         },
-        // vk::WriteDescriptorSet {
-        //     // sampler uniform
-        //     s_type: vk::StructureType::WRITE_DESCRIPTOR_SET,
-        //     p_next: ptr::null(),
-        //     dst_set: descriptor_sets[0],
-        //     dst_binding: 1,
-        //     dst_array_element: 0,
-        //     descriptor_count: 1,
-        //     descriptor_type: vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
-        //     p_image_info: descriptor_image_infos.as_ptr(),
-        //     p_buffer_info: ptr::null(),
-        //     p_texel_buffer_view: ptr::null(),
-        // },
+        vk::WriteDescriptorSet {
+            // sampler uniform
+            s_type: vk::StructureType::WRITE_DESCRIPTOR_SET,
+            p_next: ptr::null(),
+            dst_set: descriptor_sets[0],
+            dst_binding: 1,
+            dst_array_element: 0,
+            descriptor_count: 1,
+            descriptor_type: vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
+            p_image_info: descriptor_image_infos.as_ptr(),
+            p_buffer_info: ptr::null(),
+            p_texel_buffer_view: ptr::null(),
+        },
     ];
 
     unsafe {
@@ -472,4 +488,35 @@ fn create_descriptors(
     }
 
     (descriptor_sets, layouts)
+}
+
+pub fn create_descriptor_pool(vulkan: &VkInstance, size: u32) -> vk::DescriptorPool {
+    let pool_sizes = [
+        vk::DescriptorPoolSize {
+            // transform descriptor pool
+            ty: vk::DescriptorType::UNIFORM_BUFFER,
+            descriptor_count: size,
+        },
+        vk::DescriptorPoolSize {
+            // sampler descriptor pool
+            ty: vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
+            descriptor_count: size,
+        },
+    ];
+
+    let descriptor_pool_create_info = vk::DescriptorPoolCreateInfo {
+        s_type: vk::StructureType::DESCRIPTOR_POOL_CREATE_INFO,
+        p_next: ptr::null(),
+        flags: vk::DescriptorPoolCreateFlags::empty(),
+        max_sets: size,
+        pool_size_count: pool_sizes.len() as u32,
+        p_pool_sizes: pool_sizes.as_ptr(),
+    };
+
+    unsafe {
+        vulkan
+            .device
+            .create_descriptor_pool(&descriptor_pool_create_info, None)
+            .expect("Failed to create Descriptor Pool!")
+    }
 }

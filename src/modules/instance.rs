@@ -258,8 +258,6 @@ impl VkInstance {
         }
     }
 
-  
-
     pub fn copy_buffer(
         &self,
         src_buffer: vk::Buffer,

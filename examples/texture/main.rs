@@ -10,16 +10,24 @@ use pipeline::{create_pipeline, Vertex};
 fn main() {
     let vertices = vec![
         Vertex {
-            pos: [-1.0, 1.0],
-            color: [0.0, 1.0, 0.0, 1.0],
+            pos: [-0.75, -0.75],
+            color: [1.0, 0.0, 0.0],
+            tex_coord: [1.0, 0.0],
         },
         Vertex {
-            pos: [1.0, 1.0],
-            color: [0.0, 0.0, 1.0, 1.0],
+            pos: [0.75, -0.75],
+            color: [0.0, 1.0, 0.0],
+            tex_coord: [0.0, 0.0],
         },
         Vertex {
-            pos: [0.0, -1.0],
-            color: [1.0, 0.0, 0.0, 1.0],
+            pos: [0.75, 0.75],
+            color: [0.0, 0.0, 1.0],
+            tex_coord: [0.0, 1.0],
+        },
+        Vertex {
+            pos: [-0.75, 0.75],
+            color: [1.0, 1.0, 1.0],
+            tex_coord: [1.0, 1.0],
         },
     ];
 
@@ -38,10 +46,8 @@ fn main() {
     let render_pass = swapchain.create_render_pass(&vulkan.device);
     let frame_buffers = swapchain.create_frame_buffers(&render_pass, &vulkan);
 
-    let descriptor_pool = vulkan.create_descriptor_pool(3);
-
     let (pipeline, layout, vertex_descriptor, descriptor) =
-        create_pipeline(&swapchain, render_pass, &descriptor_pool, &vulkan);
+        create_pipeline(&swapchain, render_pass, &vulkan);
 
     let mut index_buffer = shader::create_index_buffer(&indices, &vulkan);
     let mut vertex_buffer = shader::create_vertex_buffer(&vertices, &vulkan, &vertex_descriptor);
@@ -142,7 +148,7 @@ fn main() {
             vulkan.device.destroy_render_pass(render_pass, None);
             vulkan.device.destroy_pipeline(pipeline, None);
             vulkan.device.destroy_pipeline_layout(layout, None);
-            vulkan.device.destroy_descriptor_pool(descriptor_pool, None);
+     
             vertex_buffer.destroy(&vulkan);
             index_buffer.destroy(&vulkan);
         },
