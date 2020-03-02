@@ -42,7 +42,7 @@ fn main() {
     let render_pass = swapchain.create_render_pass(&vulkan.device);
     let frame_buffers = swapchain.create_frame_buffers(&render_pass, &vulkan);
 
-    let (pipeline, layout, vertex_descriptor, descriptors, texture) =
+    let (pipeline, layout, vertex_descriptor, mut descriptors, texture) =
         create_pipeline(&swapchain, render_pass, &vulkan);
 
     let mut index_buffer = shader::create_index_buffer(&indices, &vulkan);
@@ -136,15 +136,18 @@ fn main() {
             vulkan.render_frame(frame, &swapchain, &command_buffers);
         }
         Event::LoopDestroyed => unsafe {
-            vulkan.wait_idle().unwrap();
+            vulkan.wait_idle();
 
             for &framebuffer in frame_buffers.iter() {
                 vulkan.device.destroy_framebuffer(framebuffer, None);
             }
+            texture.destroy(&vulkan);
             swapchain.destroy(&vulkan);
             vulkan.device.destroy_render_pass(render_pass, None);
             vulkan.device.destroy_pipeline(pipeline, None);
             vulkan.device.destroy_pipeline_layout(layout, None);
+            vulkan.device.destroy_descriptor_pool(descriptor_pool, None);
+            descriptors.destroy(&vulkan);
             vertex_buffer.destroy(&vulkan);
             index_buffer.destroy(&vulkan);
         },

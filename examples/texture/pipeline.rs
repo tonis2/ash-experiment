@@ -230,11 +230,7 @@ pub fn create_pipeline(
             .device
             .destroy_shader_module(fragment_shader_module, None);
 
-        let texture = create_texture(
-            &Path::new("examples/assets/texture.jpg"),
-            &vulkan,
-            &swapchain,
-        );
+        let texture = create_texture(&Path::new("examples/assets/texture.jpg"), &vulkan);
 
         let imageview_info = vk::ImageViewCreateInfo {
             s_type: vk::StructureType::IMAGE_VIEW_CREATE_INFO,
@@ -271,8 +267,8 @@ pub fn create_pipeline(
             ..Default::default()
         };
 
-        let sampler = vulkan.create_texture_sampler(sampler_create_info);
-        let texture_image_view = vulkan.create_image_view(imageview_info);
+        // let sampler = vulkan.create_texture_sampler(sampler_create_info);
+        // let texture_image_view = vulkan.create_image_view(imageview_info);
 
         (
             pipeline[0],
@@ -301,7 +297,7 @@ pub fn create_uniform_data(swapchain: &Swapchain) -> UniformBufferObject {
     }
 }
 
-pub fn create_texture(image_path: &Path, vulkan: &VkInstance, swapchain: &Swapchain) -> Image {
+pub fn create_texture(image_path: &Path, vulkan: &VkInstance) -> Image {
     let mut image_object = image::open(image_path).unwrap(); // this function is slow in debug mode.
     image_object = image_object.flipv();
     let (image_width, image_height) = (image_object.width(), image_object.height());
@@ -353,8 +349,22 @@ pub fn create_texture(image_path: &Path, vulkan: &VkInstance, swapchain: &Swapch
         vk::MemoryPropertyFlags::DEVICE_LOCAL,
         &vulkan,
     );
-
+    vulkan.transition_image_layout(
+        image,
+        vk::Format::R8G8B8A8_UNORM,
+        vk::ImageLayout::UNDEFINED,
+        vk::ImageLayout::TRANSFER_DST_OPTIMAL,
+    );
     vulkan.copy_buffer_to_image(buffer.buffer, image, image_width, image_height);
+
+    vulkan.transition_image_layout(
+        image,
+        vk::Format::R8G8B8A8_UNORM,
+        vk::ImageLayout::TRANSFER_DST_OPTIMAL,
+        vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
+    );
+
+    buffer.destroy(&vulkan);
 
     Image { image, memory }
 }

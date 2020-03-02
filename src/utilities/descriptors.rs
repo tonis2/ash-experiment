@@ -1,4 +1,4 @@
-use super::{buffer::Buffer};
+use super::buffer::Buffer;
 use crate::VkInstance;
 use ash::{version::DeviceV1_0, vk};
 use std::ptr;
@@ -86,5 +86,14 @@ impl DescriptorInfo {
                 .update_descriptor_sets(&descriptor_write_sets, &[]);
         }
         descriptor_sets
+    }
+
+    pub fn destroy(&mut self, vulkan: &VkInstance) {
+        for layout in &self.layouts {
+            unsafe {
+                vulkan.device.destroy_descriptor_set_layout(*layout, None);
+                self.buffer.destroy(&vulkan);
+            }
+        }
     }
 }

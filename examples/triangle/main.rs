@@ -120,7 +120,7 @@ fn main() {
             vulkan.render_frame(frame, &swapchain, &command_buffers);
         }
         Event::LoopDestroyed => unsafe {
-            vulkan.wait_idle().unwrap();
+            vulkan.wait_idle();
 
             for &framebuffer in frame_buffers.iter() {
                 vulkan.device.destroy_framebuffer(framebuffer, None);

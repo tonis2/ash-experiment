@@ -64,8 +64,12 @@ impl VkInstance {
         }
     }
 
-    pub fn wait_idle(&self) -> std::result::Result<(), vk::Result> {
-        unsafe { self.device.device_wait_idle() }
+    pub fn wait_idle(&self) {
+        unsafe {
+            self.device
+                .device_wait_idle()
+                .expect("failed to wait device idle")
+        }
     }
 
     pub fn create_command_buffers(&self, amount: usize) -> Vec<vk::CommandBuffer> {
@@ -395,12 +399,78 @@ impl VkInstance {
                 .expect("Failed to create Sampler!")
         }
     }
+
+    pub fn transition_image_layout(
+        &self,
+        image: vk::Image,
+        _format: vk::Format,
+        old_layout: vk::ImageLayout,
+        new_layout: vk::ImageLayout,
+    ) {
+        let command_buffer = self.begin_single_time_command();
+
+        let src_access_mask;
+        let dst_access_mask;
+        let source_stage;
+        let destination_stage;
+
+        if old_layout == vk::ImageLayout::UNDEFINED
+            && new_layout == vk::ImageLayout::TRANSFER_DST_OPTIMAL
+        {
+            src_access_mask = vk::AccessFlags::empty();
+            dst_access_mask = vk::AccessFlags::TRANSFER_WRITE;
+            source_stage = vk::PipelineStageFlags::TOP_OF_PIPE;
+            destination_stage = vk::PipelineStageFlags::TRANSFER;
+        } else if old_layout == vk::ImageLayout::TRANSFER_DST_OPTIMAL
+            && new_layout == vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL
+        {
+            src_access_mask = vk::AccessFlags::TRANSFER_WRITE;
+            dst_access_mask = vk::AccessFlags::SHADER_READ;
+            source_stage = vk::PipelineStageFlags::TRANSFER;
+            destination_stage = vk::PipelineStageFlags::FRAGMENT_SHADER;
+        } else {
+            panic!("Unsupported layout transition!")
+        }
+
+        let image_barriers = [vk::ImageMemoryBarrier {
+            s_type: vk::StructureType::IMAGE_MEMORY_BARRIER,
+            p_next: ptr::null(),
+            src_access_mask,
+            dst_access_mask,
+            old_layout,
+            new_layout,
+            src_queue_family_index: vk::QUEUE_FAMILY_IGNORED,
+            dst_queue_family_index: vk::QUEUE_FAMILY_IGNORED,
+            image,
+            subresource_range: vk::ImageSubresourceRange {
+                aspect_mask: vk::ImageAspectFlags::COLOR,
+                base_mip_level: 0,
+                level_count: 1,
+                base_array_layer: 0,
+                layer_count: 1,
+            },
+        }];
+
+        unsafe {
+            self.device.cmd_pipeline_barrier(
+                command_buffer,
+                source_stage,
+                destination_stage,
+                vk::DependencyFlags::empty(),
+                &[],
+                &[],
+                &image_barriers,
+            );
+        }
+
+        self.end_single_time_command(command_buffer);
+    }
 }
 
 impl Drop for VkInstance {
     fn drop(&mut self) {
         unsafe {
-            self.wait_idle().unwrap();
+            self.wait_idle();
             self.surface
                 .surface_loader
                 .destroy_surface(self.surface.surface, None);

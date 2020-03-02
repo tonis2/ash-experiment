@@ -53,4 +53,11 @@ impl Image {
 
         (texture_image, texture_image_memory)
     }
+
+    pub fn destroy(&self, vulkan: &VkInstance) {
+        unsafe {
+            vulkan.device.destroy_image(self.image, None);
+            vulkan.device.free_memory(self.memory, None);
+        }
+    }
 }
