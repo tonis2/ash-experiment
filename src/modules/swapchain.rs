@@ -102,7 +102,10 @@ impl Swapchain {
                         image,
                     };
 
-                    vulkan.create_image_view(imageview_create_info)
+                    vulkan
+                        .device
+                        .create_image_view(&imageview_create_info, None)
+                        .expect("Failed to create Image View!")
                 })
                 .collect();
 
@@ -314,5 +317,3 @@ pub fn choose_swapchain_format(
 
     return available_formats.first().unwrap().clone();
 }
-
-

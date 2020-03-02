@@ -258,13 +258,7 @@ impl VkInstance {
         }
     }
 
-    pub fn create_image_view(&self, image_create_info: vk::ImageViewCreateInfo) -> vk::ImageView {
-        unsafe {
-            self.device
-                .create_image_view(&image_create_info, None)
-                .expect("Failed to create Image View!")
-        }
-    }
+  
 
     pub fn copy_buffer(
         &self,

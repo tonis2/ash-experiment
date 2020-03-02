@@ -1,15 +1,11 @@
 mod pipeline;
 
-use vulkan::{
-    utilities::{shader, Image},
-    Swapchain, VkInstance,
-};
+use vulkan::{utilities::shader, Swapchain, VkInstance};
 use winit::event::{ElementState, Event, KeyboardInput, VirtualKeyCode, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop};
 
 use ash::{version::DeviceV1_0, vk};
 use pipeline::{create_pipeline, Vertex};
-use std::path::Path;
 
 fn main() {
     let vertices = vec![
@@ -42,15 +38,15 @@ fn main() {
     let render_pass = swapchain.create_render_pass(&vulkan.device);
     let frame_buffers = swapchain.create_frame_buffers(&render_pass, &vulkan);
 
-    let (pipeline, layout, vertex_descriptor, mut descriptors, texture) =
-        create_pipeline(&swapchain, render_pass, &vulkan);
+    let descriptor_pool = vulkan.create_descriptor_pool(3);
+
+    let (pipeline, layout, vertex_descriptor, descriptor) =
+        create_pipeline(&swapchain, render_pass, &descriptor_pool, &vulkan);
 
     let mut index_buffer = shader::create_index_buffer(&indices, &vulkan);
     let mut vertex_buffer = shader::create_vertex_buffer(&vertices, &vulkan, &vertex_descriptor);
 
-    let descriptor_pool = vulkan.create_descriptor_pool(swapchain.image_views.len());
     let command_buffers = vulkan.create_command_buffers(swapchain.image_views.len());
-    let uniform_descriptor_sets = descriptors.build(&vulkan, &descriptor_pool, 1);
 
     event_loop.run(move |event, _, control_flow| match event {
         Event::WindowEvent { event, .. } => match event {
@@ -113,7 +109,7 @@ fn main() {
                         vk::PipelineBindPoint::GRAPHICS,
                         layout,
                         0,
-                        &uniform_descriptor_sets,
+                        &descriptor,
                         &[],
                     );
                     device.cmd_set_viewport(command_buffer, 0, &viewports);
@@ -141,13 +137,12 @@ fn main() {
             for &framebuffer in frame_buffers.iter() {
                 vulkan.device.destroy_framebuffer(framebuffer, None);
             }
-            texture.destroy(&vulkan);
+            // texture.destroy(&vulkan);
             swapchain.destroy(&vulkan);
             vulkan.device.destroy_render_pass(render_pass, None);
             vulkan.device.destroy_pipeline(pipeline, None);
             vulkan.device.destroy_pipeline_layout(layout, None);
             vulkan.device.destroy_descriptor_pool(descriptor_pool, None);
-            descriptors.destroy(&vulkan);
             vertex_buffer.destroy(&vulkan);
             index_buffer.destroy(&vulkan);
         },
