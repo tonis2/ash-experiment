@@ -204,7 +204,7 @@ pub fn create_pipeline(
     let imageview_info = vk::ImageViewCreateInfo {
         s_type: vk::StructureType::IMAGE_VIEW_CREATE_INFO,
         view_type: vk::ImageViewType::TYPE_2D,
-        format: swapchain.format,
+        format: vk::Format::R8G8B8A8_UNORM,
         components: vk::ComponentMapping {
             r: vk::ComponentSwizzle::IDENTITY,
             g: vk::ComponentSwizzle::IDENTITY,
@@ -236,13 +236,13 @@ pub fn create_pipeline(
         ..Default::default()
     };
 
-    // let sampler = vulkan.create_texture_sampler(sampler_create_info);
-    // let image_view = unsafe {
-    //     vulkan
-    //         .device
-    //         .create_image_view(&imageview_info, None)
-    //         .expect("Failed to create Image View!")
-    // };
+    let sampler = vulkan.create_texture_sampler(sampler_create_info);
+    let image_view = unsafe {
+        vulkan
+            .device
+            .create_image_view(&imageview_info, None)
+            .expect("Failed to create Image View!")
+    };
     //Create uniform buffer
     let (descriptor_set, descriptor_layout) =
         create_descriptors(descriptor_info, uniform_buffer, &descriptor_pool, &vulkan);
