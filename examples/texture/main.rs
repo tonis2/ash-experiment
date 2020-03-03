@@ -1,7 +1,7 @@
 mod pipeline;
 mod renderpass;
 
-use vulkan::{Swapchain, VkInstance};
+use vulkan::{utilities::FPSLimiter, Swapchain, VkInstance};
 use winit::event::{ElementState, Event, KeyboardInput, VirtualKeyCode, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop};
 
@@ -53,7 +53,7 @@ fn main() {
     let mut vertex_buffer = Pipeline::create_vertex_buffer(&vertices, &vulkan);
 
     let command_buffers = vulkan.create_command_buffers(swapchain.image_views.len());
-
+    let mut tick_counter = FPSLimiter::new();
     event_loop.run(move |event, _, control_flow| match event {
         Event::WindowEvent { event, .. } => match event {
             WindowEvent::CloseRequested => *control_flow = ControlFlow::Exit,
@@ -73,6 +73,9 @@ fn main() {
         },
         Event::MainEventsCleared => {
             window.request_redraw();
+            print!("FPS: {}\r", tick_counter.fps());
+
+            tick_counter.tick_frame();
         }
         Event::RedrawRequested(_window_id) => {
             let extent = vec![vk::Rect2D {

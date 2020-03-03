@@ -16,17 +16,17 @@ use std::ptr;
 
 #[derive(Clone, Debug, Copy)]
 pub struct Vertex {
-    pub pos: [f32; 3],
-    pub color: [f32; 3],
+    pub pos: [f32; 4],
+    pub color: [f32; 4],
     pub tex_coord: [f32; 2],
 }
 
 #[repr(C)]
 #[derive(Clone, Debug, Copy)]
 pub struct UniformBufferObject {
-    model: Matrix4<f32>,
-    view: Matrix4<f32>,
-    proj: Matrix4<f32>,
+   pub model: Matrix4<f32>,
+   pub view: Matrix4<f32>,
+   pub proj: Matrix4<f32>,
 }
 
 pub struct Pipeline {
@@ -36,15 +36,17 @@ pub struct Pipeline {
     pub texture: (Image, vk::ImageView),
     pub depth_image: (Image, vk::ImageView),
     pub sampler: vk::Sampler,
+    pub uniform_buffer: Buffer,
+    pub uniform_transform: UniformBufferObject,
+
     descriptor_pool: vk::DescriptorPool,
     descriptor_layout: Vec<vk::DescriptorSetLayout>,
-    uniform_buffer: Buffer,
 }
 
 impl Pipeline {
     pub fn create_index_buffer(indices: &Vec<u32>, vulkan: &VkInstance) -> Buffer {
         let index_input_buffer_info = vk::BufferCreateInfo {
-            size: (std::mem::size_of_val(indices) as vk::DeviceSize) * 2,
+            size: (std::mem::size_of_val(&indices[..]) as vk::DeviceSize),
             usage: vk::BufferUsageFlags::INDEX_BUFFER,
             sharing_mode: vk::SharingMode::EXCLUSIVE,
             ..Default::default()
@@ -81,7 +83,7 @@ impl Pipeline {
             vk::VertexInputAttributeDescription {
                 binding: 0,
                 location: 0,
-                format: vk::Format::R32G32_SFLOAT,
+                format: vk::Format::R32G32B32_SFLOAT,
                 offset: offset_of!(Vertex, pos) as u32,
             },
             vk::VertexInputAttributeDescription {
@@ -252,7 +254,7 @@ impl Pipeline {
         };
 
         let texture = create_texture(
-            &Path::new("examples/assets/texture.jpg"),
+            &Path::new("examples/assets/chalet.jpg"),
             &mut imageview_info,
             &vulkan,
         );
@@ -358,6 +360,35 @@ impl Pipeline {
             descriptor_pool,
             descriptor_layout,
             uniform_buffer,
+            uniform_transform: uniform_data
+        }
+    }
+
+    pub fn update_uniform_buffer(&mut self, delta_time: f32, vulkan: &VkInstance) {
+        self.uniform_transform.model = cgmath::Matrix4::from_axis_angle(
+            cgmath::Vector3::new(0.0, 0.0, 1.0),
+            cgmath::Deg(90.0) * delta_time,
+        ) * self.uniform_transform.model;
+
+        let ubos = [self.uniform_transform.clone()];
+
+        let buffer_size = (std::mem::size_of::<UniformBufferObject>() * ubos.len()) as u64;
+
+        unsafe {
+            let data_ptr =
+            vulkan.device
+                    .map_memory(
+                        self.uniform_buffer.memory,
+                        0,
+                        buffer_size,
+                        vk::MemoryMapFlags::empty(),
+                    )
+                    .expect("Failed to Map Memory") as *mut UniformBufferObject;
+
+            data_ptr.copy_from_nonoverlapping(ubos.as_ptr(), ubos.len());
+
+            vulkan.device
+                .unmap_memory(self.uniform_buffer.memory);
         }
     }
 

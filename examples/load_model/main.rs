@@ -1,7 +1,8 @@
 mod pipeline;
 mod renderpass;
 
-use vulkan::{Swapchain, VkInstance};
+use std::path::Path;
+use vulkan::{utilities::FPSLimiter, Swapchain, VkInstance};
 use winit::event::{ElementState, Event, KeyboardInput, VirtualKeyCode, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop};
 
@@ -9,55 +10,12 @@ use ash::{version::DeviceV1_0, vk};
 use pipeline::{Pipeline, Vertex};
 
 fn main() {
-    let vertices = vec![
-        Vertex {
-            pos: [-0.75, -0.75, 0.0],
-            color: [1.0, 0.0, 0.0],
-            tex_coord: [0.0, 0.0],
-        },
-        Vertex {
-            pos: [0.75, -0.75, 0.0],
-            color: [0.0, 1.0, 0.0],
-            tex_coord: [1.0, 0.0],
-        },
-        Vertex {
-            pos: [0.75, 0.75, 0.0],
-            color: [0.0, 0.0, 1.0],
-            tex_coord: [1.0, 1.0],
-        },
-        Vertex {
-            pos: [-0.75, 0.75, 0.0],
-            color: [1.0, 1.0, 1.0],
-            tex_coord: [0.0, 1.0],
-        },
-        Vertex {
-            pos: [-0.75, -0.75, -0.75],
-            color: [1.0, 0.0, 0.0],
-            tex_coord: [0.0, 0.0],
-        },
-        Vertex {
-            pos: [0.75, -0.75, -0.75],
-            color: [0.0, 1.0, 0.0],
-            tex_coord: [1.0, 0.0],
-        },
-        Vertex {
-            pos: [0.75, 0.75, -0.75],
-            color: [0.0, 0.0, 1.0],
-            tex_coord: [1.0, 1.0],
-        },
-        Vertex {
-            pos: [-0.75, 0.75, -0.75],
-            color: [1.0, 1.0, 1.0],
-            tex_coord: [0.0, 1.0],
-        },
-    ];
-
-    let indices = vec![0, 1, 2, 2, 3, 0, 4, 5, 6, 6, 7, 4];
+    let (vertices, indices) = load_model(Path::new("examples/assets/chalet.obj"));
 
     let event_loop = EventLoop::new();
     let window = winit::window::WindowBuilder::new()
         .with_title("test")
-        .with_inner_size(winit::dpi::LogicalSize::new(800.0, 600.0))
+        .with_inner_size(winit::dpi::LogicalSize::new(1500.0, 900.0))
         .build(&event_loop)
         .expect("Failed to create window.");
 
@@ -76,6 +34,7 @@ fn main() {
 
     let command_buffers = vulkan.create_command_buffers(swapchain.image_views.len());
 
+    let mut tick_counter = FPSLimiter::new();
     event_loop.run(move |event, _, control_flow| match event {
         Event::WindowEvent { event, .. } => match event {
             WindowEvent::CloseRequested => *control_flow = ControlFlow::Exit,
@@ -95,8 +54,14 @@ fn main() {
         },
         Event::MainEventsCleared => {
             window.request_redraw();
+            print!("FPS: {}\r", tick_counter.fps());
+            tick_counter.tick_frame();
         }
         Event::RedrawRequested(_window_id) => {
+            let delta_time = tick_counter.delta_time();
+
+            pipeline.update_uniform_buffer(delta_time, &vulkan);
+
             let frame = vulkan.queue.next_frame(&vulkan, &swapchain);
 
             let extent = vec![vk::Rect2D {
@@ -128,6 +93,7 @@ fn main() {
                 min_depth: 0.0,
                 max_depth: 1.0,
             }];
+
             vulkan.build_frame(
                 frame.image_index,
                 &command_buffers,
@@ -184,4 +150,39 @@ fn main() {
         },
         _ => {}
     });
+}
+
+fn load_model(model_path: &Path) -> (Vec<Vertex>, Vec<u32>) {
+    let model_obj = tobj::load_obj(model_path).expect("Failed to load model object!");
+
+    let mut vertices = vec![];
+    let mut indices = vec![];
+
+    let (models, _) = model_obj;
+    for m in models.iter() {
+        let mesh = &m.mesh;
+
+        if mesh.texcoords.len() == 0 {
+            panic!("Missing texture coordinate for the model.")
+        }
+
+        let total_vertices_count = mesh.positions.len() / 3;
+        for i in 0..total_vertices_count {
+            let vertex = Vertex {
+                pos: [
+                    mesh.positions[i * 3],
+                    mesh.positions[i * 3 + 1],
+                    mesh.positions[i * 3 + 2],
+                    1.0,
+                ],
+                color: [1.0, 1.0, 1.0, 1.0],
+                tex_coord: [mesh.texcoords[i * 2], mesh.texcoords[i * 2 + 1]],
+            };
+            vertices.push(vertex);
+        }
+
+        indices = mesh.indices.clone();
+    }
+
+    (vertices, indices)
 }

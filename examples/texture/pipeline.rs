@@ -24,9 +24,9 @@ pub struct Vertex {
 #[repr(C)]
 #[derive(Clone, Debug, Copy)]
 pub struct UniformBufferObject {
-    model: Matrix4<f32>,
-    view: Matrix4<f32>,
-    proj: Matrix4<f32>,
+    pub model: Matrix4<f32>,
+    pub view: Matrix4<f32>,
+    pub proj: Matrix4<f32>,
 }
 
 pub struct Pipeline {
@@ -36,9 +36,9 @@ pub struct Pipeline {
     pub texture: Image,
     pub image_view: vk::ImageView,
     pub sampler: vk::Sampler,
+    pub uniform_buffer: Buffer,
     descriptor_pool: vk::DescriptorPool,
     descriptor_layout: Vec<vk::DescriptorSetLayout>,
-    uniform_buffer: Buffer,
 }
 
 impl Pipeline {
