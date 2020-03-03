@@ -553,28 +553,24 @@ fn create_descriptors(
         vk::WriteDescriptorSet {
             // transform uniform
             s_type: vk::StructureType::WRITE_DESCRIPTOR_SET,
-            p_next: ptr::null(),
             dst_set: descriptor_sets[0],
             dst_binding: 0,
             dst_array_element: 0,
             descriptor_count: 1,
             descriptor_type: vk::DescriptorType::UNIFORM_BUFFER,
-            p_image_info: ptr::null(),
             p_buffer_info: buffer_info.as_ptr(),
-            p_texel_buffer_view: ptr::null(),
+            ..Default::default()
         },
         vk::WriteDescriptorSet {
             // sampler uniform
             s_type: vk::StructureType::WRITE_DESCRIPTOR_SET,
-            p_next: ptr::null(),
             dst_set: descriptor_sets[0],
             dst_binding: 1,
             dst_array_element: 0,
             descriptor_count: 1,
             descriptor_type: vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
             p_image_info: descriptor_image_infos.as_ptr(),
-            p_buffer_info: ptr::null(),
-            p_texel_buffer_view: ptr::null(),
+            ..Default::default()
         },
     ];
 
