@@ -1,11 +1,11 @@
 mod pipeline;
 
-use vulkan::{utilities::shader, Swapchain, VkInstance};
+use vulkan::{Swapchain, VkInstance};
 use winit::event::{ElementState, Event, KeyboardInput, VirtualKeyCode, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop};
 
 use ash::{version::DeviceV1_0, vk};
-use pipeline::{create_pipeline, Vertex};
+use pipeline::Vertex;
 
 fn main() {
     let vertices = vec![
@@ -31,7 +31,7 @@ fn main() {
         },
     ];
 
-    let indices = vec![0, 1, 2];
+    let indices = vec![0, 1, 2, 2, 3, 0];
 
     let event_loop = EventLoop::new();
     let window = winit::window::WindowBuilder::new()
@@ -46,11 +46,11 @@ fn main() {
     let render_pass = swapchain.create_render_pass(&vulkan.device);
     let frame_buffers = swapchain.create_frame_buffers(&render_pass, &vulkan);
 
-    let (pipeline, layout, vertex_descriptor, descriptor) =
-        create_pipeline(&swapchain, render_pass, &vulkan);
+    let (pipeline, layout, descriptor) =
+        pipeline::create_pipeline(&swapchain, render_pass, &vulkan);
 
-    let mut index_buffer = shader::create_index_buffer(&indices, &vulkan);
-    let mut vertex_buffer = shader::create_vertex_buffer(&vertices, &vulkan, &vertex_descriptor);
+    let mut index_buffer = pipeline::create_index_buffer(&indices, &vulkan);
+    let mut vertex_buffer = pipeline::create_vertex_buffer(&vertices, &vulkan);
 
     let command_buffers = vulkan.create_command_buffers(swapchain.image_views.len());
 
@@ -132,7 +132,7 @@ fn main() {
                         0,
                         vk::IndexType::UINT32,
                     );
-                    device.cmd_draw_indexed(command_buffer, index_buffer.size, 1, 0, 0, 1);
+                    device.cmd_draw_indexed(command_buffer, indices.len() as u32, 1, 0, 0, 1);
                 },
             );
             vulkan.render_frame(frame, &swapchain, &command_buffers);
@@ -148,7 +148,7 @@ fn main() {
             vulkan.device.destroy_render_pass(render_pass, None);
             vulkan.device.destroy_pipeline(pipeline, None);
             vulkan.device.destroy_pipeline_layout(layout, None);
-     
+
             vertex_buffer.destroy(&vulkan);
             index_buffer.destroy(&vulkan);
         },

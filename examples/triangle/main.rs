@@ -1,11 +1,11 @@
 mod pipeline;
 
-use vulkan::{utilities::shader, Swapchain, VkInstance};
+use vulkan::{Swapchain, VkInstance};
 use winit::event::{ElementState, Event, KeyboardInput, VirtualKeyCode, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop};
 
 use ash::{version::DeviceV1_0, vk};
-use pipeline::{create_pipeline, Vertex};
+use pipeline::Vertex;
 
 fn main() {
     let vertices = vec![
@@ -38,10 +38,10 @@ fn main() {
     let render_pass = swapchain.create_render_pass(&vulkan.device);
     let frame_buffers = swapchain.create_frame_buffers(&render_pass, &vulkan);
 
-    let (pipeline, layout, vertex_descriptor) = create_pipeline(&swapchain, render_pass, &vulkan);
+    let (pipeline, layout) = pipeline::create_pipeline(&swapchain, render_pass, &vulkan);
 
-    let mut index_buffer = shader::create_index_buffer(&indices, &vulkan);
-    let mut vertex_buffer = shader::create_vertex_buffer(&vertices, &vulkan, &vertex_descriptor);
+    let mut index_buffer = pipeline::create_index_buffer(&indices, &vulkan);
+    let mut vertex_buffer = pipeline::create_vertex_buffer(&vertices, &vulkan);
 
     let command_buffers = vulkan.create_command_buffers(swapchain.image_views.len());
 

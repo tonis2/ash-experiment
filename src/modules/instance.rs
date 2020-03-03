@@ -256,6 +256,7 @@ impl VkInstance {
             Buffer {
                 size: 0,
                 buffer,
+                usage: info.usage,
                 memory: buffer_memory,
                 memory_requirements,
             }

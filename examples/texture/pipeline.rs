@@ -1,7 +1,7 @@
 use vulkan::{
     modules::swapchain::Swapchain,
     offset_of,
-    utilities::{Buffer, Image, Shader, VertexDescriptor},
+    utilities::{tools::load_shader, Buffer, Image},
     VkInstance,
 };
 
@@ -29,55 +29,67 @@ pub struct UniformBufferObject {
     proj: Matrix4<f32>,
 }
 
+pub fn create_index_buffer(indices: &Vec<u16>, vulkan: &VkInstance) -> Buffer {
+    let index_input_buffer_info = vk::BufferCreateInfo {
+        size: std::mem::size_of_val(indices) as vk::DeviceSize,
+        usage: vk::BufferUsageFlags::INDEX_BUFFER,
+        sharing_mode: vk::SharingMode::EXCLUSIVE,
+        ..Default::default()
+    };
+    let mut buffer = vulkan.create_buffer(index_input_buffer_info);
+    buffer.copy_to_buffer_dynamic(align_of::<u32>() as u64, &indices, &vulkan);
+    buffer
+}
+
+pub fn create_vertex_buffer(vertices: &[Vertex], vulkan: &VkInstance) -> Buffer {
+    let vertex_input_buffer_info = vk::BufferCreateInfo {
+        size: std::mem::size_of_val(vertices) as vk::DeviceSize,
+        usage: vk::BufferUsageFlags::VERTEX_BUFFER,
+        sharing_mode: vk::SharingMode::EXCLUSIVE,
+        ..Default::default()
+    };
+    let mut buffer = vulkan.create_buffer(vertex_input_buffer_info);
+    buffer.copy_to_buffer_dynamic(align_of::<Vertex>() as u64, &vertices, &vulkan);
+    buffer
+}
+
 //Creates a new pipeline
 pub fn create_pipeline(
     swapchain: &Swapchain,
     renderpass: vk::RenderPass,
     vulkan: &VkInstance,
-) -> (
-    vk::Pipeline,
-    vk::PipelineLayout,
-    VertexDescriptor,
-    Vec<vk::DescriptorSet>,
-) {
-    let vertex_descriptor = VertexDescriptor {
-        binding_descriptor: vec![vk::VertexInputBindingDescription {
+) -> (vk::Pipeline, vk::PipelineLayout, Vec<vk::DescriptorSet>) {
+    let vertex_binding = vec![vk::VertexInputBindingDescription {
+        binding: 0,
+        stride: mem::size_of::<Vertex>() as u32,
+        input_rate: vk::VertexInputRate::VERTEX,
+    }];
+    let vertex_attributes = vec![
+        vk::VertexInputAttributeDescription {
             binding: 0,
-            stride: mem::size_of::<Vertex>() as u32,
-            input_rate: vk::VertexInputRate::VERTEX,
-        }],
-        attribute_descriptor: vec![
-            vk::VertexInputAttributeDescription {
-                binding: 0,
-                location: 0,
-                format: vk::Format::R32G32_SFLOAT,
-                offset: offset_of!(Vertex, pos) as u32,
-            },
-            vk::VertexInputAttributeDescription {
-                binding: 0,
-                location: 1,
-                format: vk::Format::R32G32B32_SFLOAT,
-                offset: offset_of!(Vertex, color) as u32,
-            },
-            vk::VertexInputAttributeDescription {
-                binding: 0,
-                location: 2,
-                format: vk::Format::R32G32_SFLOAT,
-                offset: offset_of!(Vertex, tex_coord) as u32,
-            },
-        ],
-        size: 3 * std::mem::size_of::<Vertex>() as u64,
-        align: align_of::<Vertex>() as u64,
-    };
-
-    let descriptor_len = vertex_descriptor.attribute_descriptor.len() as u32;
-    let binding_len = vertex_descriptor.binding_descriptor.len() as u32;
+            location: 0,
+            format: vk::Format::R32G32_SFLOAT,
+            offset: offset_of!(Vertex, pos) as u32,
+        },
+        vk::VertexInputAttributeDescription {
+            binding: 0,
+            location: 1,
+            format: vk::Format::R32G32B32_SFLOAT,
+            offset: offset_of!(Vertex, color) as u32,
+        },
+        vk::VertexInputAttributeDescription {
+            binding: 0,
+            location: 2,
+            format: vk::Format::R32G32_SFLOAT,
+            offset: offset_of!(Vertex, tex_coord) as u32,
+        },
+    ];
 
     let vertex_input_state_info = vk::PipelineVertexInputStateCreateInfo {
-        vertex_attribute_description_count: descriptor_len,
-        p_vertex_attribute_descriptions: vertex_descriptor.attribute_descriptor.as_ptr(),
-        vertex_binding_description_count: binding_len,
-        p_vertex_binding_descriptions: vertex_descriptor.binding_descriptor.as_ptr(),
+        vertex_attribute_description_count: vertex_attributes.len() as u32,
+        p_vertex_attribute_descriptions: vertex_attributes.as_ptr(),
+        vertex_binding_description_count: vertex_binding.len() as u32,
+        p_vertex_binding_descriptions: vertex_binding.as_ptr(),
         ..Default::default()
     };
     let vertex_input_assembly_state_info = vk::PipelineInputAssemblyStateCreateInfo {
@@ -144,11 +156,32 @@ pub fn create_pipeline(
     let dynamic_state_info =
         vk::PipelineDynamicStateCreateInfo::builder().dynamic_states(&dynamic_state);
 
-    let (vertex_shader_module, fragment_shader_module) = Shader {
-        vertex_shader: "examples/texture/shaders/spv/shader-textures.vert.spv",
-        fragment_shader: "examples/texture/shaders/spv/shader-textures.frag.spv",
-    }
-    .load(&vulkan);
+    let vertex_shader = load_shader(&Path::new(
+        "examples/texture/shaders/spv/shader-textures.vert.spv",
+    ));
+    let frag_shader = load_shader(&Path::new(
+        "examples/texture/shaders/spv/shader-textures.frag.spv",
+    ));
+
+    let vertex_shader_module = unsafe {
+        vulkan
+            .device
+            .create_shader_module(
+                &vk::ShaderModuleCreateInfo::builder().code(&vertex_shader),
+                None,
+            )
+            .expect("Vertex shader module error")
+    };
+
+    let fragment_shader_module = unsafe {
+        vulkan
+            .device
+            .create_shader_module(
+                &vk::ShaderModuleCreateInfo::builder().code(&frag_shader),
+                None,
+            )
+            .expect("Fragment shader module error")
+    };
 
     let shader_entry_name = CString::new("main").unwrap();
     let shaders = &[
@@ -306,12 +339,7 @@ pub fn create_pipeline(
             .destroy_shader_module(fragment_shader_module, None);
     }
 
-    (
-        pipeline[0],
-        pipeline_layout,
-        vertex_descriptor,
-        descriptor_set,
-    )
+    (pipeline[0], pipeline_layout, descriptor_set)
 }
 
 pub fn create_uniform_data(swapchain: &Swapchain) -> UniformBufferObject {
@@ -358,7 +386,7 @@ pub fn create_texture(image_path: &Path, vulkan: &VkInstance) -> Image {
     };
 
     let mut buffer = vulkan.create_buffer(image_buffer);
-    buffer.copy_buffer::<u8>(image_size, &image_data, &vulkan);
+    buffer.copy_buffer::<u8>(&image_data, &vulkan);
 
     let image_create_info = vk::ImageCreateInfo {
         s_type: vk::StructureType::IMAGE_CREATE_INFO,
