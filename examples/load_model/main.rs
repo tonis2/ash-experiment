@@ -163,9 +163,9 @@ fn main() {
             }
 
             pipeline.destroy(&vulkan);
-            swapchain.destroy(&vulkan);
+           
             vulkan.device.destroy_render_pass(render_pass, None);
-
+            swapchain.destroy(&vulkan);
             vertex_buffer.destroy(&vulkan);
             index_buffer.destroy(&vulkan);
         },

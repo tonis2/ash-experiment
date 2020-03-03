@@ -16,7 +16,7 @@ impl Image {
         image_info: vk::ImageCreateInfo,
         required_memory_properties: vk::MemoryPropertyFlags,
         vulkan: &VkInstance,
-    ) -> (vk::Image, vk::DeviceMemory) {
+    ) -> Image {
         let texture_image = unsafe {
             vulkan
                 .device
@@ -49,9 +49,12 @@ impl Image {
                 .device
                 .bind_image_memory(texture_image, texture_image_memory, 0)
                 .expect("Failed to bind Image Memmory!");
-        }
+        };
 
-        (texture_image, texture_image_memory)
+        Image {
+            image: texture_image,
+            memory: texture_image_memory,
+        }
     }
 
     pub fn destroy(&self, vulkan: &VkInstance) {

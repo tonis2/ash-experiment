@@ -376,9 +376,10 @@ impl VkInstance {
     pub fn transition_image_layout(
         &self,
         image: vk::Image,
-        _format: vk::Format,
+        format: vk::Format,
         old_layout: vk::ImageLayout,
         new_layout: vk::ImageLayout,
+        mip_levels: u32,
     ) {
         let command_buffer = self.begin_single_time_command();
 
@@ -405,6 +406,16 @@ impl VkInstance {
             panic!("Unsupported layout transition!")
         }
 
+        let aspect_mask = if new_layout == vk::ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL {
+            if format == vk::Format::D32_SFLOAT_S8_UINT || format == vk::Format::D24_UNORM_S8_UINT {
+                vk::ImageAspectFlags::DEPTH | vk::ImageAspectFlags::STENCIL
+            } else {
+                vk::ImageAspectFlags::DEPTH
+            }
+        } else {
+            vk::ImageAspectFlags::COLOR
+        };
+
         let image_barriers = [vk::ImageMemoryBarrier {
             s_type: vk::StructureType::IMAGE_MEMORY_BARRIER,
             p_next: ptr::null(),
@@ -416,9 +427,9 @@ impl VkInstance {
             dst_queue_family_index: vk::QUEUE_FAMILY_IGNORED,
             image,
             subresource_range: vk::ImageSubresourceRange {
-                aspect_mask: vk::ImageAspectFlags::COLOR,
+                aspect_mask,
                 base_mip_level: 0,
-                level_count: 1,
+                level_count: mip_levels,
                 base_array_layer: 0,
                 layer_count: 1,
             },
@@ -435,8 +446,32 @@ impl VkInstance {
                 &image_barriers,
             );
         }
-
         self.end_single_time_command(command_buffer);
+    }
+
+    pub fn find_depth_format(
+        &self,
+        candidate_formats: &[vk::Format],
+        tiling: vk::ImageTiling,
+        features: vk::FormatFeatureFlags,
+    ) -> vk::Format {
+        for &format in candidate_formats.iter() {
+            let format_properties = unsafe {
+                self.instance
+                    .get_physical_device_format_properties(self.physical_device, format)
+            };
+            if tiling == vk::ImageTiling::LINEAR
+                && format_properties.linear_tiling_features.contains(features)
+            {
+                return format.clone();
+            } else if tiling == vk::ImageTiling::OPTIMAL
+                && format_properties.optimal_tiling_features.contains(features)
+            {
+                return format.clone();
+            }
+        }
+
+        panic!("Failed to find supported format!")
     }
 }
 

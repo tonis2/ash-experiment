@@ -213,8 +213,6 @@ impl Pipeline {
             },
         ];
 
-     
-
         let descriptor_info = vec![
             vk::DescriptorSetLayoutBinding {
                 // transform uniform
@@ -360,7 +358,7 @@ impl Pipeline {
             descriptors: descriptor_set,
             descriptor_pool,
             descriptor_layout,
-            uniform_buffer
+            uniform_buffer,
         }
     }
 
@@ -379,7 +377,7 @@ impl Pipeline {
                 .device
                 .destroy_descriptor_set_layout(self.descriptor_layout[0], None);
 
-                self.uniform_buffer.destroy(&vulkan);
+            self.uniform_buffer.destroy(&vulkan);
         }
     }
 }
@@ -451,18 +449,18 @@ pub fn create_texture(
         ..Default::default()
     };
 
-    let (image, memory) = Image::create_image(
+    let image = Image::create_image(
         image_create_info,
         vk::MemoryPropertyFlags::DEVICE_LOCAL,
         &vulkan,
     );
     vulkan.transition_image_layout(
-        image,
+        image.image,
         vk::Format::R8G8B8A8_UNORM,
         vk::ImageLayout::UNDEFINED,
         vk::ImageLayout::TRANSFER_DST_OPTIMAL,
+        1,
     );
-
 
     let buffer_image_regions = vec![vk::BufferImageCopy {
         image_subresource: vk::ImageSubresourceLayers {
@@ -472,7 +470,7 @@ pub fn create_texture(
             layer_count: 1,
         },
         image_extent: vk::Extent3D {
-            width:image_width,
+            width: image_width,
             height: image_height,
             depth: 1,
         },
@@ -481,19 +479,20 @@ pub fn create_texture(
         buffer_row_length: 0,
         image_offset: vk::Offset3D { x: 0, y: 0, z: 0 },
     }];
-    vulkan.copy_buffer_to_image(buffer.buffer, image, buffer_image_regions);
+    vulkan.copy_buffer_to_image(buffer.buffer, image.image, buffer_image_regions);
 
     vulkan.transition_image_layout(
-        image,
+        image.image,
         vk::Format::R8G8B8A8_UNORM,
         vk::ImageLayout::TRANSFER_DST_OPTIMAL,
         vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
+        1
     );
 
     buffer.destroy(&vulkan);
+    
+    image_info.image = image.image;
 
-    let img = Image { image, memory };
-    image_info.image = img.image;
     let image_view = unsafe {
         vulkan
             .device
@@ -501,7 +500,7 @@ pub fn create_texture(
             .expect("Failed to create Image View!")
     };
 
-    (img, image_view)
+    (image, image_view)
 }
 
 fn create_descriptors(
