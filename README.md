@@ -6,6 +6,6 @@ Practice rendering engine, built on top of vulkan and [ash](https://github.com/M
 Many thanks to these [examples](https://github.com/unknownue/vulkan-tutorial-rust)
 
 
-To run examples use
-
+To run examples download assets running `python3 ./download_assets.py`  
+and then you can choose examle with 
 `cargo run --example` + example name 
