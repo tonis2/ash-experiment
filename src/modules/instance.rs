@@ -402,6 +402,22 @@ impl VkInstance {
             dst_access_mask = vk::AccessFlags::SHADER_READ;
             source_stage = vk::PipelineStageFlags::TRANSFER;
             destination_stage = vk::PipelineStageFlags::FRAGMENT_SHADER;
+        } else if old_layout == vk::ImageLayout::UNDEFINED
+            && new_layout == vk::ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL
+        {
+            src_access_mask = vk::AccessFlags::empty();
+            dst_access_mask = vk::AccessFlags::DEPTH_STENCIL_ATTACHMENT_READ
+                | vk::AccessFlags::DEPTH_STENCIL_ATTACHMENT_WRITE;
+            source_stage = vk::PipelineStageFlags::TOP_OF_PIPE;
+            destination_stage = vk::PipelineStageFlags::EARLY_FRAGMENT_TESTS;
+        } else if old_layout == vk::ImageLayout::UNDEFINED
+            && new_layout == vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL
+        {
+            src_access_mask = vk::AccessFlags::empty();
+            dst_access_mask =
+                vk::AccessFlags::COLOR_ATTACHMENT_READ | vk::AccessFlags::COLOR_ATTACHMENT_WRITE;
+            source_stage = vk::PipelineStageFlags::TOP_OF_PIPE;
+            destination_stage = vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT;
         } else {
             panic!("Unsupported layout transition!")
         }
