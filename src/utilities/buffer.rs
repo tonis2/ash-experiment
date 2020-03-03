@@ -4,6 +4,7 @@ use ash::vk;
 
 use ash::util::Align;
 
+#[derive(Clone, Debug, Copy)]
 pub struct Buffer {
     pub size: u32,
     pub buffer: vk::Buffer,
@@ -30,8 +31,6 @@ impl Buffer {
             data_slice.copy_from_slice(data);
 
             vulkan.device.unmap_memory(self.memory);
-
-            self.size = data.len() as u32;
         }
     }
 

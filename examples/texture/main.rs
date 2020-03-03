@@ -97,7 +97,7 @@ fn main() {
             let frame = vulkan.queue.next_frame(&vulkan, &swapchain);
 
             vulkan.build_frame(
-                &frame,
+                frame.image_index,
                 &command_buffers,
                 &frame_buffers,
                 &render_pass,
@@ -134,7 +134,7 @@ fn main() {
                     device.cmd_draw_indexed(command_buffer, indices.len() as u32, 1, 0, 0, 1);
                 },
             );
-            vulkan.render_frame(frame, &swapchain, &command_buffers);
+            vulkan.render_frame(&frame, &swapchain, &command_buffers);
         }
         Event::LoopDestroyed => unsafe {
             vulkan.wait_idle();

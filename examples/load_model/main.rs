@@ -5,25 +5,53 @@ use winit::event::{ElementState, Event, KeyboardInput, VirtualKeyCode, WindowEve
 use winit::event_loop::{ControlFlow, EventLoop};
 
 use ash::{version::DeviceV1_0, vk};
-use pipeline::Vertex;
+use pipeline::{Pipeline, Vertex};
 
 fn main() {
     let vertices = vec![
         Vertex {
-            pos: [-1.0, 1.0],
-            color: [0.0, 1.0, 0.0, 1.0],
+            pos: [-0.75, -0.75, 0.0],
+            color: [1.0, 0.0, 0.0],
+            tex_coord: [0.0, 0.0],
         },
         Vertex {
-            pos: [1.0, 1.0],
-            color: [0.0, 0.0, 1.0, 1.0],
+            pos: [0.75, -0.75, 0.0],
+            color: [0.0, 1.0, 0.0],
+            tex_coord: [1.0, 0.0],
         },
         Vertex {
-            pos: [0.0, -1.0],
-            color: [1.0, 0.0, 0.0, 1.0],
+            pos: [0.75, 0.75, 0.0],
+            color: [0.0, 0.0, 1.0],
+            tex_coord: [1.0, 1.0],
+        },
+        Vertex {
+            pos: [-0.75, 0.75, 0.0],
+            color: [1.0, 1.0, 1.0],
+            tex_coord: [0.0, 1.0],
+        },
+        Vertex {
+            pos: [-0.75, -0.75, -0.75],
+            color: [1.0, 0.0, 0.0],
+            tex_coord: [0.0, 0.0],
+        },
+        Vertex {
+            pos: [0.75, -0.75, -0.75],
+            color: [0.0, 1.0, 0.0],
+            tex_coord: [1.0, 0.0],
+        },
+        Vertex {
+            pos: [0.75, 0.75, -0.75],
+            color: [0.0, 0.0, 1.0],
+            tex_coord: [1.0, 1.0],
+        },
+        Vertex {
+            pos: [-0.75, 0.75, -0.75],
+            color: [1.0, 1.0, 1.0],
+            tex_coord: [0.0, 1.0],
         },
     ];
 
-    let indices = vec![0, 1, 2];
+    let indices = vec![0, 1, 2, 2, 3, 0, 4, 5, 6, 6, 7, 4];
 
     let event_loop = EventLoop::new();
     let window = winit::window::WindowBuilder::new()
@@ -38,10 +66,10 @@ fn main() {
     let render_pass = swapchain.create_render_pass(&vulkan.device);
     let frame_buffers = swapchain.create_frame_buffers(&render_pass, &vulkan);
 
-    let (pipeline, layout) = pipeline::create_pipeline(&swapchain, render_pass, &vulkan);
+    let mut pipeline = Pipeline::create_pipeline(&swapchain, render_pass, &vulkan);
 
-    let mut index_buffer = pipeline::create_index_buffer(&indices, &vulkan);
-    let mut vertex_buffer = pipeline::create_vertex_buffer(&vertices, &vulkan);
+    let mut index_buffer = Pipeline::create_index_buffer(&indices, &vulkan);
+    let mut vertex_buffer = Pipeline::create_vertex_buffer(&vertices, &vulkan);
 
     let command_buffers = vulkan.create_command_buffers(swapchain.image_views.len());
 
@@ -66,6 +94,8 @@ fn main() {
             window.request_redraw();
         }
         Event::RedrawRequested(_window_id) => {
+            let frame = vulkan.queue.next_frame(&vulkan, &swapchain);
+
             let extent = vec![vk::Rect2D {
                 offset: vk::Offset2D { x: 0, y: 0 },
                 extent: swapchain.extent,
@@ -85,8 +115,6 @@ fn main() {
                 min_depth: 0.0,
                 max_depth: 1.0,
             }];
-            let frame = vulkan.queue.next_frame(&vulkan, &swapchain);
-
             vulkan.build_frame(
                 frame.image_index,
                 &command_buffers,
@@ -98,7 +126,15 @@ fn main() {
                     device.cmd_bind_pipeline(
                         command_buffer,
                         vk::PipelineBindPoint::GRAPHICS,
-                        pipeline,
+                        pipeline.pipeline,
+                    );
+                    device.cmd_bind_descriptor_sets(
+                        command_buffer,
+                        vk::PipelineBindPoint::GRAPHICS,
+                        pipeline.layout,
+                        0,
+                        &pipeline.descriptors,
+                        &[],
                     );
                     device.cmd_set_viewport(command_buffer, 0, &viewports);
                     device.cmd_set_scissor(command_buffer, 0, &extent);
@@ -114,7 +150,7 @@ fn main() {
                         0,
                         vk::IndexType::UINT32,
                     );
-                    device.cmd_draw_indexed(command_buffer, index_buffer.size, 1, 0, 0, 1);
+                    device.cmd_draw_indexed(command_buffer, indices.len() as u32, 1, 0, 0, 0);
                 },
             );
             vulkan.render_frame(&frame, &swapchain, &command_buffers);
@@ -125,10 +161,11 @@ fn main() {
             for &framebuffer in frame_buffers.iter() {
                 vulkan.device.destroy_framebuffer(framebuffer, None);
             }
+
+            pipeline.destroy(&vulkan);
             swapchain.destroy(&vulkan);
             vulkan.device.destroy_render_pass(render_pass, None);
-            vulkan.device.destroy_pipeline(pipeline, None);
-            vulkan.device.destroy_pipeline_layout(layout, None);
+
             vertex_buffer.destroy(&vulkan);
             index_buffer.destroy(&vulkan);
         },

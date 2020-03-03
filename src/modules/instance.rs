@@ -102,7 +102,7 @@ impl VkInstance {
 
     pub fn build_frame<F: Fn(vk::CommandBuffer, &ash::Device)>(
         &self,
-        frame: &Frame,
+        frame: usize,
         command_buffers: &Vec<vk::CommandBuffer>,
         frame_buffers: &Vec<vk::Framebuffer>,
         renderpass: &vk::RenderPass,
@@ -118,42 +118,38 @@ impl VkInstance {
         };
         unsafe {
             self.device
-                .begin_command_buffer(
-                    command_buffers[frame.image_index],
-                    &command_buffer_begin_info,
-                )
+                .begin_command_buffer(command_buffers[frame], &command_buffer_begin_info)
                 .expect("Failed to begin recording Command Buffer at beginning!");
 
             let render_pass_begin_info = vk::RenderPassBeginInfo {
                 s_type: vk::StructureType::RENDER_PASS_BEGIN_INFO,
                 p_next: ptr::null(),
                 render_pass: *renderpass,
-                framebuffer: frame_buffers[frame.image_index],
+                framebuffer: frame_buffers[frame],
                 render_area: render_area,
                 clear_value_count: clear_values.len() as u32,
                 p_clear_values: clear_values.as_ptr(),
             };
 
             self.device.cmd_begin_render_pass(
-                command_buffers[frame.image_index],
+                command_buffers[frame],
                 &render_pass_begin_info,
                 vk::SubpassContents::INLINE,
             );
 
-            apply(command_buffers[frame.image_index], &self.device);
+            apply(command_buffers[frame], &self.device);
+
+            self.device.cmd_end_render_pass(command_buffers[frame]);
 
             self.device
-                .cmd_end_render_pass(command_buffers[frame.image_index]);
-
-            self.device
-                .end_command_buffer(command_buffers[frame.image_index])
+                .end_command_buffer(command_buffers[frame])
                 .expect("Failed to record Command Buffer at Ending!");
         }
     }
 
     pub fn render_frame(
         &mut self,
-        frame: Frame,
+        frame: &Frame,
         swapchain: &Swapchain,
         command_buffers: &Vec<vk::CommandBuffer>,
     ) {
@@ -254,7 +250,7 @@ impl VkInstance {
                 .expect("Failed to bind Buffer");
 
             Buffer {
-                size: 0,
+                size: info.size as u32,
                 buffer,
                 usage: info.usage,
                 memory: buffer_memory,

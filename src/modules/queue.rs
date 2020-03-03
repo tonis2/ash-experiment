@@ -3,7 +3,7 @@ use ash::{version::DeviceV1_0, vk};
 use super::swapchain::Swapchain;
 use crate::constants::MAX_FRAMES_IN_FLIGHT;
 use std::ptr;
-
+#[derive(Debug)]
 pub struct Frame {
     pub wait_fences: Vec<vk::Fence>,
     pub signal_semaphores: Vec<vk::Semaphore>,
