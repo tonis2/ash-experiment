@@ -349,36 +349,16 @@ impl VkInstance {
         &self,
         buffer: vk::Buffer,
         image: vk::Image,
-        width: u32,
-        height: u32,
+        image_regions: Vec<vk::BufferImageCopy>,
     ) {
         let command_buffer = self.begin_single_time_command();
-
-        let buffer_image_regions = [vk::BufferImageCopy {
-            image_subresource: vk::ImageSubresourceLayers {
-                aspect_mask: vk::ImageAspectFlags::COLOR,
-                mip_level: 0,
-                base_array_layer: 0,
-                layer_count: 1,
-            },
-            image_extent: vk::Extent3D {
-                width,
-                height,
-                depth: 1,
-            },
-            buffer_offset: 0,
-            buffer_image_height: 0,
-            buffer_row_length: 0,
-            image_offset: vk::Offset3D { x: 0, y: 0, z: 0 },
-        }];
-
         unsafe {
             self.device.cmd_copy_buffer_to_image(
                 command_buffer,
                 buffer,
                 image,
                 vk::ImageLayout::TRANSFER_DST_OPTIMAL,
-                &buffer_image_regions,
+                &image_regions,
             );
         }
 

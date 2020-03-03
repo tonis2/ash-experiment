@@ -462,7 +462,26 @@ pub fn create_texture(
         vk::ImageLayout::UNDEFINED,
         vk::ImageLayout::TRANSFER_DST_OPTIMAL,
     );
-    vulkan.copy_buffer_to_image(buffer.buffer, image, image_width, image_height);
+
+
+    let buffer_image_regions = vec![vk::BufferImageCopy {
+        image_subresource: vk::ImageSubresourceLayers {
+            aspect_mask: vk::ImageAspectFlags::COLOR,
+            mip_level: 0,
+            base_array_layer: 0,
+            layer_count: 1,
+        },
+        image_extent: vk::Extent3D {
+            width:image_width,
+            height: image_height,
+            depth: 1,
+        },
+        buffer_offset: 0,
+        buffer_image_height: 0,
+        buffer_row_length: 0,
+        image_offset: vk::Offset3D { x: 0, y: 0, z: 0 },
+    }];
+    vulkan.copy_buffer_to_image(buffer.buffer, image, buffer_image_regions);
 
     vulkan.transition_image_layout(
         image,
