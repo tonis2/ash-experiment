@@ -1,4 +1,5 @@
 mod pipeline;
+mod renderpass;
 
 use vulkan::{Swapchain, VkInstance};
 use winit::event::{ElementState, Event, KeyboardInput, VirtualKeyCode, WindowEvent};
@@ -63,10 +64,12 @@ fn main() {
     let mut vulkan = VkInstance::new(&window);
 
     let swapchain = Swapchain::new(&vulkan, &window);
-    let render_pass = swapchain.create_render_pass(&vulkan.device);
-    let frame_buffers = swapchain.create_frame_buffers(&render_pass, &vulkan);
+    let render_pass = renderpass::create_render_pass(&swapchain, &vulkan);
 
     let mut pipeline = Pipeline::create_pipeline(&swapchain, render_pass, &vulkan);
+
+    let frame_buffers =
+        swapchain.create_frame_buffers(&render_pass, vec![pipeline.depth_image.1], &vulkan);
 
     let mut index_buffer = Pipeline::create_index_buffer(&indices, &vulkan);
     let mut vertex_buffer = Pipeline::create_vertex_buffer(&vertices, &vulkan);
@@ -101,11 +104,21 @@ fn main() {
                 extent: swapchain.extent,
             }];
 
-            let clear_values = vec![vk::ClearValue {
-                color: vk::ClearColorValue {
-                    float32: [0.0, 0.0, 0.0, 1.0],
+            let clear_values = vec![
+                vk::ClearValue {
+                    // clear value for color buffer
+                    color: vk::ClearColorValue {
+                        float32: [0.0, 0.0, 0.0, 1.0],
+                    },
                 },
-            }];
+                vk::ClearValue {
+                    // clear value for depth buffer
+                    depth_stencil: vk::ClearDepthStencilValue {
+                        depth: 1.0,
+                        stencil: 0,
+                    },
+                },
+            ];
 
             let viewports = [vk::Viewport {
                 x: 0.0,
@@ -163,7 +176,7 @@ fn main() {
             }
 
             pipeline.destroy(&vulkan);
-           
+
             vulkan.device.destroy_render_pass(render_pass, None);
             swapchain.destroy(&vulkan);
             vertex_buffer.destroy(&vulkan);

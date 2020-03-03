@@ -1,4 +1,5 @@
 mod pipeline;
+mod renderpass;
 
 use vulkan::{Swapchain, VkInstance};
 use winit::event::{ElementState, Event, KeyboardInput, VirtualKeyCode, WindowEvent};
@@ -43,8 +44,8 @@ fn main() {
     let mut vulkan = VkInstance::new(&window);
 
     let swapchain = Swapchain::new(&vulkan, &window);
-    let render_pass = swapchain.create_render_pass(&vulkan.device);
-    let frame_buffers = swapchain.create_frame_buffers(&render_pass, &vulkan);
+    let render_pass = renderpass::create_render_pass(&swapchain, &vulkan.device);
+    let frame_buffers = swapchain.create_frame_buffers(&render_pass, vec![], &vulkan);
 
     let mut pipeline = Pipeline::create_pipeline(&swapchain, render_pass, &vulkan);
 
