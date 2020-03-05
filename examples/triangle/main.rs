@@ -83,7 +83,7 @@ fn main() {
                 0,
                 vk::IndexType::UINT32,
             );
-            device.cmd_draw_indexed(command_buffer, index_buffer.size, 1, 0, 0, 1);
+            device.cmd_draw_indexed(command_buffer, indices.len() as u32, 1, 0, 0, 1);
         },
     );
 

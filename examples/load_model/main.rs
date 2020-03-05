@@ -36,8 +36,6 @@ fn main() {
 
     let mut tick_counter = FPSLimiter::new();
 
-
-
     let extent = vec![vk::Rect2D {
         offset: vk::Offset2D { x: 0, y: 0 },
         extent: swapchain.extent,

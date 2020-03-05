@@ -46,7 +46,7 @@ pub struct Pipeline {
 impl Pipeline {
     pub fn create_index_buffer(indices: &Vec<u32>, vulkan: &VkInstance) -> Buffer {
         let index_input_buffer_info = vk::BufferCreateInfo {
-            size: (std::mem::size_of_val(&indices[..]) as vk::DeviceSize),
+            size: std::mem::size_of_val(&indices) as vk::DeviceSize * indices.len() as u64,
             usage: vk::BufferUsageFlags::INDEX_BUFFER,
             sharing_mode: vk::SharingMode::EXCLUSIVE,
             ..Default::default()
