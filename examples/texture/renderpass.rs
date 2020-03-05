@@ -1,11 +1,11 @@
 use ash::{version::DeviceV1_0, vk};
-use vulkan::Swapchain;
 use std::ptr;
+use vulkan::{Swapchain, VkInstance};
 
-pub fn create_render_pass<D: DeviceV1_0>(swapchain: &Swapchain, device: &D) -> vk::RenderPass {
+pub fn create_render_pass(swapchain: &Swapchain, vulkan: &VkInstance) -> vk::RenderPass {
     let color_attachment = vk::AttachmentDescription {
-        format: swapchain.format,
         flags: vk::AttachmentDescriptionFlags::empty(),
+        format: swapchain.format,
         samples: vk::SampleCountFlags::TYPE_1,
         load_op: vk::AttachmentLoadOp::CLEAR,
         store_op: vk::AttachmentStoreOp::STORE,
@@ -15,15 +15,42 @@ pub fn create_render_pass<D: DeviceV1_0>(swapchain: &Swapchain, device: &D) -> v
         final_layout: vk::ImageLayout::PRESENT_SRC_KHR,
     };
 
+    let depth_format = vulkan.find_depth_format(
+        &[
+            vk::Format::D32_SFLOAT,
+            vk::Format::D32_SFLOAT_S8_UINT,
+            vk::Format::D24_UNORM_S8_UINT,
+        ],
+        vk::ImageTiling::OPTIMAL,
+        vk::FormatFeatureFlags::DEPTH_STENCIL_ATTACHMENT,
+    );
+
+    let depth_attachment = vk::AttachmentDescription {
+        flags: vk::AttachmentDescriptionFlags::empty(),
+        format: depth_format,
+        samples: vk::SampleCountFlags::TYPE_1,
+        load_op: vk::AttachmentLoadOp::CLEAR,
+        store_op: vk::AttachmentStoreOp::DONT_CARE,
+        stencil_load_op: vk::AttachmentLoadOp::DONT_CARE,
+        stencil_store_op: vk::AttachmentStoreOp::DONT_CARE,
+        initial_layout: vk::ImageLayout::UNDEFINED,
+        final_layout: vk::ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+    };
+
     let color_attachment_ref = vk::AttachmentReference {
         attachment: 0,
         layout: vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL,
     };
 
+    let depth_attachment_ref = vk::AttachmentReference {
+        attachment: 1,
+        layout: vk::ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+    };
+
     let subpasses = [vk::SubpassDescription {
         color_attachment_count: 1,
         p_color_attachments: &color_attachment_ref,
-        p_depth_stencil_attachment: ptr::null(),
+        p_depth_stencil_attachment: &depth_attachment_ref,
         flags: vk::SubpassDescriptionFlags::empty(),
         pipeline_bind_point: vk::PipelineBindPoint::GRAPHICS,
         input_attachment_count: 0,
@@ -33,7 +60,7 @@ pub fn create_render_pass<D: DeviceV1_0>(swapchain: &Swapchain, device: &D) -> v
         p_preserve_attachments: ptr::null(),
     }];
 
-    let render_pass_attachments = [color_attachment];
+    let render_pass_attachments = [color_attachment, depth_attachment];
 
     let subpass_dependencies = [vk::SubpassDependency {
         src_subpass: vk::SUBPASS_EXTERNAL,
@@ -59,7 +86,8 @@ pub fn create_render_pass<D: DeviceV1_0>(swapchain: &Swapchain, device: &D) -> v
     };
 
     unsafe {
-        device
+        vulkan
+            .device
             .create_render_pass(&renderpass_create_info, None)
             .expect("Failed to create render pass!")
     }

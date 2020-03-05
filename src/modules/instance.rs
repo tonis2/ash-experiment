@@ -5,6 +5,7 @@ use ash::{
 
 use std::ffi::CString;
 use std::ptr;
+use std::rc::Rc;
 use winit::window::Window;
 
 use super::{
@@ -262,11 +263,12 @@ impl VkInstance {
                 usage: info.usage,
                 memory: buffer_memory,
                 memory_requirements,
+                device: Rc::new(self.device.clone()),
             }
         }
     }
 
-    pub fn copy_buffer(&self, src_buffer: Buffer, dst_buffer: Buffer) {
+    pub fn copy_buffer(&self, src_buffer: Buffer, dst_buffer: &Buffer) {
         let command_buffer = self.begin_single_time_command();
 
         let copy_regions = [vk::BufferCopy {
@@ -285,6 +287,7 @@ impl VkInstance {
         }
 
         self.end_single_time_command(command_buffer);
+        src_buffer.destroy();
     }
 
     pub fn begin_single_time_command(&self) -> vk::CommandBuffer {

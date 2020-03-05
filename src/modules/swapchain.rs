@@ -132,6 +132,7 @@ impl Swapchain {
             let mut all_attachments: Vec<vk::ImageView> = vec![image_view];
             all_attachments.extend_from_slice(&attachments);
             let attachment_count = all_attachments.len() as u32;
+           
             let framebuffer_create_info = vk::FramebufferCreateInfo {
                 s_type: vk::StructureType::FRAMEBUFFER_CREATE_INFO,
                 p_next: ptr::null(),

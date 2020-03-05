@@ -66,10 +66,9 @@ impl Pipeline {
             },
             vk::MemoryPropertyFlags::DEVICE_LOCAL,
         );
-        staging_buffer.copy_to_buffer_dynamic(align_of::<u32>() as u64, &indices, &vulkan);
-        vulkan.copy_buffer(staging_buffer, buffer);
+        staging_buffer.copy_to_buffer_dynamic(align_of::<u32>() as u64, &indices);
+        vulkan.copy_buffer(staging_buffer, &buffer);
 
-        staging_buffer.destroy(&vulkan);
         buffer
     }
 
@@ -84,7 +83,7 @@ impl Pipeline {
             vk::MemoryPropertyFlags::HOST_VISIBLE | vk::MemoryPropertyFlags::HOST_COHERENT,
         );
 
-        staging_buffer.copy_to_buffer_dynamic(align_of::<Vertex>() as u64, &vertices, &vulkan);
+        staging_buffer.copy_to_buffer_dynamic(align_of::<Vertex>() as u64, &vertices);
 
         let buffer = vulkan.create_buffer(
             vk::BufferCreateInfo {
@@ -96,9 +95,7 @@ impl Pipeline {
             vk::MemoryPropertyFlags::DEVICE_LOCAL,
         );
 
-        vulkan.copy_buffer(staging_buffer, buffer);
-
-        staging_buffer.destroy(&vulkan);
+        vulkan.copy_buffer(staging_buffer, &buffer);
 
         buffer
     }
@@ -326,11 +323,8 @@ impl Pipeline {
             vk::MemoryPropertyFlags::HOST_VISIBLE | vk::MemoryPropertyFlags::HOST_COHERENT,
         );
 
-        uniform_buffer.copy_to_buffer_dynamic(
-            align_of::<UniformBufferObject>() as u64,
-            &[uniform_data],
-            &vulkan,
-        );
+        uniform_buffer
+            .copy_to_buffer_dynamic(align_of::<UniformBufferObject>() as u64, &[uniform_data]);
         let descriptor_pool = create_descriptor_pool(&vulkan, swapchain.image_views.len() as u32);
         let (descriptor_set, descriptor_layout) = create_descriptors(
             descriptor_info,
@@ -441,15 +435,13 @@ impl Pipeline {
 
             vulkan.device.destroy_image_view(self.texture.1, None);
             vulkan.device.destroy_image_view(self.depth_image.1, None);
-
+            self.uniform_buffer.destroy();
             self.depth_image.0.destroy(&vulkan);
             self.texture.0.destroy(&vulkan);
 
             vulkan
                 .device
                 .destroy_descriptor_set_layout(self.descriptor_layout[0], None);
-
-            self.uniform_buffer.destroy(&vulkan);
         }
     }
 }
@@ -567,7 +559,6 @@ pub fn create_texture(
         1,
     );
 
-    buffer.destroy(&vulkan);
     image_info.image = image.image;
     let image_view = unsafe {
         vulkan

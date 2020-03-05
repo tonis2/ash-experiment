@@ -44,28 +44,38 @@ fn main() {
     let mut vulkan = VkInstance::new(&window);
 
     let swapchain = Swapchain::new(&vulkan, &window);
-    let render_pass = renderpass::create_render_pass(&swapchain, &vulkan.device);
-    let frame_buffers = swapchain.create_frame_buffers(&render_pass, vec![], &vulkan);
+    let render_pass = renderpass::create_render_pass(&swapchain, &vulkan);
 
     let mut pipeline = Pipeline::create_pipeline(&swapchain, render_pass, &vulkan);
+    let frame_buffers =
+        swapchain.create_frame_buffers(&render_pass, vec![pipeline.depth_image.1], &vulkan);
 
-    let mut index_buffer = Pipeline::create_index_buffer(&indices, &vulkan);
-    let mut vertex_buffer = Pipeline::create_vertex_buffer(&vertices, &vulkan);
+    let index_buffer = Pipeline::create_index_buffer(&indices, &vulkan);
+    let vertex_buffer = Pipeline::create_vertex_buffer(&vertices, &vulkan);
 
     let command_buffers = vulkan.create_command_buffers(swapchain.image_views.len());
     let mut tick_counter = FPSLimiter::new();
 
-       
     let extent = vec![vk::Rect2D {
         offset: vk::Offset2D { x: 0, y: 0 },
         extent: swapchain.extent,
     }];
 
-    let clear_values = vec![vk::ClearValue {
-        color: vk::ClearColorValue {
-            float32: [0.0, 0.0, 0.0, 1.0],
+    let clear_values = vec![
+        vk::ClearValue {
+            // clear value for color buffer
+            color: vk::ClearColorValue {
+                float32: [0.0, 0.0, 0.0, 1.0],
+            },
         },
-    }];
+        vk::ClearValue {
+            // clear value for depth buffer
+            depth_stencil: vk::ClearDepthStencilValue {
+                depth: 1.0,
+                stencil: 0,
+            },
+        },
+    ];
 
     let viewports = [vk::Viewport {
         x: 0.0,
@@ -88,21 +98,24 @@ fn main() {
                 vk::PipelineBindPoint::GRAPHICS,
                 pipeline.pipeline,
             );
+            device.cmd_bind_descriptor_sets(
+                command_buffer,
+                vk::PipelineBindPoint::GRAPHICS,
+                pipeline.layout,
+                0,
+                &pipeline.descriptors,
+                &[],
+            );
             device.cmd_set_viewport(command_buffer, 0, &viewports);
             device.cmd_set_scissor(command_buffer, 0, &extent);
-            device.cmd_bind_vertex_buffers(
-                command_buffer,
-                0,
-                &[vertex_buffer.buffer],
-                &[0],
-            );
+            device.cmd_bind_vertex_buffers(command_buffer, 0, &[vertex_buffer.buffer], &[0]);
             device.cmd_bind_index_buffer(
                 command_buffer,
                 index_buffer.buffer,
                 0,
                 vk::IndexType::UINT32,
             );
-            device.cmd_draw_indexed(command_buffer, indices.len() as u32, 1, 0, 0, 1);
+            device.cmd_draw_indexed(command_buffer, indices.len() as u32, 1, 0, 0, 0);
         },
     );
     event_loop.run(move |event, _, control_flow| match event {
@@ -129,11 +142,8 @@ fn main() {
             tick_counter.tick_frame();
         }
         Event::RedrawRequested(_window_id) => {
-    
-
             let frame = vulkan.queue.next_frame(&vulkan, &swapchain);
 
-           
             vulkan.render_frame(&frame, &swapchain, &command_buffers);
         }
         Event::LoopDestroyed => unsafe {
@@ -145,10 +155,10 @@ fn main() {
 
             pipeline.destroy(&vulkan);
             swapchain.destroy(&vulkan);
-            vulkan.device.destroy_render_pass(render_pass, None);
 
-            vertex_buffer.destroy(&vulkan);
-            index_buffer.destroy(&vulkan);
+            vulkan.device.destroy_render_pass(render_pass, None);
+            index_buffer.destroy();
+            vertex_buffer.destroy();
         },
         _ => {}
     });

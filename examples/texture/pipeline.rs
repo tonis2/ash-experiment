@@ -6,7 +6,7 @@ use vulkan::{
 };
 
 use ash::{version::DeviceV1_0, vk};
-use cgmath::{Deg, Matrix4, Point3, SquareMatrix, Vector3};
+use cgmath::{Deg, Matrix4, Point3, Vector3};
 use image::GenericImageView;
 use std::default::Default;
 use std::ffi::CString;
@@ -33,16 +33,18 @@ pub struct Pipeline {
     pub pipeline: vk::Pipeline,
     pub layout: vk::PipelineLayout,
     pub descriptors: Vec<vk::DescriptorSet>,
-    pub texture: Image,
-    pub image_view: vk::ImageView,
+    pub texture: (Image, vk::ImageView),
+    pub depth_image: (Image, vk::ImageView),
     pub sampler: vk::Sampler,
     pub uniform_buffer: Buffer,
+    pub uniform_transform: UniformBufferObject,
+
     descriptor_pool: vk::DescriptorPool,
     descriptor_layout: Vec<vk::DescriptorSetLayout>,
 }
 
 impl Pipeline {
-    pub fn create_index_buffer(indices: &Vec<u8>, vulkan: &VkInstance) -> Buffer {
+    pub fn create_index_buffer(indices: &Vec<u32>, vulkan: &VkInstance) -> Buffer {
         let size = std::mem::size_of_val(&indices) as vk::DeviceSize * indices.len() as u64;
 
         let mut staging_buffer = vulkan.create_buffer(
@@ -64,10 +66,9 @@ impl Pipeline {
             },
             vk::MemoryPropertyFlags::DEVICE_LOCAL,
         );
-        staging_buffer.copy_to_buffer_dynamic(align_of::<u32>() as u64, &indices, &vulkan);
-        vulkan.copy_buffer(staging_buffer, buffer);
+        staging_buffer.copy_to_buffer_dynamic(align_of::<u32>() as u64, &indices);
+        vulkan.copy_buffer(staging_buffer, &buffer);
 
-        staging_buffer.destroy(&vulkan);
         buffer
     }
 
@@ -82,7 +83,7 @@ impl Pipeline {
             vk::MemoryPropertyFlags::HOST_VISIBLE | vk::MemoryPropertyFlags::HOST_COHERENT,
         );
 
-        staging_buffer.copy_to_buffer_dynamic(align_of::<Vertex>() as u64, &vertices, &vulkan);
+        staging_buffer.copy_to_buffer_dynamic(align_of::<Vertex>() as u64, &vertices);
 
         let buffer = vulkan.create_buffer(
             vk::BufferCreateInfo {
@@ -94,9 +95,7 @@ impl Pipeline {
             vk::MemoryPropertyFlags::DEVICE_LOCAL,
         );
 
-        vulkan.copy_buffer(staging_buffer, buffer);
-
-        staging_buffer.destroy(&vulkan);
+        vulkan.copy_buffer(staging_buffer, &buffer);
 
         buffer
     }
@@ -116,7 +115,7 @@ impl Pipeline {
             vk::VertexInputAttributeDescription {
                 binding: 0,
                 location: 0,
-                format: vk::Format::R32G32_SFLOAT,
+                format: vk::Format::R32G32B32_SFLOAT,
                 offset: offset_of!(Vertex, pos) as u32,
             },
             vk::VertexInputAttributeDescription {
@@ -204,12 +203,9 @@ impl Pipeline {
         let dynamic_state_info =
             vk::PipelineDynamicStateCreateInfo::builder().dynamic_states(&dynamic_state);
 
-        let vertex_shader = load_shader(&Path::new(
-            "examples/texture/shaders/spv/shader-textures.vert.spv",
-        ));
-        let frag_shader = load_shader(&Path::new(
-            "examples/texture/shaders/spv/shader-textures.frag.spv",
-        ));
+        let vertex_shader =
+            load_shader(&Path::new("examples/texture/shaders/spv/textures.vert.spv"));
+        let frag_shader = load_shader(&Path::new("examples/texture/shaders/spv/textures.frag.spv"));
 
         let vertex_shader_module = unsafe {
             vulkan
@@ -289,7 +285,7 @@ impl Pipeline {
             ..Default::default()
         };
 
-        let (texture, image_view) = create_texture(
+        let texture = create_texture(
             &Path::new("examples/assets/texture.jpg"),
             &mut imageview_info,
             &vulkan,
@@ -327,17 +323,14 @@ impl Pipeline {
             vk::MemoryPropertyFlags::HOST_VISIBLE | vk::MemoryPropertyFlags::HOST_COHERENT,
         );
 
-        uniform_buffer.copy_to_buffer_dynamic(
-            align_of::<UniformBufferObject>() as u64,
-            &[uniform_data],
-            &vulkan,
-        );
+        uniform_buffer
+            .copy_to_buffer_dynamic(align_of::<UniformBufferObject>() as u64, &[uniform_data]);
         let descriptor_pool = create_descriptor_pool(&vulkan, swapchain.image_views.len() as u32);
         let (descriptor_set, descriptor_layout) = create_descriptors(
             descriptor_info,
             &uniform_buffer,
             sampler,
-            image_view,
+            texture.1,
             &descriptor_pool,
             &vulkan,
         );
@@ -377,6 +370,8 @@ impl Pipeline {
                 .expect("Unable to create graphics pipeline")
         };
 
+        let depth_image = create_depth_resources(&swapchain, &vulkan);
+
         //Destoy shader modules
         unsafe {
             vulkan
@@ -391,48 +386,55 @@ impl Pipeline {
             pipeline: pipeline[0],
             layout: pipeline_layout,
             texture,
-            image_view,
+            depth_image,
             sampler,
             descriptors: descriptor_set,
             descriptor_pool,
             descriptor_layout,
             uniform_buffer,
+            uniform_transform: uniform_data,
         }
     }
 
     pub fn destroy(&mut self, vulkan: &VkInstance) {
         unsafe {
-            vulkan.device.destroy_image_view(self.image_view, None);
             vulkan.device.destroy_pipeline(self.pipeline, None);
             vulkan.device.destroy_pipeline_layout(self.layout, None);
             vulkan.device.destroy_sampler(self.sampler, None);
             vulkan
                 .device
                 .destroy_descriptor_pool(self.descriptor_pool, None);
-            self.texture.destroy(&vulkan);
+
+            vulkan.device.destroy_image_view(self.texture.1, None);
+            vulkan.device.destroy_image_view(self.depth_image.1, None);
+            self.uniform_buffer.destroy();
+            self.depth_image.0.destroy(&vulkan);
+            self.texture.0.destroy(&vulkan);
 
             vulkan
                 .device
                 .destroy_descriptor_set_layout(self.descriptor_layout[0], None);
-
-            self.uniform_buffer.destroy(&vulkan);
         }
     }
 }
 pub fn create_uniform_data(swapchain: &Swapchain) -> UniformBufferObject {
     UniformBufferObject {
-        model: Matrix4::<f32>::identity(),
+        model: Matrix4::from_angle_z(Deg(90.0)),
         view: Matrix4::look_at(
             Point3::new(2.0, 2.0, 2.0),
             Point3::new(0.0, 0.0, 0.0),
             Vector3::new(0.0, 0.0, 1.0),
         ),
-        proj: cgmath::perspective(
-            Deg(45.0),
-            swapchain.extent.width as f32 / swapchain.extent.height as f32,
-            0.1,
-            10.0,
-        ),
+        proj: {
+            let mut proj = cgmath::perspective(
+                Deg(45.0),
+                swapchain.extent.width as f32 / swapchain.extent.height as f32,
+                0.1,
+                10.0,
+            );
+            proj[1][1] = proj[1][1] * -1.0;
+            proj
+        },
     }
 }
 
@@ -502,7 +504,6 @@ pub fn create_texture(
         vk::ImageLayout::TRANSFER_DST_OPTIMAL,
         1,
     );
-
     let buffer_image_regions = vec![vk::BufferImageCopy {
         image_subresource: vk::ImageSubresourceLayers {
             aspect_mask: vk::ImageAspectFlags::COLOR,
@@ -530,10 +531,7 @@ pub fn create_texture(
         1,
     );
 
-    buffer.destroy(&vulkan);
-
     image_info.image = image.image;
-
     let image_view = unsafe {
         vulkan
             .device
@@ -597,28 +595,24 @@ fn create_descriptors(
         vk::WriteDescriptorSet {
             // transform uniform
             s_type: vk::StructureType::WRITE_DESCRIPTOR_SET,
-            p_next: ptr::null(),
             dst_set: descriptor_sets[0],
             dst_binding: 0,
             dst_array_element: 0,
             descriptor_count: 1,
             descriptor_type: vk::DescriptorType::UNIFORM_BUFFER,
-            p_image_info: ptr::null(),
             p_buffer_info: buffer_info.as_ptr(),
-            p_texel_buffer_view: ptr::null(),
+            ..Default::default()
         },
         vk::WriteDescriptorSet {
             // sampler uniform
             s_type: vk::StructureType::WRITE_DESCRIPTOR_SET,
-            p_next: ptr::null(),
             dst_set: descriptor_sets[0],
             dst_binding: 1,
             dst_array_element: 0,
             descriptor_count: 1,
             descriptor_type: vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
             p_image_info: descriptor_image_infos.as_ptr(),
-            p_buffer_info: ptr::null(),
-            p_texel_buffer_view: ptr::null(),
+            ..Default::default()
         },
     ];
 
@@ -631,6 +625,78 @@ fn create_descriptors(
     (descriptor_sets, layouts)
 }
 
+//Creates depth image
+pub fn create_depth_resources(
+    swapchain: &Swapchain,
+    vulkan: &VkInstance,
+) -> (Image, vk::ImageView) {
+    let depth_format = vulkan.find_depth_format(
+        &[
+            vk::Format::D32_SFLOAT,
+            vk::Format::D32_SFLOAT_S8_UINT,
+            vk::Format::D24_UNORM_S8_UINT,
+        ],
+        vk::ImageTiling::OPTIMAL,
+        vk::FormatFeatureFlags::DEPTH_STENCIL_ATTACHMENT,
+    );
+    let depth_image_info = vk::ImageCreateInfo {
+        s_type: vk::StructureType::IMAGE_CREATE_INFO,
+        image_type: vk::ImageType::TYPE_2D,
+        format: depth_format,
+        mip_levels: 1,
+        array_layers: 1,
+        samples: vk::SampleCountFlags::TYPE_1,
+        tiling: vk::ImageTiling::OPTIMAL,
+        usage: vk::ImageUsageFlags::DEPTH_STENCIL_ATTACHMENT,
+        sharing_mode: vk::SharingMode::EXCLUSIVE,
+        extent: vk::Extent3D {
+            width: swapchain.extent.width,
+            height: swapchain.extent.height,
+            depth: 1,
+        },
+        ..Default::default()
+    };
+
+    let image = Image::create_image(
+        depth_image_info,
+        vk::MemoryPropertyFlags::DEVICE_LOCAL,
+        &vulkan,
+    );
+
+    let imageview_info = vk::ImageViewCreateInfo {
+        s_type: vk::StructureType::IMAGE_VIEW_CREATE_INFO,
+        view_type: vk::ImageViewType::TYPE_2D,
+        format: depth_format,
+        image: image.image,
+        subresource_range: vk::ImageSubresourceRange {
+            aspect_mask: vk::ImageAspectFlags::DEPTH,
+            base_mip_level: 0,
+            level_count: 1,
+            base_array_layer: 0,
+            layer_count: 1,
+        },
+        ..Default::default()
+    };
+
+    let image_view = unsafe {
+        vulkan
+            .device
+            .create_image_view(&imageview_info, None)
+            .expect("Failed to create Image View!")
+    };
+
+    vulkan.transition_image_layout(
+        image.image,
+        depth_format,
+        vk::ImageLayout::UNDEFINED,
+        vk::ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+        1,
+    );
+
+    (image, image_view)
+}
+
+//Creates descriptor pool for uniform buffers and stuff
 pub fn create_descriptor_pool(vulkan: &VkInstance, size: u32) -> vk::DescriptorPool {
     let pool_sizes = [
         vk::DescriptorPoolSize {

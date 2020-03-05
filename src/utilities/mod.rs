@@ -1,9 +1,9 @@
 pub mod platform;
 pub mod tools;
 pub mod buffer;
-pub mod textures;
+pub mod images;
 pub mod fps_meter;
 
-pub use textures::Image;
+pub use images::Image;
 pub use buffer::Buffer;
 pub use fps_meter::FPSLimiter;

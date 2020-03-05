@@ -41,8 +41,8 @@ fn main() {
 
     let (pipeline, layout) = pipeline::create_pipeline(&swapchain, render_pass, &vulkan);
 
-    let mut index_buffer = pipeline::create_index_buffer(&indices, &vulkan);
-    let mut vertex_buffer = pipeline::create_vertex_buffer(&vertices, &vulkan);
+    let index_buffer = pipeline::create_index_buffer(&indices, &vulkan);
+    let vertex_buffer = pipeline::create_vertex_buffer(&vertices, &vulkan);
 
     let command_buffers = vulkan.create_command_buffers(swapchain.image_views.len());
 
@@ -118,12 +118,13 @@ fn main() {
             for &framebuffer in frame_buffers.iter() {
                 vulkan.device.destroy_framebuffer(framebuffer, None);
             }
+
             swapchain.destroy(&vulkan);
             vulkan.device.destroy_render_pass(render_pass, None);
             vulkan.device.destroy_pipeline(pipeline, None);
             vulkan.device.destroy_pipeline_layout(layout, None);
-            vertex_buffer.destroy(&vulkan);
-            index_buffer.destroy(&vulkan);
+            index_buffer.destroy();
+            vertex_buffer.destroy();
         },
         _ => {}
     });
