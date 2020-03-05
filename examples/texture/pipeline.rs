@@ -43,26 +43,61 @@ pub struct Pipeline {
 
 impl Pipeline {
     pub fn create_index_buffer(indices: &Vec<u8>, vulkan: &VkInstance) -> Buffer {
-        let index_input_buffer_info = vk::BufferCreateInfo {
-            size: std::mem::size_of_val(&indices) as vk::DeviceSize * indices.len() as u64,
-            usage: vk::BufferUsageFlags::INDEX_BUFFER,
-            sharing_mode: vk::SharingMode::EXCLUSIVE,
-            ..Default::default()
-        };
-        let mut buffer = vulkan.create_buffer(index_input_buffer_info);
-        buffer.copy_to_buffer_dynamic(align_of::<u32>() as u64, &indices, &vulkan);
+        let size = std::mem::size_of_val(&indices) as vk::DeviceSize * indices.len() as u64;
+
+        let mut staging_buffer = vulkan.create_buffer(
+            vk::BufferCreateInfo {
+                size,
+                usage: vk::BufferUsageFlags::TRANSFER_SRC,
+                sharing_mode: vk::SharingMode::EXCLUSIVE,
+                ..Default::default()
+            },
+            vk::MemoryPropertyFlags::HOST_VISIBLE | vk::MemoryPropertyFlags::HOST_COHERENT,
+        );
+
+        let buffer = vulkan.create_buffer(
+            vk::BufferCreateInfo {
+                size,
+                usage: vk::BufferUsageFlags::TRANSFER_DST | vk::BufferUsageFlags::INDEX_BUFFER,
+                sharing_mode: vk::SharingMode::EXCLUSIVE,
+                ..Default::default()
+            },
+            vk::MemoryPropertyFlags::DEVICE_LOCAL,
+        );
+        staging_buffer.copy_to_buffer_dynamic(align_of::<u32>() as u64, &indices, &vulkan);
+        vulkan.copy_buffer(staging_buffer, buffer);
+
+        staging_buffer.destroy(&vulkan);
         buffer
     }
 
     pub fn create_vertex_buffer(vertices: &[Vertex], vulkan: &VkInstance) -> Buffer {
-        let vertex_input_buffer_info = vk::BufferCreateInfo {
-            size: std::mem::size_of_val(vertices) as vk::DeviceSize,
-            usage: vk::BufferUsageFlags::VERTEX_BUFFER,
-            sharing_mode: vk::SharingMode::EXCLUSIVE,
-            ..Default::default()
-        };
-        let mut buffer = vulkan.create_buffer(vertex_input_buffer_info);
-        buffer.copy_to_buffer_dynamic(align_of::<Vertex>() as u64, &vertices, &vulkan);
+        let mut staging_buffer = vulkan.create_buffer(
+            vk::BufferCreateInfo {
+                size: std::mem::size_of_val(vertices) as vk::DeviceSize,
+                usage: vk::BufferUsageFlags::TRANSFER_SRC,
+                sharing_mode: vk::SharingMode::EXCLUSIVE,
+                ..Default::default()
+            },
+            vk::MemoryPropertyFlags::HOST_VISIBLE | vk::MemoryPropertyFlags::HOST_COHERENT,
+        );
+
+        staging_buffer.copy_to_buffer_dynamic(align_of::<Vertex>() as u64, &vertices, &vulkan);
+
+        let buffer = vulkan.create_buffer(
+            vk::BufferCreateInfo {
+                size: std::mem::size_of_val(vertices) as vk::DeviceSize,
+                usage: vk::BufferUsageFlags::TRANSFER_DST | vk::BufferUsageFlags::VERTEX_BUFFER,
+                sharing_mode: vk::SharingMode::EXCLUSIVE,
+                ..Default::default()
+            },
+            vk::MemoryPropertyFlags::DEVICE_LOCAL,
+        );
+
+        vulkan.copy_buffer(staging_buffer, buffer);
+
+        staging_buffer.destroy(&vulkan);
+
         buffer
     }
 
@@ -287,7 +322,10 @@ impl Pipeline {
             ..Default::default()
         };
 
-        let mut uniform_buffer = vulkan.create_buffer(buffer_create_info);
+        let mut uniform_buffer = vulkan.create_buffer(
+            buffer_create_info,
+            vk::MemoryPropertyFlags::HOST_VISIBLE | vk::MemoryPropertyFlags::HOST_COHERENT,
+        );
 
         uniform_buffer.copy_to_buffer_dynamic(
             align_of::<UniformBufferObject>() as u64,
@@ -428,7 +466,10 @@ pub fn create_texture(
         ..Default::default()
     };
 
-    let mut buffer = vulkan.create_buffer(image_buffer);
+    let mut buffer = vulkan.create_buffer(
+        image_buffer,
+        vk::MemoryPropertyFlags::HOST_VISIBLE | vk::MemoryPropertyFlags::HOST_COHERENT,
+    );
     buffer.copy_buffer::<u8>(&image_data, &vulkan);
 
     let image_create_info = vk::ImageCreateInfo {
@@ -486,11 +527,11 @@ pub fn create_texture(
         vk::Format::R8G8B8A8_UNORM,
         vk::ImageLayout::TRANSFER_DST_OPTIMAL,
         vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
-        1
+        1,
     );
 
     buffer.destroy(&vulkan);
-    
+
     image_info.image = image.image;
 
     let image_view = unsafe {

@@ -224,16 +224,22 @@ impl VkInstance {
         }
     }
 
-    pub fn create_buffer(&self, info: vk::BufferCreateInfo) -> Buffer {
+    pub fn create_buffer(
+        &self,
+        info: vk::BufferCreateInfo,
+        flags: vk::MemoryPropertyFlags,
+    ) -> Buffer {
         unsafe {
             let buffer = self.device.create_buffer(&info, None).unwrap();
             let memory_requirements = self.device.get_buffer_memory_requirements(buffer);
             let memory_index = find_memorytype_index(
                 &memory_requirements,
                 &self.get_physical_device_memory_properties(),
-                vk::MemoryPropertyFlags::HOST_VISIBLE | vk::MemoryPropertyFlags::HOST_COHERENT,
+                flags,
             )
             .expect("Unable to find suitable memorytype for the index buffer.");
+
+            // vk::MemoryPropertyFlags::HOST_VISIBLE | vk::MemoryPropertyFlags::HOST_COHERENT
 
             let buffer_memory_allocate = vk::MemoryAllocateInfo {
                 allocation_size: memory_requirements.size,
@@ -260,23 +266,22 @@ impl VkInstance {
         }
     }
 
-    pub fn copy_buffer(
-        &self,
-        src_buffer: vk::Buffer,
-        dst_buffer: vk::Buffer,
-        size: vk::DeviceSize,
-    ) {
+    pub fn copy_buffer(&self, src_buffer: Buffer, dst_buffer: Buffer) {
         let command_buffer = self.begin_single_time_command();
 
         let copy_regions = [vk::BufferCopy {
             src_offset: 0,
             dst_offset: 0,
-            size,
+            size: src_buffer.size as u64,
         }];
 
         unsafe {
-            self.device
-                .cmd_copy_buffer(command_buffer, src_buffer, dst_buffer, &copy_regions);
+            self.device.cmd_copy_buffer(
+                command_buffer,
+                src_buffer.buffer,
+                dst_buffer.buffer,
+                &copy_regions,
+            );
         }
 
         self.end_single_time_command(command_buffer);
