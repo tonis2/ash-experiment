@@ -38,18 +38,15 @@ impl Buffer {
 
     //copy to buffer with fixed size
     pub fn copy_buffer<T>(&mut self, data: &Vec<T>, vulkan: &VkInstance) {
-        let buffer_size = ::std::mem::size_of_val(data) as vk::DeviceSize;
         unsafe {
             let data_ptr = vulkan
                 .device
-                .map_memory(self.memory, 0, buffer_size, vk::MemoryMapFlags::empty())
+                .map_memory(self.memory, 0, self.size as u64, vk::MemoryMapFlags::empty())
                 .expect("Failed to Map Memory") as *mut T;
 
             data_ptr.copy_from_nonoverlapping(data[..].as_ptr(), data.len());
 
             vulkan.device.unmap_memory(self.memory);
-
-            self.size = data.len() as u32;
         }
     }
 

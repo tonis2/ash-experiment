@@ -41,7 +41,7 @@ pub fn create_index_buffer(indices: &Vec<u16>, vulkan: &VkInstance) -> Buffer {
         },
         vk::MemoryPropertyFlags::DEVICE_LOCAL,
     );
-    staging_buffer.copy_to_buffer_dynamic(align_of::<u32>() as u64, &indices);
+    staging_buffer.copy_to_buffer_dynamic::<u16>(align_of::<u32>() as u64, &indices);
     
     vulkan.copy_buffer(staging_buffer, &buffer);
     
@@ -49,9 +49,10 @@ pub fn create_index_buffer(indices: &Vec<u16>, vulkan: &VkInstance) -> Buffer {
 }
 
 pub fn create_vertex_buffer(vertices: &[Vertex], vulkan: &VkInstance) -> Buffer {
+    let size = std::mem::size_of_val(vertices) as vk::DeviceSize;
     let mut staging_buffer = vulkan.create_buffer(
         vk::BufferCreateInfo {
-            size: std::mem::size_of_val(vertices) as vk::DeviceSize,
+            size,
             usage: vk::BufferUsageFlags::TRANSFER_SRC,
             sharing_mode: vk::SharingMode::EXCLUSIVE,
             ..Default::default()
@@ -59,11 +60,11 @@ pub fn create_vertex_buffer(vertices: &[Vertex], vulkan: &VkInstance) -> Buffer 
         vk::MemoryPropertyFlags::HOST_VISIBLE | vk::MemoryPropertyFlags::HOST_COHERENT,
     );
 
-    staging_buffer.copy_to_buffer_dynamic(align_of::<Vertex>() as u64, &vertices);
+    staging_buffer.copy_to_buffer_dynamic::<Vertex>(align_of::<Vertex>() as u64, &vertices);
 
     let buffer = vulkan.create_buffer(
         vk::BufferCreateInfo {
-            size: std::mem::size_of_val(vertices) as vk::DeviceSize,
+            size,
             usage: vk::BufferUsageFlags::TRANSFER_DST | vk::BufferUsageFlags::VERTEX_BUFFER,
             sharing_mode: vk::SharingMode::EXCLUSIVE,
             ..Default::default()
