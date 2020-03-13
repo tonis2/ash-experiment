@@ -12,6 +12,7 @@ memoffset = "0.5.1"
 num       = "0.2"
 tobj      = "0.1.10"
 image     = "0.22"
+vk-mem    = "0.2.0"
 
 [dependencies.bitflags]
 version = ">= 1.0.4"

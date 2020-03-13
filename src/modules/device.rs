@@ -2,7 +2,7 @@ use ash::{version::InstanceV1_0, vk};
 
 use crate::utilities::platform::DeviceExtension;
 
-use super::queue::{Queue, QueueFamilyIndices};
+use super::queue::QueueFamilyIndices;
 use super::{surface::VkSurface, swapchain::SwapchainSupport};
 use std::collections::HashSet;
 use std::ptr;
@@ -71,7 +71,7 @@ pub fn create_logical_device(
     validation: &super::debug::ValidationInfo,
     device_extensions: &DeviceExtension,
     surface: &VkSurface,
-) -> (ash::Device, Queue) {
+) -> (ash::Device, QueueFamilyIndices) {
     let indices = find_queue_family(instance, physical_device, surface);
 
     let mut unique_queue_families = HashSet::new();
@@ -136,9 +136,7 @@ pub fn create_logical_device(
             .expect("Failed to create logical Device!")
     };
 
-    let queue = Queue::new(&device, indices);
-
-    (device, queue)
+    (device, indices)
 }
 
 pub fn find_queue_family(

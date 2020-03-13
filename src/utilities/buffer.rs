@@ -1,68 +1,88 @@
-use crate::VkInstance;
-use ash::version::DeviceV1_0;
+use crate::Context;
 use ash::vk;
 
-use ash::util::Align;
-use std::rc::Rc;
+use std::sync::Arc;
 
 #[derive(Clone)]
 pub struct Buffer {
-    pub size: u32,
     pub buffer: vk::Buffer,
-    pub memory: vk::DeviceMemory,
-    pub usage: vk::BufferUsageFlags,
-    pub memory_requirements: vk::MemoryRequirements,
-    pub device: Rc<ash::Device>,
+    pub allocation: vk_mem::Allocation,
+    pub allocation_info: vk_mem::AllocationInfo,
+    pub context: Arc<Context>,
 }
 
 impl Buffer {
-    //Copy to buffer when size can be dynamic
-    pub fn copy_to_buffer_dynamic<D: Copy>(&mut self, align: u64, data: &[D]) {
-        unsafe {
-            let index_ptr = self
-                .device
-                .map_memory(
-                    self.memory,
-                    0,
-                    self.memory_requirements.size,
-                    vk::MemoryMapFlags::empty(),
-                )
-                .unwrap();
-            let mut data_slice = Align::new(index_ptr, align, self.memory_requirements.size);
+    pub fn new(
+        allocation_create_info: &vk_mem::AllocationCreateInfo,
+        buffer_create_info: &vk::BufferCreateInfo,
+        context: Arc<Context>,
+    ) -> Buffer {
+        let (buffer, allocation, allocation_info) = context
+            .memory
+            .create_buffer(&buffer_create_info, &allocation_create_info)
+            .expect("Failed to create buffer!");
 
-            data_slice.copy_from_slice(data);
-
-            self.device.unmap_memory(self.memory);
+        Buffer {
+            buffer,
+            allocation,
+            allocation_info,
+            context,
         }
     }
 
-    //copy to buffer with fixed size
-    pub fn copy_buffer<T>(&mut self, data: &Vec<T>, vulkan: &VkInstance) {
+    pub fn new_mapped_basic(
+        size: vk::DeviceSize,
+        buffer_usage: vk::BufferUsageFlags,
+        memory_usage: vk_mem::MemoryUsage,
+        context: Arc<Context>,
+    ) -> Self {
+        let allocation_create_info = vk_mem::AllocationCreateInfo {
+            usage: memory_usage,
+            ..Default::default()
+        };
+
+        let buffer_create_info = vk::BufferCreateInfo::builder()
+            .size(size)
+            .usage(buffer_usage)
+            .sharing_mode(vk::SharingMode::EXCLUSIVE)
+            .build();
+
+        Buffer::new(&allocation_create_info, &buffer_create_info, context)
+    }
+
+    pub fn upload_to_buffer<T: Copy>(&self, data: &[T], offset: usize, alignment: vk::DeviceSize) {
+        let data_pointer = self.map_memory().expect("Failed to map memory!");
         unsafe {
-            let data_ptr = vulkan
-                .device
-                .map_memory(self.memory, 0, self.size as u64, vk::MemoryMapFlags::empty())
-                .expect("Failed to Map Memory") as *mut T;
-
-            data_ptr.copy_from_nonoverlapping(data[..].as_ptr(), data.len());
-
-            vulkan.device.unmap_memory(self.memory);
+            let mut align = ash::util::Align::new(
+                data_pointer.add(offset) as _,
+                alignment,
+                self.allocation_info.get_size() as _,
+            );
+            align.copy_from_slice(data);
         }
     }
 
-    pub fn destroy(&self) {
-        unsafe {
-            self.device.destroy_buffer(self.buffer, None);
-            self.device.free_memory(self.memory, None);
-        }
+    pub fn map_memory(&self) -> vk_mem::error::Result<*mut u8> {
+        self.context.memory.map_memory(&self.allocation)
+    }
+
+    pub fn unmap_memory(&self) -> vk_mem::error::Result<()> {
+        self.context.memory.unmap_memory(&self.allocation)
+    }
+
+    pub fn flush(&self, offset: usize, size: usize) -> vk_mem::error::Result<()> {
+        self.context.memory.flush_allocation(&self.allocation, offset, size)
+    }
+
+    pub fn size(&self) -> u64 {
+        self.allocation_info.get_size() as u64
     }
 }
 
-// impl Drop for Buffer {
-//     fn drop(&mut self) {
-//         unsafe {
-//             self.device.destroy_buffer(self.buffer, None);
-//             self.device.free_memory(self.memory, None);
-//         }
-//     }
-// }
+impl Drop for Buffer {
+    fn drop(&mut self) {
+        self.context.memory
+            .destroy_buffer(self.buffer, &self.allocation)
+            .expect("Failed to destroy buffer!");
+    }
+}

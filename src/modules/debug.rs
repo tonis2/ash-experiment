@@ -23,6 +23,7 @@ unsafe extern "system" fn vulkan_debug_callback(
     vk::FALSE
 }
 
+
 pub struct Debugger {
     pub report_loader: DebugReport,
     pub reporter: vk::DebugReportCallbackEXT,

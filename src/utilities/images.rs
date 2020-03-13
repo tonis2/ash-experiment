@@ -1,10 +1,12 @@
-use ash::version::DeviceV1_0;
+use crate::Context;
+use std::sync::Arc;
 use ash::vk;
 
 use std::ptr;
 
 use super::tools::find_memory_type;
-use crate::VkInstance;
+use ash::{version::DeviceV1_0};
+
 
 pub struct Image {
     pub image: vk::Image,
@@ -15,17 +17,17 @@ impl Image {
     pub fn create_image(
         image_info: vk::ImageCreateInfo,
         required_memory_properties: vk::MemoryPropertyFlags,
-        vulkan: &VkInstance,
+        context: Arc<Context>,
     ) -> Image {
         let texture_image = unsafe {
-            vulkan
+            context
                 .device
                 .create_image(&image_info, None)
                 .expect("Failed to create Texture Image!")
         };
 
         let image_memory_requirement =
-            unsafe { vulkan.device.get_image_memory_requirements(texture_image) };
+            unsafe { context.device.get_image_memory_requirements(texture_image) };
         let memory_allocate_info = vk::MemoryAllocateInfo {
             s_type: vk::StructureType::MEMORY_ALLOCATE_INFO,
             p_next: ptr::null(),
@@ -33,19 +35,19 @@ impl Image {
             memory_type_index: find_memory_type(
                 image_memory_requirement.memory_type_bits,
                 required_memory_properties,
-                &vulkan.get_physical_device_memory_properties(),
+                &context.get_physical_device_memory_properties(),
             ),
         };
 
         let texture_image_memory = unsafe {
-            vulkan
+            context
                 .device
                 .allocate_memory(&memory_allocate_info, None)
                 .expect("Failed to allocate Texture Image memory!")
         };
 
         unsafe {
-            vulkan
+            context
                 .device
                 .bind_image_memory(texture_image, texture_image_memory, 0)
                 .expect("Failed to bind Image Memmory!");
@@ -57,10 +59,10 @@ impl Image {
         }
     }
 
-    pub fn destroy(&self, vulkan: &VkInstance) {
+    pub fn destroy(&self, context: Arc<Context>) {
         unsafe {
-            vulkan.device.destroy_image(self.image, None);
-            vulkan.device.free_memory(self.memory, None);
+            context.device.destroy_image(self.image, None);
+            context.device.free_memory(self.memory, None);
         }
     }
 }

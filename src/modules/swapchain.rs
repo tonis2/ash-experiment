@@ -1,6 +1,9 @@
-use super::instance::VkInstance;
+use super::context::Context;
+use std::sync::Arc;
+
 use ash::{version::DeviceV1_0, vk};
 use std::ptr;
+
 
 use super::device::query_swapchain_support;
 use winit::window::Window;
@@ -14,10 +17,10 @@ pub struct Swapchain {
     pub extent: vk::Extent2D,
 }
 impl Swapchain {
-    pub fn new(vulkan: &VkInstance, window: &Window) -> Swapchain {
+    pub fn new(context: Arc<Context>, window: &Window) -> Swapchain {
         unsafe {
             let swapchain_support =
-                query_swapchain_support(vulkan.physical_device, &vulkan.surface);
+                query_swapchain_support(context.physical_device, &context.surface);
 
             let surface_format = choose_swapchain_format(&swapchain_support.formats);
             let present_mode = choose_swapchain_present_mode(&swapchain_support.present_modes);
@@ -30,7 +33,7 @@ impl Swapchain {
                 image_count
             };
 
-            let queue_family = &vulkan.queue.queue_family_indices;
+            let queue_family = &context.queue_family;
 
             let (image_sharing_mode, queue_family_index_count, queue_family_indices) =
                 if queue_family.graphics_family != queue_family.present_family {
@@ -50,7 +53,7 @@ impl Swapchain {
                 s_type: vk::StructureType::SWAPCHAIN_CREATE_INFO_KHR,
                 p_next: ptr::null(),
                 flags: vk::SwapchainCreateFlagsKHR::empty(),
-                surface: vulkan.surface.surface,
+                surface: context.surface.surface,
                 min_image_count: image_count,
                 image_color_space: surface_format.color_space,
                 image_format: surface_format.format,
@@ -68,7 +71,7 @@ impl Swapchain {
             };
 
             let swapchain_loader =
-                ash::extensions::khr::Swapchain::new(&vulkan.instance, &vulkan.device);
+                ash::extensions::khr::Swapchain::new(&context.instance, &context.device);
             let swapchain = swapchain_loader
                 .create_swapchain(&swapchain_create_info, None)
                 .expect("Failed to create Swapchain!");
@@ -102,7 +105,7 @@ impl Swapchain {
                         image,
                     };
 
-                    vulkan
+                    context
                         .device
                         .create_image_view(&imageview_create_info, None)
                         .expect("Failed to create Image View!")
@@ -124,7 +127,7 @@ impl Swapchain {
         &self,
         render_pass: &vk::RenderPass,
         attachments: Vec<vk::ImageView>,
-        vulkan: &VkInstance,
+        context: Arc<Context>,
     ) -> Vec<vk::Framebuffer> {
         let mut frame_buffers = vec![];
 
@@ -132,7 +135,7 @@ impl Swapchain {
             let mut all_attachments: Vec<vk::ImageView> = vec![image_view];
             all_attachments.extend_from_slice(&attachments);
             let attachment_count = all_attachments.len() as u32;
-           
+
             let framebuffer_create_info = vk::FramebufferCreateInfo {
                 s_type: vk::StructureType::FRAMEBUFFER_CREATE_INFO,
                 p_next: ptr::null(),
@@ -146,7 +149,7 @@ impl Swapchain {
             };
 
             let framebuffer = unsafe {
-                vulkan
+                context
                     .device
                     .create_framebuffer(&framebuffer_create_info, None)
                     .expect("Failed to create Framebuffer!")
@@ -157,10 +160,10 @@ impl Swapchain {
         frame_buffers
     }
 
-    pub fn destroy(&self, vulkan: &VkInstance) {
+    pub fn destroy(&self, context: Arc<Context>) {
         unsafe {
             for image in self.image_views.iter() {
-                vulkan.device.destroy_image_view(*image, None);
+                context.device.destroy_image_view(*image, None);
             }
             self.swapchain_loader
                 .destroy_swapchain(self.swapchain, None);

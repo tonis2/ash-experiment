@@ -1,12 +1,13 @@
 use vulkan::{
     modules::swapchain::Swapchain,
     offset_of,
-    utilities::{tools::load_shader, Buffer},
-    VkInstance,
+    utilities::tools::load_shader, Context
 };
 
+use std::sync::Arc;
+
 use ash::version::DeviceV1_0;
-use std::mem::{self, align_of};
+use std::mem;
 
 use ash::vk;
 use std::default::Default;
@@ -19,69 +20,11 @@ pub struct Vertex {
     pub color: [f32; 4],
 }
 
-pub fn create_index_buffer(indices: &Vec<u16>, vulkan: &VkInstance) -> Buffer {
-    let size = std::mem::size_of_val(&indices) as vk::DeviceSize * indices.len() as u64;
-
-    let mut staging_buffer = vulkan.create_buffer(
-        vk::BufferCreateInfo {
-            size,
-            usage: vk::BufferUsageFlags::TRANSFER_SRC,
-            sharing_mode: vk::SharingMode::EXCLUSIVE,
-            ..Default::default()
-        },
-        vk::MemoryPropertyFlags::HOST_VISIBLE | vk::MemoryPropertyFlags::HOST_COHERENT,
-    );
-
-    let buffer = vulkan.create_buffer(
-        vk::BufferCreateInfo {
-            size,
-            usage: vk::BufferUsageFlags::TRANSFER_DST | vk::BufferUsageFlags::INDEX_BUFFER,
-            sharing_mode: vk::SharingMode::EXCLUSIVE,
-            ..Default::default()
-        },
-        vk::MemoryPropertyFlags::DEVICE_LOCAL,
-    );
-    staging_buffer.copy_to_buffer_dynamic::<u16>(align_of::<u32>() as u64, &indices);
-    
-    vulkan.copy_buffer(staging_buffer, &buffer);
-    
-    buffer
-}
-
-pub fn create_vertex_buffer(vertices: &[Vertex], vulkan: &VkInstance) -> Buffer {
-    let size = std::mem::size_of_val(vertices) as vk::DeviceSize;
-    let mut staging_buffer = vulkan.create_buffer(
-        vk::BufferCreateInfo {
-            size,
-            usage: vk::BufferUsageFlags::TRANSFER_SRC,
-            sharing_mode: vk::SharingMode::EXCLUSIVE,
-            ..Default::default()
-        },
-        vk::MemoryPropertyFlags::HOST_VISIBLE | vk::MemoryPropertyFlags::HOST_COHERENT,
-    );
-
-    staging_buffer.copy_to_buffer_dynamic::<Vertex>(align_of::<Vertex>() as u64, &vertices);
-
-    let buffer = vulkan.create_buffer(
-        vk::BufferCreateInfo {
-            size,
-            usage: vk::BufferUsageFlags::TRANSFER_DST | vk::BufferUsageFlags::VERTEX_BUFFER,
-            sharing_mode: vk::SharingMode::EXCLUSIVE,
-            ..Default::default()
-        },
-        vk::MemoryPropertyFlags::DEVICE_LOCAL,
-    );
-
-    vulkan.copy_buffer(staging_buffer, &buffer);
-
-    buffer
-}
-
 //Creates a new pipeline
 pub fn create_pipeline(
     swapchain: &Swapchain,
     renderpass: vk::RenderPass,
-    vulkan: &vulkan::VkInstance,
+    context: Arc<Context>,
 ) -> (vk::Pipeline, vk::PipelineLayout) {
     let vertex_binding = vec![vk::VertexInputBindingDescription {
         binding: 0,
@@ -178,7 +121,7 @@ pub fn create_pipeline(
     let layout_create_info = vk::PipelineLayoutCreateInfo::default();
 
     let pipeline_layout = unsafe {
-        vulkan
+        context
             .device
             .create_pipeline_layout(&layout_create_info, None)
             .unwrap()
@@ -192,7 +135,7 @@ pub fn create_pipeline(
     ));
 
     let vertex_shader_module = unsafe {
-        vulkan
+        context
             .device
             .create_shader_module(
                 &vk::ShaderModuleCreateInfo::builder().code(&vertex_shader),
@@ -202,7 +145,7 @@ pub fn create_pipeline(
     };
 
     let fragment_shader_module = unsafe {
-        vulkan
+        context
             .device
             .create_shader_module(
                 &vk::ShaderModuleCreateInfo::builder().code(&frag_shader),
@@ -240,7 +183,7 @@ pub fn create_pipeline(
         .layout(pipeline_layout)
         .render_pass(renderpass);
     let pipeline = unsafe {
-        vulkan
+        context
             .device
             .create_graphics_pipelines(
                 vk::PipelineCache::null(),
@@ -252,10 +195,10 @@ pub fn create_pipeline(
 
     //Destoy shader modules
     unsafe {
-        vulkan
+        context
             .device
             .destroy_shader_module(vertex_shader_module, None);
-        vulkan
+            context
             .device
             .destroy_shader_module(fragment_shader_module, None);
     }
