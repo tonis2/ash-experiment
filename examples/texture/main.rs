@@ -1,12 +1,13 @@
 mod pipeline;
 mod renderpass;
 
-use vulkan::{utilities::FPSLimiter, Swapchain, VkInstance};
+use vulkan::{utilities::FPSLimiter, Context, Queue, Swapchain, VkInstance};
 use winit::event::{ElementState, Event, KeyboardInput, VirtualKeyCode, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop};
 
 use ash::{version::DeviceV1_0, vk};
 use pipeline::{Pipeline, Vertex};
+use std::sync::Arc;
 
 fn main() {
     let vertices = vec![
@@ -41,19 +42,25 @@ fn main() {
         .build(&event_loop)
         .expect("Failed to create window.");
 
-    let mut vulkan = VkInstance::new(&window);
+    let vulkan = Arc::new(Context::new(&window));
 
-    let swapchain = Swapchain::new(&vulkan, &window);
-    let render_pass = renderpass::create_render_pass(&swapchain, &vulkan);
+    let instance = VkInstance::new(vulkan.clone());
 
-    let mut pipeline = Pipeline::create_pipeline(&swapchain, render_pass, &vulkan);
+    let mut queue = Queue::new(vulkan.clone());
+
+    let swapchain = Swapchain::new(vulkan.clone(), &window);
+    let render_pass = renderpass::create_render_pass(&swapchain, &instance);
+
+    let pipeline = Pipeline::create_pipeline(&swapchain, render_pass, &instance);
     let frame_buffers =
-        swapchain.create_frame_buffers(&render_pass, vec![pipeline.depth_image.1], &vulkan);
+        swapchain.create_frame_buffers(&render_pass, vec![pipeline.depth_image.1], vulkan.clone());
 
-    let index_buffer = Pipeline::create_index_buffer(&indices, &vulkan);
-    let vertex_buffer = Pipeline::create_vertex_buffer(&vertices, &vulkan);
+    let index_buffer =
+        instance.create_device_local_buffer(vk::BufferUsageFlags::INDEX_BUFFER, &indices);
+    let vertex_buffer =
+        instance.create_device_local_buffer(vk::BufferUsageFlags::VERTEX_BUFFER, &vertices);
 
-    let command_buffers = vulkan.create_command_buffers(swapchain.image_views.len());
+    let command_buffers = instance.create_command_buffers(swapchain.image_views.len());
     let mut tick_counter = FPSLimiter::new();
 
     let extent = vec![vk::Rect2D {
@@ -86,12 +93,13 @@ fn main() {
         max_depth: 1.0,
     }];
 
-    vulkan.build_frame(
+    queue.build_frame(
         &command_buffers,
         &frame_buffers,
         &render_pass,
         extent[0],
         clear_values,
+        vulkan.clone(),
         |command_buffer, device| unsafe {
             device.cmd_bind_pipeline(
                 command_buffer,
@@ -142,9 +150,9 @@ fn main() {
             tick_counter.tick_frame();
         }
         Event::RedrawRequested(_window_id) => {
-            let frame = vulkan.queue.next_frame(&vulkan, &swapchain);
+            let frame = queue.next_frame(&vulkan, &swapchain);
 
-            vulkan.render_frame(&frame, &swapchain, &command_buffers);
+            queue.render_frame(&frame, &swapchain, &command_buffers, vulkan.clone());
         }
         Event::LoopDestroyed => unsafe {
             vulkan.wait_idle();
@@ -152,13 +160,6 @@ fn main() {
             for &framebuffer in frame_buffers.iter() {
                 vulkan.device.destroy_framebuffer(framebuffer, None);
             }
-
-            pipeline.destroy(&vulkan);
-            swapchain.destroy(&vulkan);
-
-            vulkan.device.destroy_render_pass(render_pass, None);
-            index_buffer.destroy();
-            vertex_buffer.destroy();
         },
         _ => {}
     });

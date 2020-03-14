@@ -82,9 +82,9 @@ impl Context {
             self.surface
                 .surface_loader
                 .destroy_surface(self.surface.surface, None);
-
+                self.device.destroy_device(None);
             // self.queue.destroy(&self.device);
-            self.device.destroy_device(None);
+        
             // self._debugger.destroy();
             // self.instance.destroy_instance(None);
         }

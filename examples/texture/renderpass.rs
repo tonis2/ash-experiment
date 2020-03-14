@@ -87,7 +87,7 @@ pub fn create_render_pass(swapchain: &Swapchain, vulkan: &VkInstance) -> vk::Ren
 
     unsafe {
         vulkan
-            .device
+            .device()
             .create_render_pass(&renderpass_create_info, None)
             .expect("Failed to create render pass!")
     }

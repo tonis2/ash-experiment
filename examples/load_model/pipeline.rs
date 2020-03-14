@@ -2,17 +2,14 @@ use vulkan::{
     modules::swapchain::Swapchain,
     offset_of,
     utilities::{tools::load_shader, Buffer, Image},
-    VkInstance,
+    Context, VkInstance,
 };
 
 use ash::{version::DeviceV1_0, vk};
 use cgmath::{Deg, Matrix4, Point3, Vector3};
 use image::GenericImageView;
-use std::default::Default;
-use std::ffi::CString;
-use std::mem::{self, align_of};
-use std::path::Path;
-use std::ptr;
+
+use std::{default::Default, ffi::CString, mem, path::Path, ptr, sync::Arc};
 
 #[derive(Clone, Debug, Copy)]
 pub struct Vertex {
@@ -39,67 +36,12 @@ pub struct Pipeline {
     pub uniform_buffer: Buffer,
     pub uniform_transform: UniformBufferObject,
 
+    context: Arc<Context>,
     descriptor_pool: vk::DescriptorPool,
     descriptor_layout: Vec<vk::DescriptorSetLayout>,
 }
 
 impl Pipeline {
-    pub fn create_index_buffer(indices: &Vec<u32>, vulkan: &VkInstance) -> Buffer {
-        let size = std::mem::size_of_val(&indices) as vk::DeviceSize * indices.len() as u64;
-
-        let mut staging_buffer = vulkan.create_buffer(
-            vk::BufferCreateInfo {
-                size,
-                usage: vk::BufferUsageFlags::TRANSFER_SRC,
-                sharing_mode: vk::SharingMode::EXCLUSIVE,
-                ..Default::default()
-            },
-            vk::MemoryPropertyFlags::HOST_VISIBLE | vk::MemoryPropertyFlags::HOST_COHERENT,
-        );
-
-        let buffer = vulkan.create_buffer(
-            vk::BufferCreateInfo {
-                size,
-                usage: vk::BufferUsageFlags::TRANSFER_DST | vk::BufferUsageFlags::INDEX_BUFFER,
-                sharing_mode: vk::SharingMode::EXCLUSIVE,
-                ..Default::default()
-            },
-            vk::MemoryPropertyFlags::DEVICE_LOCAL,
-        );
-        staging_buffer.copy_to_buffer_dynamic(align_of::<u32>() as u64, &indices);
-        vulkan.copy_buffer(staging_buffer, &buffer);
-
-        buffer
-    }
-
-    pub fn create_vertex_buffer(vertices: &[Vertex], vulkan: &VkInstance) -> Buffer {
-        let mut staging_buffer = vulkan.create_buffer(
-            vk::BufferCreateInfo {
-                size: std::mem::size_of_val(vertices) as vk::DeviceSize,
-                usage: vk::BufferUsageFlags::TRANSFER_SRC,
-                sharing_mode: vk::SharingMode::EXCLUSIVE,
-                ..Default::default()
-            },
-            vk::MemoryPropertyFlags::HOST_VISIBLE | vk::MemoryPropertyFlags::HOST_COHERENT,
-        );
-
-        staging_buffer.copy_to_buffer_dynamic(align_of::<Vertex>() as u64, &vertices);
-
-        let buffer = vulkan.create_buffer(
-            vk::BufferCreateInfo {
-                size: std::mem::size_of_val(vertices) as vk::DeviceSize,
-                usage: vk::BufferUsageFlags::TRANSFER_DST | vk::BufferUsageFlags::VERTEX_BUFFER,
-                sharing_mode: vk::SharingMode::EXCLUSIVE,
-                ..Default::default()
-            },
-            vk::MemoryPropertyFlags::DEVICE_LOCAL,
-        );
-
-        vulkan.copy_buffer(staging_buffer, &buffer);
-
-        buffer
-    }
-
     //Creates a new pipeline
     pub fn create_pipeline(
         swapchain: &Swapchain,
@@ -209,7 +151,7 @@ impl Pipeline {
 
         let vertex_shader_module = unsafe {
             vulkan
-                .device
+                .device()
                 .create_shader_module(
                     &vk::ShaderModuleCreateInfo::builder().code(&vertex_shader),
                     None,
@@ -219,7 +161,7 @@ impl Pipeline {
 
         let fragment_shader_module = unsafe {
             vulkan
-                .device
+                .device()
                 .create_shader_module(
                     &vk::ShaderModuleCreateInfo::builder().code(&frag_shader),
                     None,
@@ -311,20 +253,15 @@ impl Pipeline {
 
         let uniform_data = create_uniform_data(&swapchain);
 
-        let buffer_create_info = vk::BufferCreateInfo {
-            size: std::mem::size_of_val(&uniform_data) as u64,
-            usage: vk::BufferUsageFlags::UNIFORM_BUFFER,
-            sharing_mode: vk::SharingMode::EXCLUSIVE,
-            ..Default::default()
-        };
-
-        let mut uniform_buffer = vulkan.create_buffer(
-            buffer_create_info,
-            vk::MemoryPropertyFlags::HOST_VISIBLE | vk::MemoryPropertyFlags::HOST_COHERENT,
+        let uniform_buffer = Buffer::new_mapped_basic(
+            std::mem::size_of_val(&uniform_data) as u64,
+            vk::BufferUsageFlags::UNIFORM_BUFFER,
+            vk_mem::MemoryUsage::CpuOnly,
+            vulkan.context(),
         );
 
-        uniform_buffer
-            .copy_to_buffer_dynamic(align_of::<UniformBufferObject>() as u64, &[uniform_data]);
+        uniform_buffer.upload_to_buffer(&[uniform_data], 0);
+
         let descriptor_pool = create_descriptor_pool(&vulkan, swapchain.image_views.len() as u32);
         let (descriptor_set, descriptor_layout) = create_descriptors(
             descriptor_info,
@@ -341,7 +278,7 @@ impl Pipeline {
         //Create pipeline stuff
         let pipeline_layout = unsafe {
             vulkan
-                .device
+                .device()
                 .create_pipeline_layout(&layout_create_info, None)
                 .unwrap()
         };
@@ -361,7 +298,7 @@ impl Pipeline {
 
         let pipeline = unsafe {
             vulkan
-                .device
+                .device()
                 .create_graphics_pipelines(
                     vk::PipelineCache::null(),
                     &[graphic_pipeline_info.build()],
@@ -375,10 +312,10 @@ impl Pipeline {
         //Destoy shader modules
         unsafe {
             vulkan
-                .device
+                .device()
                 .destroy_shader_module(vertex_shader_module, None);
             vulkan
-                .device
+                .device()
                 .destroy_shader_module(fragment_shader_module, None);
         }
 
@@ -391,60 +328,52 @@ impl Pipeline {
             descriptors: descriptor_set,
             descriptor_pool,
             descriptor_layout,
+
+            context: vulkan.context(),
             uniform_buffer,
             uniform_transform: uniform_data,
         }
     }
 
-    pub fn update_uniform_buffer(&mut self, delta_time: f32, vulkan: &VkInstance) {
+    pub fn update_uniform_buffer(&mut self, delta_time: f32) {
         self.uniform_transform.model = cgmath::Matrix4::from_axis_angle(
             cgmath::Vector3::new(0.0, 0.0, 1.0),
             cgmath::Deg(90.0) * delta_time,
         ) * self.uniform_transform.model;
 
-        let ubos = [self.uniform_transform.clone()];
-
-        let buffer_size = (std::mem::size_of::<UniformBufferObject>() * ubos.len()) as u64;
-
-        unsafe {
-            let data_ptr = vulkan
-                .device
-                .map_memory(
-                    self.uniform_buffer.memory,
-                    0,
-                    buffer_size,
-                    vk::MemoryMapFlags::empty(),
-                )
-                .expect("Failed to Map Memory")
-                as *mut UniformBufferObject;
-
-            data_ptr.copy_from_nonoverlapping(ubos.as_ptr(), ubos.len());
-
-            vulkan.device.unmap_memory(self.uniform_buffer.memory);
-        }
+        self.uniform_buffer
+            .upload_to_buffer(&[self.uniform_transform.clone()], 0);
+        self.uniform_buffer.unmap_memory().expect("failed unmap");
     }
+}
 
-    pub fn destroy(&mut self, vulkan: &VkInstance) {
+impl Drop for Pipeline {
+    fn drop(&mut self) {
         unsafe {
-            vulkan.device.destroy_pipeline(self.pipeline, None);
-            vulkan.device.destroy_pipeline_layout(self.layout, None);
-            vulkan.device.destroy_sampler(self.sampler, None);
-            vulkan
+            self.context.device.destroy_pipeline(self.pipeline, None);
+            self.context
+                .device
+                .destroy_pipeline_layout(self.layout, None);
+            self.context.device.destroy_sampler(self.sampler, None);
+            self.context
                 .device
                 .destroy_descriptor_pool(self.descriptor_pool, None);
 
-            vulkan.device.destroy_image_view(self.texture.1, None);
-            vulkan.device.destroy_image_view(self.depth_image.1, None);
-            self.uniform_buffer.destroy();
-            self.depth_image.0.destroy(&vulkan);
-            self.texture.0.destroy(&vulkan);
+            self.context.device.destroy_image_view(self.texture.1, None);
+            self.context
+                .device
+                .destroy_image_view(self.depth_image.1, None);
 
-            vulkan
+            self.depth_image.0.destroy(self.context.clone());
+            self.texture.0.destroy(self.context.clone());
+
+            self.context
                 .device
                 .destroy_descriptor_set_layout(self.descriptor_layout[0], None);
         }
     }
 }
+
 pub fn create_uniform_data(swapchain: &Swapchain) -> UniformBufferObject {
     UniformBufferObject {
         model: Matrix4::from_angle_z(Deg(90.0)),
@@ -489,18 +418,14 @@ pub fn create_texture(
         panic!("Failed to load texture image!")
     }
 
-    let image_buffer = vk::BufferCreateInfo {
-        size: image_size,
-        usage: vk::BufferUsageFlags::TRANSFER_SRC,
-        sharing_mode: vk::SharingMode::EXCLUSIVE,
-        ..Default::default()
-    };
-
-    let mut buffer = vulkan.create_buffer(
-        image_buffer,
-        vk::MemoryPropertyFlags::HOST_VISIBLE | vk::MemoryPropertyFlags::HOST_COHERENT,
+    let buffer = Buffer::new_mapped_basic(
+        image_size,
+        vk::BufferUsageFlags::TRANSFER_SRC,
+        vk_mem::MemoryUsage::CpuOnly,
+        vulkan.context(),
     );
-    buffer.copy_buffer::<u8>(&image_data, &vulkan);
+
+    buffer.upload_to_buffer::<u8>(&image_data, 0);
 
     let image_create_info = vk::ImageCreateInfo {
         s_type: vk::StructureType::IMAGE_CREATE_INFO,
@@ -523,7 +448,7 @@ pub fn create_texture(
     let image = Image::create_image(
         image_create_info,
         vk::MemoryPropertyFlags::DEVICE_LOCAL,
-        &vulkan,
+        vulkan.context(),
     );
     vulkan.transition_image_layout(
         image.image,
@@ -562,7 +487,7 @@ pub fn create_texture(
     image_info.image = image.image;
     let image_view = unsafe {
         vulkan
-            .device
+            .device()
             .create_image_view(&image_info, None)
             .expect("Failed to create Image View!")
     };
@@ -587,7 +512,7 @@ fn create_descriptors(
     };
     let layouts = unsafe {
         vec![vulkan
-            .device
+            .device()
             .create_descriptor_set_layout(&ubo_layout_create_info, None)
             .expect("Failed to create Descriptor Set Layout!")]
     };
@@ -602,7 +527,7 @@ fn create_descriptors(
 
     let descriptor_sets = unsafe {
         vulkan
-            .device
+            .device()
             .allocate_descriptor_sets(&descriptor_set_allocate_info)
             .expect("Failed to allocate descriptor sets!")
     };
@@ -616,7 +541,7 @@ fn create_descriptors(
     let buffer_info = vec![vk::DescriptorBufferInfo {
         buffer: buffer.buffer,
         offset: 0,
-        range: buffer.size as u64,
+        range: buffer.size() as u64 - std::mem::size_of::<UniformBufferObject>() as u64,
     }];
 
     let descriptor_write_sets = [
@@ -646,7 +571,7 @@ fn create_descriptors(
 
     unsafe {
         vulkan
-            .device
+            .device()
             .update_descriptor_sets(&descriptor_write_sets, &[]);
     }
 
@@ -688,7 +613,7 @@ pub fn create_depth_resources(
     let image = Image::create_image(
         depth_image_info,
         vk::MemoryPropertyFlags::DEVICE_LOCAL,
-        &vulkan,
+        vulkan.context(),
     );
 
     let imageview_info = vk::ImageViewCreateInfo {
@@ -708,7 +633,7 @@ pub fn create_depth_resources(
 
     let image_view = unsafe {
         vulkan
-            .device
+            .device()
             .create_image_view(&imageview_info, None)
             .expect("Failed to create Image View!")
     };
@@ -750,7 +675,7 @@ pub fn create_descriptor_pool(vulkan: &VkInstance, size: u32) -> vk::DescriptorP
 
     unsafe {
         vulkan
-            .device
+            .device()
             .create_descriptor_pool(&descriptor_pool_create_info, None)
             .expect("Failed to create Descriptor Pool!")
     }

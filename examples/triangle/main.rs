@@ -34,7 +34,7 @@ fn main() {
         .expect("Failed to create window.");
 
     let vulkan = Arc::new(Context::new(&window));
-    let mut queue = Queue::new(&vulkan.device);
+    let mut queue = Queue::new(vulkan.clone());
 
     let instance = VkInstance::new(vulkan.clone());
 
@@ -42,7 +42,7 @@ fn main() {
     let render_pass = renderpass::create_render_pass(&swapchain, &vulkan.device);
     let frame_buffers = swapchain.create_frame_buffers(&render_pass, vec![], vulkan.clone());
 
-    let (pipeline, layout) = pipeline::create_pipeline(&swapchain, render_pass, vulkan.clone());
+    let (pipeline, _layout) = pipeline::create_pipeline(&swapchain, render_pass, vulkan.clone());
 
     let index_buffer =
         instance.create_device_local_buffer(vk::BufferUsageFlags::INDEX_BUFFER, &indices);
@@ -115,21 +115,14 @@ fn main() {
         }
         Event::RedrawRequested(_window_id) => {
             let frame = queue.next_frame(&vulkan, &swapchain);
-
             queue.render_frame(&frame, &swapchain, &command_buffers, vulkan.clone());
         }
         Event::LoopDestroyed => unsafe {
             vulkan.wait_idle();
-            vulkan.destroy();
-            instance.destroy();
+
             for &framebuffer in frame_buffers.iter() {
                 vulkan.device.destroy_framebuffer(framebuffer, None);
             }
-
-            swapchain.destroy(vulkan.clone());
-            vulkan.device.destroy_render_pass(render_pass, None);
-            vulkan.device.destroy_pipeline(pipeline, None);
-            vulkan.device.destroy_pipeline_layout(layout, None);
         },
         _ => {}
     });

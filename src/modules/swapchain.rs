@@ -4,7 +4,6 @@ use std::sync::Arc;
 use ash::{version::DeviceV1_0, vk};
 use std::ptr;
 
-
 use super::device::query_swapchain_support;
 use winit::window::Window;
 
@@ -15,6 +14,7 @@ pub struct Swapchain {
     pub image_views: Vec<vk::ImageView>,
     pub format: vk::Format,
     pub extent: vk::Extent2D,
+    pub context: Arc<Context>,
 }
 impl Swapchain {
     pub fn new(context: Arc<Context>, window: &Window) -> Swapchain {
@@ -119,6 +119,7 @@ impl Swapchain {
                 format: surface_format.format,
                 extent,
                 image_views: swapchain_imageviews,
+                context,
             }
         }
     }
@@ -159,11 +160,13 @@ impl Swapchain {
         }
         frame_buffers
     }
+}
 
-    pub fn destroy(&self, context: Arc<Context>) {
+impl Drop for Swapchain {
+    fn drop(&mut self) {
         unsafe {
             for image in self.image_views.iter() {
-                context.device.destroy_image_view(*image, None);
+                self.context.device.destroy_image_view(*image, None);
             }
             self.swapchain_loader
                 .destroy_swapchain(self.swapchain, None);

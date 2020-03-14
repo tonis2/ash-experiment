@@ -21,12 +21,12 @@ pub struct QueueFamilyIndices {
     pub present_family: Option<u32>,
 }
 
-#[derive(Debug)]
 pub struct Queue {
     pub image_available_semaphores: Vec<vk::Semaphore>,
     pub render_finished_semaphores: Vec<vk::Semaphore>,
     pub inflight_fences: Vec<vk::Fence>,
     pub current_frame: usize,
+    pub context: Arc<Context>
 }
 
 impl QueueFamilyIndices {
@@ -43,7 +43,7 @@ impl QueueFamilyIndices {
 }
 
 impl Queue {
-    pub fn new<D: DeviceV1_0>(device: &D) -> Self {
+    pub fn new(context: Arc<Context>) -> Self {
         let semaphore_create_info = vk::SemaphoreCreateInfo {
             s_type: vk::StructureType::SEMAPHORE_CREATE_INFO,
             p_next: ptr::null(),
@@ -62,13 +62,13 @@ impl Queue {
 
         for _ in 0..MAX_FRAMES_IN_FLIGHT {
             unsafe {
-                let image_available_semaphore = device
+                let image_available_semaphore = context.device
                     .create_semaphore(&semaphore_create_info, None)
                     .expect("Failed to create Semaphore Object!");
-                let render_finished_semaphore = device
+                let render_finished_semaphore = context.device
                     .create_semaphore(&semaphore_create_info, None)
                     .expect("Failed to create Semaphore Object!");
-                let inflight_fence = device
+                let inflight_fence = context.device
                     .create_fence(&fence_create_info, None)
                     .expect("Failed to create Fence Object!");
 
@@ -83,6 +83,7 @@ impl Queue {
             render_finished_semaphores,
             inflight_fences,
             current_frame: 0,
+            context
         }
     }
 
@@ -228,13 +229,16 @@ impl Queue {
             signal_semaphores,
         }
     }
+}
 
-    pub fn destroy(&self, device: &ash::Device) {
+
+impl Drop for Queue {
+    fn drop(&mut self) {
         unsafe {
             for i in 0..MAX_FRAMES_IN_FLIGHT {
-                device.destroy_semaphore(self.image_available_semaphores[i], None);
-                device.destroy_semaphore(self.render_finished_semaphores[i], None);
-                device.destroy_fence(self.inflight_fences[i], None);
+                self.context.device.destroy_semaphore(self.image_available_semaphores[i], None);
+                self.context.device.destroy_semaphore(self.render_finished_semaphores[i], None);
+                self.context.device.destroy_fence(self.inflight_fences[i], None);
             }
         }
     }

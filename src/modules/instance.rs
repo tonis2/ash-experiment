@@ -29,6 +29,10 @@ impl VkInstance {
         self.context.clone()
     }
 
+    pub fn device(&self) -> &ash::Device {
+        &self.context.device
+    }
+
     pub fn create_command_buffers(&self, amount: usize) -> Vec<vk::CommandBuffer> {
         let command_buffer_allocate_info = vk::CommandBufferAllocateInfo {
             s_type: vk::StructureType::COMMAND_BUFFER_ALLOCATE_INFO,
@@ -60,7 +64,6 @@ impl VkInstance {
                 .unwrap()
         }
     }
-
 
     pub fn create_descriptor_pool(&self, amount: usize) -> vk::DescriptorPool {
         let pool_sizes = [vk::DescriptorPoolSize {
@@ -111,6 +114,7 @@ impl VkInstance {
         data: &[T],
     ) -> Buffer {
         let buffer_size = (data.len() * std::mem::size_of::<T>()) as ash::vk::DeviceSize;
+       
 
         let staging_buffer = Buffer::new_mapped_basic(
             buffer_size,
@@ -119,7 +123,7 @@ impl VkInstance {
             self.context(),
         );
 
-        staging_buffer.upload_to_buffer(&data, 0, std::mem::align_of::<T>() as _);
+        staging_buffer.upload_to_buffer::<T>(&data, 0);
 
         let vertex_buffer = Buffer::new_mapped_basic(
             buffer_size,

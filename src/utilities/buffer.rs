@@ -50,11 +50,12 @@ impl Buffer {
         Buffer::new(&allocation_create_info, &buffer_create_info, context)
     }
 
-    pub fn upload_to_buffer<T: Copy>(&self, data: &[T], offset: usize, alignment: vk::DeviceSize) {
+    pub fn upload_to_buffer<T: Copy>(&self, data: &[T], offset: u64) {
+        let alignment = std::mem::align_of::<T>() as _;
         let data_pointer = self.map_memory().expect("Failed to map memory!");
         unsafe {
             let mut align = ash::util::Align::new(
-                data_pointer.add(offset) as _,
+                data_pointer.add(offset as usize) as _,
                 alignment,
                 self.allocation_info.get_size() as _,
             );
@@ -71,17 +72,24 @@ impl Buffer {
     }
 
     pub fn flush(&self, offset: usize, size: usize) -> vk_mem::error::Result<()> {
-        self.context.memory.flush_allocation(&self.allocation, offset, size)
+        self.context
+            .memory
+            .flush_allocation(&self.allocation, offset, size)
     }
 
     pub fn size(&self) -> u64 {
         self.allocation_info.get_size() as u64
     }
+
+    pub fn offset(&self) -> u64 {
+        self.allocation_info.get_offset() as u64
+    }
 }
 
 impl Drop for Buffer {
     fn drop(&mut self) {
-        self.context.memory
+        self.context
+            .memory
             .destroy_buffer(self.buffer, &self.allocation)
             .expect("Failed to destroy buffer!");
     }
