@@ -251,12 +251,18 @@ impl Pipeline {
             ..Default::default()
         };
 
-        let sampler = vulkan.create_texture_sampler(sampler_create_info);
+        let sampler = unsafe {
+            vulkan
+                .context
+                .device
+                .create_sampler(&sampler_create_info, None)
+                .expect("Failed to create Sampler!")
+        };
 
         //Create uniform buffer
 
         let uniform_data = create_uniform_data(&swapchain);
-        let uniform_buffer = vulkan.create_device_local_buffer::<UniformBufferObject>(
+        let uniform_buffer = vulkan.create_gpu_buffer::<UniformBufferObject>(
             vk::BufferUsageFlags::UNIFORM_BUFFER,
             &[uniform_data],
         );

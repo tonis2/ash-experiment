@@ -45,9 +45,9 @@ fn main() {
     let (pipeline, _layout) = pipeline::create_pipeline(&swapchain, render_pass, vulkan.clone());
 
     let index_buffer =
-        instance.create_device_local_buffer(vk::BufferUsageFlags::INDEX_BUFFER, &indices);
+        instance.create_gpu_buffer(vk::BufferUsageFlags::INDEX_BUFFER, &indices);
     let vertex_buffer =
-        instance.create_device_local_buffer(vk::BufferUsageFlags::VERTEX_BUFFER, &vertices);
+        instance.create_gpu_buffer(vk::BufferUsageFlags::VERTEX_BUFFER, &vertices);
 
     let command_buffers = instance.create_command_buffers(swapchain.image_views.len());
 

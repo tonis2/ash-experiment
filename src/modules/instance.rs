@@ -4,6 +4,7 @@ use ash::{
 };
 
 use super::context::Context;
+use std::cmp::max;
 use std::ptr;
 use std::sync::Arc;
 
@@ -108,13 +109,12 @@ impl VkInstance {
         self.end_single_time_command(command_buffer);
     }
 
-    pub fn create_device_local_buffer<T: Copy>(
+    pub fn create_gpu_buffer<T: Copy>(
         &self,
         usage_flags: vk::BufferUsageFlags,
         data: &[T],
     ) -> Buffer {
         let buffer_size = (data.len() * std::mem::size_of::<T>()) as ash::vk::DeviceSize;
-       
 
         let staging_buffer = Buffer::new_mapped_basic(
             buffer_size,
@@ -233,15 +233,7 @@ impl VkInstance {
         self.end_single_time_command(command_buffer);
     }
 
-    pub fn create_texture_sampler(&self, sampler_info: vk::SamplerCreateInfo) -> vk::Sampler {
-        unsafe {
-            self.context
-                .device
-                .create_sampler(&sampler_info, None)
-                .expect("Failed to create Sampler!")
-        }
-    }
-
+  
     pub fn transition_image_layout(
         &self,
         image: vk::Image,
@@ -358,6 +350,141 @@ impl VkInstance {
         }
 
         panic!("Failed to find supported format!")
+    }
+
+    pub fn generate_mipmaps(
+        &self,
+        image: vk::Image,
+        tex_width: u32,
+        tex_height: u32,
+        mip_levels: u32,
+    ) {
+        let command_buffer = self.begin_single_time_command();
+
+        let mut image_barrier = vk::ImageMemoryBarrier {
+            s_type: vk::StructureType::IMAGE_MEMORY_BARRIER,
+            p_next: ptr::null(),
+            src_access_mask: vk::AccessFlags::empty(),
+            dst_access_mask: vk::AccessFlags::empty(),
+            old_layout: vk::ImageLayout::UNDEFINED,
+            new_layout: vk::ImageLayout::UNDEFINED,
+            src_queue_family_index: vk::QUEUE_FAMILY_IGNORED,
+            dst_queue_family_index: vk::QUEUE_FAMILY_IGNORED,
+            image,
+            subresource_range: vk::ImageSubresourceRange {
+                aspect_mask: vk::ImageAspectFlags::COLOR,
+                base_mip_level: 0,
+                level_count: 1,
+                base_array_layer: 0,
+                layer_count: 1,
+            },
+        };
+
+        let mut mip_width = tex_width as i32;
+        let mut mip_height = tex_height as i32;
+
+        for i in 1..mip_levels {
+            image_barrier.subresource_range.base_mip_level = i - 1;
+            image_barrier.old_layout = vk::ImageLayout::TRANSFER_DST_OPTIMAL;
+            image_barrier.new_layout = vk::ImageLayout::TRANSFER_SRC_OPTIMAL;
+            image_barrier.src_access_mask = vk::AccessFlags::TRANSFER_WRITE;
+            image_barrier.dst_access_mask = vk::AccessFlags::TRANSFER_READ;
+
+            unsafe {
+                self.context.device.cmd_pipeline_barrier(
+                    command_buffer,
+                    vk::PipelineStageFlags::TRANSFER,
+                    vk::PipelineStageFlags::TRANSFER,
+                    vk::DependencyFlags::empty(),
+                    &[],
+                    &[],
+                    &[image_barrier.clone()],
+                );
+            }
+
+            let blits = [vk::ImageBlit {
+                src_subresource: vk::ImageSubresourceLayers {
+                    aspect_mask: vk::ImageAspectFlags::COLOR,
+                    mip_level: i - 1,
+                    base_array_layer: 0,
+                    layer_count: 1,
+                },
+                src_offsets: [
+                    vk::Offset3D { x: 0, y: 0, z: 0 },
+                    vk::Offset3D {
+                        x: mip_width,
+                        y: mip_height,
+                        z: 1,
+                    },
+                ],
+                dst_subresource: vk::ImageSubresourceLayers {
+                    aspect_mask: vk::ImageAspectFlags::COLOR,
+                    mip_level: i,
+                    base_array_layer: 0,
+                    layer_count: 1,
+                },
+                dst_offsets: [
+                    vk::Offset3D { x: 0, y: 0, z: 0 },
+                    vk::Offset3D {
+                        x: max(mip_width / 2, 1),
+                        y: max(mip_height / 2, 1),
+                        z: 1,
+                    },
+                ],
+            }];
+
+            unsafe {
+                self.context.device.cmd_blit_image(
+                    command_buffer,
+                    image,
+                    vk::ImageLayout::TRANSFER_SRC_OPTIMAL,
+                    image,
+                    vk::ImageLayout::TRANSFER_DST_OPTIMAL,
+                    &blits,
+                    vk::Filter::LINEAR,
+                );
+            }
+
+            image_barrier.old_layout = vk::ImageLayout::TRANSFER_SRC_OPTIMAL;
+            image_barrier.new_layout = vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL;
+            image_barrier.src_access_mask = vk::AccessFlags::TRANSFER_READ;
+            image_barrier.dst_access_mask = vk::AccessFlags::SHADER_READ;
+
+            unsafe {
+                self.context.device.cmd_pipeline_barrier(
+                    command_buffer,
+                    vk::PipelineStageFlags::TRANSFER,
+                    vk::PipelineStageFlags::FRAGMENT_SHADER,
+                    vk::DependencyFlags::empty(),
+                    &[],
+                    &[],
+                    &[image_barrier.clone()],
+                );
+            }
+
+            mip_width = max(mip_width / 2, 1);
+            mip_height = max(mip_height / 2, 1);
+        }
+
+        image_barrier.subresource_range.base_mip_level = mip_levels - 1;
+        image_barrier.old_layout = vk::ImageLayout::TRANSFER_DST_OPTIMAL;
+        image_barrier.new_layout = vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL;
+        image_barrier.src_access_mask = vk::AccessFlags::TRANSFER_WRITE;
+        image_barrier.dst_access_mask = vk::AccessFlags::SHADER_READ;
+
+        unsafe {
+            self.context.device.cmd_pipeline_barrier(
+                command_buffer,
+                vk::PipelineStageFlags::TRANSFER,
+                vk::PipelineStageFlags::FRAGMENT_SHADER,
+                vk::DependencyFlags::empty(),
+                &[],
+                &[],
+                &[image_barrier.clone()],
+            );
+        }
+
+        self.end_single_time_command(command_buffer);
     }
 
     pub fn destroy(&self) {

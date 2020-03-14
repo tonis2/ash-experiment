@@ -1,12 +1,11 @@
 use crate::Context;
-use std::sync::Arc;
 use ash::vk;
+use std::sync::Arc;
 
 use std::ptr;
 
 use super::tools::find_memory_type;
-use ash::{version::DeviceV1_0};
-
+use ash::version::DeviceV1_0;
 
 pub struct Image {
     pub image: vk::Image,
@@ -28,6 +27,7 @@ impl Image {
 
         let image_memory_requirement =
             unsafe { context.device.get_image_memory_requirements(texture_image) };
+
         let memory_allocate_info = vk::MemoryAllocateInfo {
             s_type: vk::StructureType::MEMORY_ALLOCATE_INFO,
             p_next: ptr::null(),

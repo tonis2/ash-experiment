@@ -30,7 +30,7 @@ pub struct Pipeline {
     pub pipeline: vk::Pipeline,
     pub layout: vk::PipelineLayout,
     pub descriptors: Vec<vk::DescriptorSet>,
-    pub texture: (Image, vk::ImageView),
+    pub texture: (Image, vk::ImageView, u32),
     pub depth_image: (Image, vk::ImageView),
     pub sampler: vk::Sampler,
     pub uniform_buffer: Buffer,
@@ -241,13 +241,20 @@ impl Pipeline {
             address_mode_u: vk::SamplerAddressMode::REPEAT,
             address_mode_v: vk::SamplerAddressMode::REPEAT,
             address_mode_w: vk::SamplerAddressMode::REPEAT,
+            max_lod: texture.2 as f32,
             mip_lod_bias: 0.0,
             anisotropy_enable: vk::TRUE,
             max_anisotropy: 16.0,
             ..Default::default()
         };
 
-        let sampler = vulkan.create_texture_sampler(sampler_create_info);
+        let sampler = unsafe {
+            vulkan
+                .context
+                .device
+                .create_sampler(&sampler_create_info, None)
+                .expect("Failed to create Sampler!")
+        };
 
         //Create uniform buffer
 
@@ -399,7 +406,7 @@ pub fn create_texture(
     image_path: &Path,
     image_info: &mut vk::ImageViewCreateInfo,
     vulkan: &VkInstance,
-) -> (Image, vk::ImageView) {
+) -> (Image, vk::ImageView, u32) {
     let mut image_object = image::open(image_path).unwrap(); // this function is slow in debug mode.
     image_object = image_object.flipv();
     let (image_width, image_height) = (image_object.width(), image_object.height());
@@ -413,6 +420,10 @@ pub fn create_texture(
         | image::DynamicImage::ImageBgra8(_)
         | image::DynamicImage::ImageRgba8(_) => image_object.raw_pixels(),
     };
+    let mip_levels = ((::std::cmp::max(image_width, image_height) as f32)
+        .log2()
+        .floor() as u32)
+        + 1;
 
     if image_size <= 0 {
         panic!("Failed to load texture image!")
@@ -436,11 +447,13 @@ pub fn create_texture(
             height: image_height,
             depth: 1,
         },
-        mip_levels: 1,
+        mip_levels,
         array_layers: 1,
         samples: vk::SampleCountFlags::TYPE_1,
         tiling: vk::ImageTiling::OPTIMAL,
-        usage: vk::ImageUsageFlags::TRANSFER_DST | vk::ImageUsageFlags::SAMPLED,
+        usage: vk::ImageUsageFlags::TRANSFER_SRC
+            | vk::ImageUsageFlags::TRANSFER_DST
+            | vk::ImageUsageFlags::SAMPLED,
         sharing_mode: vk::SharingMode::EXCLUSIVE,
         ..Default::default()
     };
@@ -455,8 +468,9 @@ pub fn create_texture(
         vk::Format::R8G8B8A8_UNORM,
         vk::ImageLayout::UNDEFINED,
         vk::ImageLayout::TRANSFER_DST_OPTIMAL,
-        1,
+        mip_levels,
     );
+
     let buffer_image_regions = vec![vk::BufferImageCopy {
         image_subresource: vk::ImageSubresourceLayers {
             aspect_mask: vk::ImageAspectFlags::COLOR,
@@ -474,15 +488,10 @@ pub fn create_texture(
         buffer_row_length: 0,
         image_offset: vk::Offset3D { x: 0, y: 0, z: 0 },
     }];
+
     vulkan.copy_buffer_to_image(buffer.buffer, image.image, buffer_image_regions);
 
-    vulkan.transition_image_layout(
-        image.image,
-        vk::Format::R8G8B8A8_UNORM,
-        vk::ImageLayout::TRANSFER_DST_OPTIMAL,
-        vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
-        1,
-    );
+    vulkan.generate_mipmaps(image.image, image_width, image_height, mip_levels);
 
     image_info.image = image.image;
     let image_view = unsafe {
@@ -492,7 +501,7 @@ pub fn create_texture(
             .expect("Failed to create Image View!")
     };
 
-    (image, image_view)
+    (image, image_view, mip_levels)
 }
 
 fn create_descriptors(
