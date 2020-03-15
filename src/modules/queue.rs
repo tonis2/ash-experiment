@@ -21,6 +21,7 @@ pub struct QueueFamilyIndices {
     pub present_family: Option<u32>,
 }
 
+//Queue contains all the functionality neccesary to get render and get frame ready
 pub struct Queue {
     pub image_available_semaphores: Vec<vk::Semaphore>,
     pub render_finished_semaphores: Vec<vk::Semaphore>,
@@ -100,12 +101,12 @@ impl Queue {
         swapchain: &Swapchain,
         apply: F,
     ) {
+
         //Build frame buffer
-        let attachment_count = attachments.len() as u32;
         let framebuffer_create_info = vk::FramebufferCreateInfo {
             flags: vk::FramebufferCreateFlags::empty(),
             render_pass,
-            attachment_count,
+            attachment_count: attachments.len() as u32,
             p_attachments: attachments.as_ptr(),
             width: swapchain.extent.width,
             height: swapchain.extent.height,
@@ -121,7 +122,6 @@ impl Queue {
         };
 
         //build command buffer
-
         let command_buffer_begin_info = vk::CommandBufferBeginInfo {
             s_type: vk::StructureType::COMMAND_BUFFER_BEGIN_INFO,
             p_next: ptr::null(),
