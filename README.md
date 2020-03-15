@@ -9,3 +9,6 @@ Many thanks to these [vulkan examples](https://github.com/unknownue/vulkan-tutor
 To run examples download assets running `python3 ./download_assets.py`  
 and then you can choose examle with 
 `cargo run --example` + example name 
+
+
+Tested on `windows 10` and `linux 18.04`
