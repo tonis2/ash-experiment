@@ -93,7 +93,7 @@ fn main() {
 
             queue.build_frame(
                 &next_frame,
-                &command_buffers,
+                command_buffers[next_frame.image_index],
                 extent[0],
                 clear_values,
                 vec![pipeline.depth_image.1],
@@ -131,7 +131,12 @@ fn main() {
                 },
             );
 
-            queue.render_frame(&next_frame, &swapchain, &command_buffers, vulkan.clone());
+            queue.render_frame(
+                &next_frame,
+                &swapchain,
+                command_buffers[next_frame.image_index],
+                vulkan.clone(),
+            );
         }
         Event::LoopDestroyed => {}
         _ => {}

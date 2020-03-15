@@ -1,7 +1,7 @@
 mod pipeline;
 mod renderpass;
 
-use vulkan::{utilities::FPSLimiter, Context, Queue, Swapchain, VkInstance, prelude::*};
+use vulkan::{prelude::*, utilities::FPSLimiter, Context, Queue, Swapchain, VkInstance};
 use winit::event::{ElementState, Event, KeyboardInput, VirtualKeyCode, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop};
 
@@ -116,7 +116,7 @@ fn main() {
 
             queue.build_frame(
                 &next_frame,
-                &command_buffers,
+                command_buffers[next_frame.image_index],
                 extent[0],
                 clear_values,
                 vec![pipeline.depth_image.1],
@@ -154,7 +154,12 @@ fn main() {
                 },
             );
 
-            queue.render_frame(&next_frame, &swapchain, &command_buffers, vulkan.clone());
+            queue.render_frame(
+                &next_frame,
+                &swapchain,
+                command_buffers[next_frame.image_index],
+                vulkan.clone(),
+            );
         }
         Event::LoopDestroyed => {}
         _ => {}

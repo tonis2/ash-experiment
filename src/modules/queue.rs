@@ -109,7 +109,7 @@ impl Queue {
     pub fn build_frame<F: Fn(vk::CommandBuffer, &ash::Device)>(
         &self,
         frame: &Frame,
-        command_buffers: &Vec<vk::CommandBuffer>,
+        command_buffer: vk::CommandBuffer,
         render_area: vk::Rect2D,
         clear_values: Vec<vk::ClearValue>,
         attachments: Vec<vk::ImageView>,
@@ -155,7 +155,7 @@ impl Queue {
             self.context
                 .device
                 .begin_command_buffer(
-                    command_buffers[frame.image_index],
+                    command_buffer,
                     &command_buffer_begin_info,
                 )
                 .expect("Failed to begin recording Command Buffer at beginning!");
@@ -171,20 +171,20 @@ impl Queue {
             };
 
             self.context.device.cmd_begin_render_pass(
-                command_buffers[frame.image_index],
+                command_buffer,
                 &render_pass_begin_info,
                 vk::SubpassContents::INLINE,
             );
 
-            apply(command_buffers[frame.image_index], &self.context.device);
+            apply(command_buffer, &self.context.device);
 
             self.context
                 .device
-                .cmd_end_render_pass(command_buffers[frame.image_index]);
+                .cmd_end_render_pass(command_buffer);
 
             self.context
                 .device
-                .end_command_buffer(command_buffers[frame.image_index])
+                .end_command_buffer(command_buffer)
                 .expect("Failed to record Command Buffer at Ending!");
         }
     }
@@ -193,7 +193,7 @@ impl Queue {
         &mut self,
         frame: &Frame,
         swapchain: &Swapchain,
-        command_buffers: &Vec<vk::CommandBuffer>,
+        command_buffer: vk::CommandBuffer,
         context: Arc<Context>,
     ) {
         let submit_infos = vec![vk::SubmitInfo {
@@ -203,7 +203,7 @@ impl Queue {
             p_wait_semaphores: frame.wait_semaphores.as_ptr(),
             p_wait_dst_stage_mask: frame.wait_stages.as_ptr(),
             command_buffer_count: 1,
-            p_command_buffers: &command_buffers[frame.image_index as usize],
+            p_command_buffers: &command_buffer,
             signal_semaphore_count: frame.signal_semaphores.len() as u32,
             p_signal_semaphores: frame.signal_semaphores.as_ptr(),
         }];
