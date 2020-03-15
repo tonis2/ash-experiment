@@ -82,12 +82,12 @@ fn main() {
             tick_counter.tick_frame();
         }
         Event::RedrawRequested(_window_id) => {
-            let extent = vec![vk::Rect2D {
+            let extent = [vk::Rect2D {
                 offset: vk::Offset2D { x: 0, y: 0 },
                 extent: swapchain.extent,
             }];
 
-            let clear_values = vec![
+            let clear_values = [
                 vk::ClearValue {
                     // clear value for color buffer
                     color: vk::ClearColorValue {
@@ -117,7 +117,7 @@ fn main() {
             queue.build_frame(
                 command_buffers[next_frame.image_index],
                 extent[0],
-                clear_values,
+                &clear_values,
                 vec![swapchain.get_image(next_frame.image_index), pipeline.depth_image.1],
                 render_pass,
                 &swapchain,

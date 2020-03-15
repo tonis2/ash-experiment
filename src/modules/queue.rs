@@ -94,7 +94,7 @@ impl Queue {
         &self,
         command_buffer: vk::CommandBuffer,
         render_area: vk::Rect2D,
-        clear_values: Vec<vk::ClearValue>,
+        clear_values: &[vk::ClearValue],
         attachments: Vec<vk::ImageView>,
         render_pass: vk::RenderPass,
         swapchain: &Swapchain,

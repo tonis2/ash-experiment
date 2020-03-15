@@ -77,7 +77,7 @@ fn main() {
                 extent: swapchain.extent,
             }];
 
-            let clear_values = vec![vk::ClearValue {
+            let clear_values = [vk::ClearValue {
                 color: vk::ClearColorValue {
                     float32: [0.0, 0.0, 0.0, 1.0],
                 },
@@ -97,7 +97,7 @@ fn main() {
             queue.build_frame(
                 command_buffers[next_frame.image_index],
                 extent[0],
-                clear_values,
+                &clear_values,
                 vec![swapchain.get_image(next_frame.image_index)],
                 render_pass,
                 &swapchain,
