@@ -7,6 +7,11 @@ import os
 from urllib.request import urlretrieve
 from zipfile import ZipFile
 
+
+import os
+if not os.path.exists("./examples/assets"):
+    os.makedirs("./examples/assets")
+
 ASSET_GENERAL_TEXTURE_URL = "https://vulkan-tutorial.com/images/texture.jpg"
 ASSET_CHALET_TEXTURE_URL = "https://vulkan-tutorial.com/resources/chalet.jpg"
 ASSET_CHALET_OBJ_URL = "https://vulkan-tutorial.com/resources/chalet.obj.zip"
