@@ -115,11 +115,10 @@ fn main() {
             let next_frame = queue.next_frame(&swapchain);
 
             queue.build_frame(
-                &next_frame,
                 command_buffers[next_frame.image_index],
                 extent[0],
                 clear_values,
-                vec![pipeline.depth_image.1],
+                vec![swapchain.get_image(next_frame.image_index), pipeline.depth_image.1],
                 render_pass,
                 &swapchain,
                 |command_buffer, device| unsafe {

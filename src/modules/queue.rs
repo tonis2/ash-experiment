@@ -90,25 +90,8 @@ impl Queue {
         }
     }
 
-    // pub fn create_frame_buffers(
-    //     &self,
-    //     render_pass: &vk::RenderPass,
-    //     frame_image: vk::ImageView,
-    //     attachments: Vec<vk::ImageView>,
-    //     context: Arc<Context>,
-    // ) -> Vec<vk::Framebuffer> {
-    //     let mut frame_buffers = vec![];
-
-    //     for &image_view in self.image_views.iter() {
-
-    //         frame_buffers.push(framebuffer);
-    //     }
-    //     frame_buffers
-    // }
-
     pub fn build_frame<F: Fn(vk::CommandBuffer, &ash::Device)>(
         &self,
-        frame: &Frame,
         command_buffer: vk::CommandBuffer,
         render_area: vk::Rect2D,
         clear_values: Vec<vk::ClearValue>,
@@ -117,18 +100,13 @@ impl Queue {
         swapchain: &Swapchain,
         apply: F,
     ) {
-        //Frame buffer
-        let mut frame_attachments: Vec<vk::ImageView> =
-            vec![swapchain.get_image(frame.image_index)];
-
-        frame_attachments.extend_from_slice(&attachments);
-        let attachment_count = frame_attachments.len() as u32;
-
+        //Build frame buffer
+        let attachment_count = attachments.len() as u32;
         let framebuffer_create_info = vk::FramebufferCreateInfo {
             flags: vk::FramebufferCreateFlags::empty(),
             render_pass,
             attachment_count,
-            p_attachments: frame_attachments.as_ptr(),
+            p_attachments: attachments.as_ptr(),
             width: swapchain.extent.width,
             height: swapchain.extent.height,
             layers: 1,
@@ -142,7 +120,7 @@ impl Queue {
                 .expect("Failed to create Framebuffer!")
         };
 
-        //Command buffers
+        //build command buffer
 
         let command_buffer_begin_info = vk::CommandBufferBeginInfo {
             s_type: vk::StructureType::COMMAND_BUFFER_BEGIN_INFO,
@@ -154,10 +132,7 @@ impl Queue {
         unsafe {
             self.context
                 .device
-                .begin_command_buffer(
-                    command_buffer,
-                    &command_buffer_begin_info,
-                )
+                .begin_command_buffer(command_buffer, &command_buffer_begin_info)
                 .expect("Failed to begin recording Command Buffer at beginning!");
 
             let render_pass_begin_info = vk::RenderPassBeginInfo {
@@ -178,9 +153,7 @@ impl Queue {
 
             apply(command_buffer, &self.context.device);
 
-            self.context
-                .device
-                .cmd_end_render_pass(command_buffer);
+            self.context.device.cmd_end_render_pass(command_buffer);
 
             self.context
                 .device

@@ -95,11 +95,10 @@ fn main() {
             let next_frame = queue.next_frame(&swapchain);
 
             queue.build_frame(
-                &next_frame,
                 command_buffers[next_frame.image_index],
                 extent[0],
                 clear_values,
-                vec![],
+                vec![swapchain.get_image(next_frame.image_index)],
                 render_pass,
                 &swapchain,
                 |command_buffer, device| unsafe {
@@ -126,7 +125,12 @@ fn main() {
                 },
             );
 
-            queue.render_frame(&next_frame, &swapchain, command_buffers[next_frame.image_index], vulkan.clone());
+            queue.render_frame(
+                &next_frame,
+                &swapchain,
+                command_buffers[next_frame.image_index],
+                vulkan.clone(),
+            );
         }
         Event::LoopDestroyed => {}
         _ => {}
