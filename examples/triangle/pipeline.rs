@@ -10,7 +10,7 @@ use ash::version::DeviceV1_0;
 use std::mem;
 
 use ash::vk;
-use std::default::Default;
+
 use std::ffi::CString;
 use std::path::Path;
 

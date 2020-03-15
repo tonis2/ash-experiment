@@ -45,20 +45,20 @@ impl Context {
             ..Default::default()
         };
 
-       unsafe {
-        Context {
-            _entry: entry,
-            _debugger: debugger,
-            instance,
-            surface,
-            physical_device,
-            graphics_queue: device.get_device_queue(queue.graphics_family.unwrap(), 0),
-            present_queue: device.get_device_queue(queue.present_family.unwrap(), 0),
-            queue_family: queue,
-            device,
-            memory: vk_mem::Allocator::new(&memory_info).unwrap(),
+        unsafe {
+            Context {
+                _entry: entry,
+                _debugger: debugger,
+                instance,
+                surface,
+                physical_device,
+                graphics_queue: device.get_device_queue(queue.graphics_family.unwrap(), 0),
+                present_queue: device.get_device_queue(queue.present_family.unwrap(), 0),
+                queue_family: queue,
+                device,
+                memory: vk_mem::Allocator::new(&memory_info).unwrap(),
+            }
         }
-       }
     }
 
     pub fn get_physical_device_memory_properties(&self) -> vk::PhysicalDeviceMemoryProperties {
@@ -75,24 +75,20 @@ impl Context {
                 .expect("failed to wait device idle")
         }
     }
+}
 
-    pub fn destroy(&self) {
+impl Drop for Context {
+    fn drop(&mut self) {
         unsafe {
             self.wait_idle();
             self.surface
                 .surface_loader
                 .destroy_surface(self.surface.surface, None);
-                self.device.destroy_device(None);
-            // self.queue.destroy(&self.device);
-        
-            // self._debugger.destroy();
-            // self.instance.destroy_instance(None);
+            self.device.destroy_device(None);
+            self._debugger.destroy();
+            self.instance.destroy_instance(None);
         }
     }
-
-    // pub fn next_frame(&mut self) {
-    //     self.queue.current_frame = (self.queue.current_frame + 1) % MAX_FRAMES_IN_FLIGHT;
-    // }
 }
 
 //Create vulkan entry

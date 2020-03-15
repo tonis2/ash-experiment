@@ -343,6 +343,7 @@ impl Pipeline {
 impl Drop for Pipeline {
     fn drop(&mut self) {
         unsafe {
+            self.context.wait_idle();
             self.context.device.destroy_pipeline(self.pipeline, None);
             self.context
                 .device

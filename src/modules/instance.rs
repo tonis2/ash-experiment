@@ -489,6 +489,7 @@ impl VkInstance {
 
     pub fn destroy(&self) {
         unsafe {
+            self.context.wait_idle();
             self.context
                 .device
                 .destroy_command_pool(self.command_pool, None);

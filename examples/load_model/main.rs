@@ -1,18 +1,15 @@
 mod pipeline;
 mod renderpass;
 
-use std::path::Path;
-use vulkan::{utilities::FPSLimiter, Context, Queue, Swapchain, VkInstance};
+use vulkan::{prelude::*, utilities::FPSLimiter, Context, Queue, Swapchain, VkInstance};
 use winit::event::{ElementState, Event, KeyboardInput, VirtualKeyCode, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop};
 
-use ash::{version::DeviceV1_0, vk};
 use pipeline::{Pipeline, Vertex};
+use std::path::Path;
 use std::sync::Arc;
 
 fn main() {
-    let (vertices, indices) = load_model(Path::new("examples/assets/chalet.obj"));
-
     let event_loop = EventLoop::new();
     let window = winit::window::WindowBuilder::new()
         .with_title("test")
@@ -29,81 +26,14 @@ fn main() {
     let render_pass = renderpass::create_render_pass(&swapchain, &instance);
 
     let mut pipeline = Pipeline::create_pipeline(&swapchain, render_pass, &instance);
-
-    let frame_buffers =
-        swapchain.create_frame_buffers(&render_pass, vec![pipeline.depth_image.1], vulkan.clone());
-    let index_buffer =
-        instance.create_gpu_buffer(vk::BufferUsageFlags::INDEX_BUFFER, &indices);
-    let vertex_buffer =
-        instance.create_gpu_buffer(vk::BufferUsageFlags::VERTEX_BUFFER, &vertices);
+    let (vertices, indices) = load_model(Path::new("examples/assets/chalet.obj"));
+    let index_buffer = instance.create_gpu_buffer(vk::BufferUsageFlags::INDEX_BUFFER, &indices);
+    let vertex_buffer = instance.create_gpu_buffer(vk::BufferUsageFlags::VERTEX_BUFFER, &vertices);
 
     let command_buffers = instance.create_command_buffers(swapchain.image_views.len());
 
     let mut tick_counter = FPSLimiter::new();
 
-    let extent = vec![vk::Rect2D {
-        offset: vk::Offset2D { x: 0, y: 0 },
-        extent: swapchain.extent,
-    }];
-
-    let clear_values = vec![
-        vk::ClearValue {
-            // clear value for color buffer
-            color: vk::ClearColorValue {
-                float32: [0.0, 0.0, 0.0, 1.0],
-            },
-        },
-        vk::ClearValue {
-            // clear value for depth buffer
-            depth_stencil: vk::ClearDepthStencilValue {
-                depth: 1.0,
-                stencil: 0,
-            },
-        },
-    ];
-
-    let viewports = [vk::Viewport {
-        x: 0.0,
-        y: 0.0,
-        width: swapchain.extent.width as f32,
-        height: swapchain.extent.height as f32,
-        min_depth: 0.0,
-        max_depth: 1.0,
-    }];
-
-    queue.build_frame(
-        &command_buffers,
-        &frame_buffers,
-        &render_pass,
-        extent[0],
-        clear_values,
-        vulkan.clone(),
-        |command_buffer, device| unsafe {
-            device.cmd_bind_pipeline(
-                command_buffer,
-                vk::PipelineBindPoint::GRAPHICS,
-                pipeline.pipeline,
-            );
-            device.cmd_bind_descriptor_sets(
-                command_buffer,
-                vk::PipelineBindPoint::GRAPHICS,
-                pipeline.layout,
-                0,
-                &pipeline.descriptors,
-                &[],
-            );
-            device.cmd_set_viewport(command_buffer, 0, &viewports);
-            device.cmd_set_scissor(command_buffer, 0, &extent);
-            device.cmd_bind_vertex_buffers(command_buffer, 0, &[vertex_buffer.buffer], &[0]);
-            device.cmd_bind_index_buffer(
-                command_buffer,
-                index_buffer.buffer,
-                0,
-                vk::IndexType::UINT32,
-            );
-            device.cmd_draw_indexed(command_buffer, indices.len() as u32, 1, 0, 0, 0);
-        },
-    );
     event_loop.run(move |event, _, control_flow| match event {
         Event::WindowEvent { event, .. } => match event {
             WindowEvent::CloseRequested => *control_flow = ControlFlow::Exit,
@@ -128,18 +58,82 @@ fn main() {
         }
         Event::RedrawRequested(_window_id) => {
             let delta_time = tick_counter.delta_time();
-
             pipeline.update_uniform_buffer(delta_time);
-            let frame = queue.next_frame(&vulkan, &swapchain);
-            queue.render_frame(&frame, &swapchain, &command_buffers, vulkan.clone());
-        }
-        Event::LoopDestroyed => unsafe {
-            vulkan.wait_idle();
+            let extent = vec![vk::Rect2D {
+                offset: vk::Offset2D { x: 0, y: 0 },
+                extent: swapchain.extent,
+            }];
 
-            for &framebuffer in frame_buffers.iter() {
-                vulkan.device.destroy_framebuffer(framebuffer, None);
-            }
-        },
+            let clear_values = vec![
+                vk::ClearValue {
+                    // clear value for color buffer
+                    color: vk::ClearColorValue {
+                        float32: [0.0, 0.0, 0.0, 1.0],
+                    },
+                },
+                vk::ClearValue {
+                    // clear value for depth buffer
+                    depth_stencil: vk::ClearDepthStencilValue {
+                        depth: 1.0,
+                        stencil: 0,
+                    },
+                },
+            ];
+
+            let viewports = [vk::Viewport {
+                x: 0.0,
+                y: 0.0,
+                width: swapchain.extent.width as f32,
+                height: swapchain.extent.height as f32,
+                min_depth: 0.0,
+                max_depth: 1.0,
+            }];
+
+            let next_frame = queue.next_frame(&swapchain);
+
+            queue.build_frame(
+                &next_frame,
+                &command_buffers,
+                extent[0],
+                clear_values,
+                vec![pipeline.depth_image.1],
+                render_pass,
+                &swapchain,
+                |command_buffer, device| unsafe {
+                    device.cmd_bind_pipeline(
+                        command_buffer,
+                        vk::PipelineBindPoint::GRAPHICS,
+                        pipeline.pipeline,
+                    );
+                    device.cmd_bind_descriptor_sets(
+                        command_buffer,
+                        vk::PipelineBindPoint::GRAPHICS,
+                        pipeline.layout,
+                        0,
+                        &pipeline.descriptors,
+                        &[],
+                    );
+                    device.cmd_set_viewport(command_buffer, 0, &viewports);
+                    device.cmd_set_scissor(command_buffer, 0, &extent);
+                    device.cmd_bind_vertex_buffers(
+                        command_buffer,
+                        0,
+                        &[vertex_buffer.buffer],
+                        &[0],
+                    );
+                    device.cmd_bind_index_buffer(
+                        command_buffer,
+                        index_buffer.buffer,
+                        0,
+                        vk::IndexType::UINT32,
+                    );
+                    device.cmd_draw_indexed(command_buffer, indices.len() as u32, 1, 0, 0, 1);
+                },
+            );
+
+            queue.render_frame(&next_frame, &swapchain, &command_buffers, vulkan.clone());
+        }
+        Event::LoopDestroyed => {}
         _ => {}
     });
 }

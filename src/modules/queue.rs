@@ -26,7 +26,7 @@ pub struct Queue {
     pub render_finished_semaphores: Vec<vk::Semaphore>,
     pub inflight_fences: Vec<vk::Fence>,
     pub current_frame: usize,
-    pub context: Arc<Context>
+    pub context: Arc<Context>,
 }
 
 impl QueueFamilyIndices {
@@ -62,13 +62,16 @@ impl Queue {
 
         for _ in 0..MAX_FRAMES_IN_FLIGHT {
             unsafe {
-                let image_available_semaphore = context.device
+                let image_available_semaphore = context
+                    .device
                     .create_semaphore(&semaphore_create_info, None)
                     .expect("Failed to create Semaphore Object!");
-                let render_finished_semaphore = context.device
+                let render_finished_semaphore = context
+                    .device
                     .create_semaphore(&semaphore_create_info, None)
                     .expect("Failed to create Semaphore Object!");
-                let inflight_fence = context.device
+                let inflight_fence = context
+                    .device
                     .create_fence(&fence_create_info, None)
                     .expect("Failed to create Fence Object!");
 
@@ -83,59 +86,106 @@ impl Queue {
             render_finished_semaphores,
             inflight_fences,
             current_frame: 0,
-            context
+            context,
         }
     }
 
+    // pub fn create_frame_buffers(
+    //     &self,
+    //     render_pass: &vk::RenderPass,
+    //     frame_image: vk::ImageView,
+    //     attachments: Vec<vk::ImageView>,
+    //     context: Arc<Context>,
+    // ) -> Vec<vk::Framebuffer> {
+    //     let mut frame_buffers = vec![];
+
+    //     for &image_view in self.image_views.iter() {
+
+    //         frame_buffers.push(framebuffer);
+    //     }
+    //     frame_buffers
+    // }
 
     pub fn build_frame<F: Fn(vk::CommandBuffer, &ash::Device)>(
         &self,
+        frame: &Frame,
         command_buffers: &Vec<vk::CommandBuffer>,
-        frame_buffers: &Vec<vk::Framebuffer>,
-        renderpass: &vk::RenderPass,
         render_area: vk::Rect2D,
         clear_values: Vec<vk::ClearValue>,
-        context: Arc<Context>,
+        attachments: Vec<vk::ImageView>,
+        render_pass: vk::RenderPass,
+        swapchain: &Swapchain,
         apply: F,
     ) {
+        //Frame buffer
+        let mut frame_attachments: Vec<vk::ImageView> =
+            vec![swapchain.get_image(frame.image_index)];
+
+        frame_attachments.extend_from_slice(&attachments);
+        let attachment_count = frame_attachments.len() as u32;
+
+        let framebuffer_create_info = vk::FramebufferCreateInfo {
+            flags: vk::FramebufferCreateFlags::empty(),
+            render_pass,
+            attachment_count,
+            p_attachments: frame_attachments.as_ptr(),
+            width: swapchain.extent.width,
+            height: swapchain.extent.height,
+            layers: 1,
+            ..Default::default()
+        };
+
+        let framebuffer = unsafe {
+            self.context
+                .device
+                .create_framebuffer(&framebuffer_create_info, None)
+                .expect("Failed to create Framebuffer!")
+        };
+
+        //Command buffers
+
         let command_buffer_begin_info = vk::CommandBufferBeginInfo {
             s_type: vk::StructureType::COMMAND_BUFFER_BEGIN_INFO,
             p_next: ptr::null(),
             p_inheritance_info: ptr::null(),
             flags: vk::CommandBufferUsageFlags::SIMULTANEOUS_USE,
         };
+
         unsafe {
-            for (index, command_buffer) in command_buffers.iter().enumerate() {
-                context
-                    .device
-                    .begin_command_buffer(*command_buffer, &command_buffer_begin_info)
-                    .expect("Failed to begin recording Command Buffer at beginning!");
+            self.context
+                .device
+                .begin_command_buffer(
+                    command_buffers[frame.image_index],
+                    &command_buffer_begin_info,
+                )
+                .expect("Failed to begin recording Command Buffer at beginning!");
 
-                let render_pass_begin_info = vk::RenderPassBeginInfo {
-                    s_type: vk::StructureType::RENDER_PASS_BEGIN_INFO,
-                    p_next: ptr::null(),
-                    render_pass: *renderpass,
-                    framebuffer: frame_buffers[index],
-                    render_area: render_area,
-                    clear_value_count: clear_values.len() as u32,
-                    p_clear_values: clear_values.as_ptr(),
-                };
+            let render_pass_begin_info = vk::RenderPassBeginInfo {
+                s_type: vk::StructureType::RENDER_PASS_BEGIN_INFO,
+                p_next: ptr::null(),
+                render_pass,
+                framebuffer,
+                render_area: render_area,
+                clear_value_count: clear_values.len() as u32,
+                p_clear_values: clear_values.as_ptr(),
+            };
 
-                context.device.cmd_begin_render_pass(
-                    *command_buffer,
-                    &render_pass_begin_info,
-                    vk::SubpassContents::INLINE,
-                );
+            self.context.device.cmd_begin_render_pass(
+                command_buffers[frame.image_index],
+                &render_pass_begin_info,
+                vk::SubpassContents::INLINE,
+            );
 
-                apply(*command_buffer, &context.device);
+            apply(command_buffers[frame.image_index], &self.context.device);
 
-                context.device.cmd_end_render_pass(*command_buffer);
+            self.context
+                .device
+                .cmd_end_render_pass(command_buffers[frame.image_index]);
 
-                context
-                    .device
-                    .end_command_buffer(*command_buffer)
-                    .expect("Failed to record Command Buffer at Ending!");
-            }
+            self.context
+                .device
+                .end_command_buffer(command_buffers[frame.image_index])
+                .expect("Failed to record Command Buffer at Ending!");
         }
     }
 
@@ -144,7 +194,7 @@ impl Queue {
         frame: &Frame,
         swapchain: &Swapchain,
         command_buffers: &Vec<vk::CommandBuffer>,
-        context: Arc<Context>
+        context: Arc<Context>,
     ) {
         let submit_infos = vec![vk::SubmitInfo {
             s_type: vk::StructureType::SUBMIT_INFO,
@@ -196,11 +246,11 @@ impl Queue {
         self.current_frame = (self.current_frame + 1) % MAX_FRAMES_IN_FLIGHT;
     }
 
-    pub fn next_frame(&self, context: &Arc<Context>, swapchain: &Swapchain) -> Frame {
+    pub fn next_frame(&mut self, swapchain: &Swapchain) -> Frame {
         let wait_fences = vec![self.inflight_fences[self.current_frame]];
 
         let (image_index, is_sub_optimal) = unsafe {
-            context
+            self.context
                 .device
                 .wait_for_fences(&wait_fences, true, std::u64::MAX)
                 .expect("Failed to wait for Fence!");
@@ -231,14 +281,20 @@ impl Queue {
     }
 }
 
-
 impl Drop for Queue {
     fn drop(&mut self) {
         unsafe {
             for i in 0..MAX_FRAMES_IN_FLIGHT {
-                self.context.device.destroy_semaphore(self.image_available_semaphores[i], None);
-                self.context.device.destroy_semaphore(self.render_finished_semaphores[i], None);
-                self.context.device.destroy_fence(self.inflight_fences[i], None);
+                self.context.wait_idle();
+                self.context
+                    .device
+                    .destroy_semaphore(self.image_available_semaphores[i], None);
+                self.context
+                    .device
+                    .destroy_semaphore(self.render_finished_semaphores[i], None);
+                self.context
+                    .device
+                    .destroy_fence(self.inflight_fences[i], None);
             }
         }
     }

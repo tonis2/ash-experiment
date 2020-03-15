@@ -123,48 +123,15 @@ impl Swapchain {
             }
         }
     }
-
-    pub fn create_frame_buffers(
-        &self,
-        render_pass: &vk::RenderPass,
-        attachments: Vec<vk::ImageView>,
-        context: Arc<Context>,
-    ) -> Vec<vk::Framebuffer> {
-        let mut frame_buffers = vec![];
-
-        for &image_view in self.image_views.iter() {
-            let mut all_attachments: Vec<vk::ImageView> = vec![image_view];
-            all_attachments.extend_from_slice(&attachments);
-            let attachment_count = all_attachments.len() as u32;
-
-            let framebuffer_create_info = vk::FramebufferCreateInfo {
-                s_type: vk::StructureType::FRAMEBUFFER_CREATE_INFO,
-                p_next: ptr::null(),
-                flags: vk::FramebufferCreateFlags::empty(),
-                render_pass: *render_pass,
-                attachment_count,
-                p_attachments: all_attachments.as_ptr(),
-                width: self.extent.width,
-                height: self.extent.height,
-                layers: 1,
-            };
-
-            let framebuffer = unsafe {
-                context
-                    .device
-                    .create_framebuffer(&framebuffer_create_info, None)
-                    .expect("Failed to create Framebuffer!")
-            };
-
-            frame_buffers.push(framebuffer);
-        }
-        frame_buffers
+    pub fn get_image(&self, image_index: usize) -> vk::ImageView {
+        self.image_views[image_index]
     }
 }
 
 impl Drop for Swapchain {
     fn drop(&mut self) {
         unsafe {
+            self.context.wait_idle();
             for image in self.image_views.iter() {
                 self.context.device.destroy_image_view(*image, None);
             }
