@@ -13,9 +13,8 @@ use std::{default::Default, ffi::CString, mem, path::Path, ptr, sync::Arc};
 
 #[derive(Clone, Debug, Copy)]
 pub struct Vertex {
-    pub pos: [f32; 4],
-    pub color: [f32; 4],
-    pub tex_coord: [f32; 2],
+    pub pos: [f32; 3],
+    pub tex_cord: [f32; 2],
 }
 
 #[repr(C)]
@@ -63,14 +62,8 @@ impl Pipeline {
             vk::VertexInputAttributeDescription {
                 binding: 0,
                 location: 1,
-                format: vk::Format::R32G32B32_SFLOAT,
-                offset: offset_of!(Vertex, color) as u32,
-            },
-            vk::VertexInputAttributeDescription {
-                binding: 0,
-                location: 2,
                 format: vk::Format::R32G32_SFLOAT,
-                offset: offset_of!(Vertex, tex_coord) as u32,
+                offset: offset_of!(Vertex, tex_cord) as u32,
             },
         ];
 
@@ -145,9 +138,8 @@ impl Pipeline {
         let dynamic_state_info =
             vk::PipelineDynamicStateCreateInfo::builder().dynamic_states(&dynamic_state);
 
-        let vertex_shader =
-            load_shader(&Path::new("examples/load_model/shaders/spv/depth.vert.spv"));
-        let frag_shader = load_shader(&Path::new("examples/load_model/shaders/spv/depth.frag.spv"));
+        let vertex_shader = load_shader(&Path::new("examples/lights/shaders/lights.vert.spv"));
+        let frag_shader = load_shader(&Path::new("examples/lights/shaders/lights.frag.spv"));
 
         let vertex_shader_module = unsafe {
             vulkan
@@ -228,7 +220,7 @@ impl Pipeline {
         };
 
         let texture = create_texture(
-            &Path::new("examples/assets/chalet.jpg"),
+            &Path::new("examples/assets/texture.jpg"),
             &mut imageview_info,
             &vulkan,
         );
@@ -270,6 +262,7 @@ impl Pipeline {
         uniform_buffer.upload_to_buffer(&[uniform_data], 0);
 
         let descriptor_pool = create_descriptor_pool(&vulkan, swapchain.image_views.len() as u32);
+
         let (descriptor_set, descriptor_layout) = create_descriptors(
             descriptor_info,
             &uniform_buffer,
@@ -340,17 +333,6 @@ impl Pipeline {
             uniform_buffer,
             uniform_transform: uniform_data,
         }
-    }
-
-    pub fn update_uniform_buffer(&mut self, delta_time: f32) {
-        self.uniform_transform.model = cgmath::Matrix4::from_axis_angle(
-            cgmath::Vector3::new(0.0, 0.0, 1.0),
-            cgmath::Deg(90.0) * delta_time,
-        ) * self.uniform_transform.model;
-
-        self.uniform_buffer
-            .upload_to_buffer(&[self.uniform_transform.clone()], 0);
-        self.uniform_buffer.unmap_memory().expect("failed unmap");
     }
 }
 
