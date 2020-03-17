@@ -67,7 +67,7 @@ fn main() {
             max_depth: 1.0,
         }];
 
-        queue.build_frame(
+        vulkan.build_command(
             command_buffers[image_index],
             extent[0],
             &clear_values,

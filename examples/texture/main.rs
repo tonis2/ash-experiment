@@ -114,11 +114,14 @@ fn main() {
 
             let next_frame = queue.next_frame(&swapchain);
 
-            queue.build_frame(
+            vulkan.build_command(
                 command_buffers[next_frame.image_index],
                 extent[0],
                 &clear_values,
-                vec![swapchain.get_image(next_frame.image_index), pipeline.depth_image.1],
+                vec![
+                    swapchain.get_image(next_frame.image_index),
+                    pipeline.depth_image.1,
+                ],
                 render_pass,
                 &swapchain,
                 |command_buffer, device| unsafe {

@@ -94,7 +94,7 @@ fn main() {
 
             let next_frame = queue.next_frame(&swapchain);
 
-            queue.build_frame(
+            vulkan.build_command(
                 command_buffers[next_frame.image_index],
                 extent[0],
                 &clear_values,

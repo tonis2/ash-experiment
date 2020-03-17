@@ -4,7 +4,8 @@ use ash::{
 };
 
 use super::{debug::Debugger, device, queue::QueueFamilyIndices, surface::VkSurface};
-
+use super::swapchain::Swapchain;
+use std::ptr;
 use crate::constants::*;
 use crate::utilities::platform::extension_names;
 
@@ -75,6 +76,78 @@ impl Context {
                 .expect("failed to wait device idle")
         }
     }
+
+    pub fn build_command<F: Fn(vk::CommandBuffer, &ash::Device)>(
+        &self,
+        command_buffer: vk::CommandBuffer,
+        render_area: vk::Rect2D,
+        clear_values: &[vk::ClearValue],
+        attachments: Vec<vk::ImageView>,
+        render_pass: vk::RenderPass,
+        swapchain: &Swapchain,
+        apply: F,
+    ) {
+
+        //Build frame buffer
+        let framebuffer_create_info = vk::FramebufferCreateInfo {
+            flags: vk::FramebufferCreateFlags::empty(),
+            render_pass,
+            attachment_count: attachments.len() as u32,
+            p_attachments: attachments.as_ptr(),
+            width: swapchain.extent.width,
+            height: swapchain.extent.height,
+            layers: 1,
+            ..Default::default()
+        };
+
+        let framebuffer = unsafe {
+            self
+                .device
+                .create_framebuffer(&framebuffer_create_info, None)
+                .expect("Failed to create Framebuffer!")
+        };
+
+        //build command buffer
+        let command_buffer_begin_info = vk::CommandBufferBeginInfo {
+            s_type: vk::StructureType::COMMAND_BUFFER_BEGIN_INFO,
+            p_next: ptr::null(),
+            p_inheritance_info: ptr::null(),
+            flags: vk::CommandBufferUsageFlags::SIMULTANEOUS_USE,
+        };
+
+        unsafe {
+            self
+                .device
+                .begin_command_buffer(command_buffer, &command_buffer_begin_info)
+                .expect("Failed to begin recording Command Buffer at beginning!");
+
+            let render_pass_begin_info = vk::RenderPassBeginInfo {
+                s_type: vk::StructureType::RENDER_PASS_BEGIN_INFO,
+                p_next: ptr::null(),
+                render_pass,
+                framebuffer,
+                render_area: render_area,
+                clear_value_count: clear_values.len() as u32,
+                p_clear_values: clear_values.as_ptr(),
+            };
+
+            self.device.cmd_begin_render_pass(
+                command_buffer,
+                &render_pass_begin_info,
+                vk::SubpassContents::INLINE,
+            );
+
+            apply(command_buffer, &self.device);
+
+            self.device.cmd_end_render_pass(command_buffer);
+
+            self
+                .device
+                .end_command_buffer(command_buffer)
+                .expect("Failed to record Command Buffer at Ending!");
+        }
+    }
+
 }
 
 impl Drop for Context {
