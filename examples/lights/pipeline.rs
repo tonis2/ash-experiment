@@ -368,9 +368,9 @@ pub fn create_uniform_data(swapchain: &Swapchain) -> UniformBufferObject {
     UniformBufferObject {
         model: Matrix4::from_angle_z(Deg(90.0)),
         view: Matrix4::look_at(
-            Point3::new(2.0, 2.0, 2.0),
+            Point3::new(2.0, 2.0, 6.5),
             Point3::new(0.0, 0.0, 0.0),
-            Vector3::new(0.0, 0.0, 1.0),
+            Vector3::new(0.0, 0.5, 1.0),
         ),
         proj: {
             let mut proj = cgmath::perspective(

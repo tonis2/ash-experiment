@@ -341,17 +341,6 @@ impl Pipeline {
             uniform_transform: uniform_data,
         }
     }
-
-    pub fn update_uniform_buffer(&mut self, delta_time: f32) {
-        self.uniform_transform.model = cgmath::Matrix4::from_axis_angle(
-            cgmath::Vector3::new(0.0, 0.0, 1.0),
-            cgmath::Deg(90.0) * delta_time,
-        ) * self.uniform_transform.model;
-
-        self.uniform_buffer
-            .upload_to_buffer(&[self.uniform_transform.clone()], 0);
-        self.uniform_buffer.unmap_memory().expect("failed unmap");
-    }
 }
 
 impl Drop for Pipeline {

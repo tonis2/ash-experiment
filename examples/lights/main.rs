@@ -108,6 +108,17 @@ fn main() {
             tick_counter.tick_frame();
         }
         Event::RedrawRequested(_window_id) => {
+            let delta_time = tick_counter.delta_time();
+            
+            //Update uniform buffer
+            pipeline.uniform_transform.model = cgmath::Matrix4::from_axis_angle(
+                cgmath::Vector3::new(0.0, 0.0, 1.0),
+                cgmath::Deg(90.0) * delta_time,
+            ) * pipeline.uniform_transform.model;
+    
+            pipeline.uniform_buffer
+                .upload_to_buffer(&[pipeline.uniform_transform.clone()], 0);
+
             let extent = [vk::Rect2D {
                 offset: vk::Offset2D { x: 0, y: 0 },
                 extent: swapchain.extent,
