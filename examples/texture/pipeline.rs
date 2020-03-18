@@ -149,8 +149,8 @@ impl Pipeline {
             vk::PipelineDynamicStateCreateInfo::builder().dynamic_states(&dynamic_state);
 
         let vertex_shader =
-            load_shader(&Path::new("examples/texture/shaders/spv/textures.vert.spv"));
-        let frag_shader = load_shader(&Path::new("examples/texture/shaders/spv/textures.frag.spv"));
+            load_shader(&Path::new("examples/texture/shaders/textures.vert.spv"));
+        let frag_shader = load_shader(&Path::new("examples/texture/shaders/textures.frag.spv"));
 
         let vertex_shader_module = unsafe {
             vulkan
