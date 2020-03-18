@@ -16,9 +16,19 @@ fn vertex(pos: [i8; 3], tc: [i8; 2]) -> Vertex {
         tex_cord: [tc[0] as f32, tc[1] as f32],
     }
 }
+
+fn create_plane(size: i8) -> Vec<Vertex> {
+    vec![
+        vertex([-size, -size, 0], [0, 0]),
+        vertex([size, -size, 0], [0, 0]),
+        vertex([size, size, 0], [0, 0]),
+        vertex([-size, size, 0], [0, 0]),
+    ]
+}
 fn main() {
     //Cube data
     let cube_vertices = vec![
+        //top
         vertex([-1, -1, 1], [0, 0]),
         vertex([1, -1, 1], [1, 0]),
         vertex([1, 1, 1], [1, 1]),
@@ -59,14 +69,8 @@ fn main() {
         20, 21, 22, 22, 23, 20, // back
     ];
 
-    let plane_vertices = vec![
-        vertex([4, -4, 0], [0, 0]),
-        vertex([4, 4, 0], [0, 0]),
-        vertex([-4, -4, 0], [0, 0]),
-        vertex([-4, 4, 0], [0, 0]),
-    ];
-
-    let plane_indices = vec![0, 1, 2, 2, 1, 3];
+    let plane_vertices = create_plane(6);
+    let plane_indices = vec![0, 1, 2, 2, 3, 0];
 
     let event_loop = EventLoop::new();
     let window = winit::window::WindowBuilder::new()
@@ -99,8 +103,10 @@ fn main() {
     let plane_vertex_buffer =
         instance.create_gpu_buffer(vk::BufferUsageFlags::VERTEX_BUFFER, &plane_vertices);
 
-    let cube_transform = PushConstantTransForm::new(cgmath::Deg(90.0));
-    let plane_transform = PushConstantTransForm::new(cgmath::Deg(0.0));
+    let mut cube_transform =
+        PushConstantTransForm::new(cgmath::Deg(90.0), cgmath::Vector3::new(0.0, 0.0, 1.0));
+    let plane_transform =
+        PushConstantTransForm::new(cgmath::Deg(0.0), cgmath::Vector3::new(-0.5, 0.0, 0.0));
 
     event_loop.run(move |event, _, control_flow| match event {
         Event::WindowEvent { event, .. } => match event {
@@ -127,15 +133,13 @@ fn main() {
         Event::RedrawRequested(_window_id) => {
             let delta_time = tick_counter.delta_time();
 
-            //Update uniform buffer
-            // pipeline.uniform_transform.model = cgmath::Matrix4::from_axis_angle(
-            //     cgmath::Vector3::new(0.0, 0.0, 1.0),
-            //     cgmath::Deg(90.0) * delta_time,
-            // ) * pipeline.uniform_transform.model;
-
-            // pipeline
-            //     .uniform_buffer
-            //     .upload_to_buffer(&[pipeline.uniform_transform.clone()], 0);
+            // rotate cube
+            cube_transform.model = PushConstantTransForm::new(
+                cgmath::Deg(90.0) * delta_time,
+                cgmath::Vector3::new(0.0, 0.0, 0.0),
+            )
+            .model
+                * cube_transform.model;
 
             let extent = [vk::Rect2D {
                 offset: vk::Offset2D { x: 0, y: 0 },
@@ -219,7 +223,6 @@ fn main() {
                     device.cmd_draw_indexed(command_buffer, cube_indices.len() as u32, 1, 0, 0, 1);
 
                     //Draw plane
-
                     device.cmd_push_constants(
                         command_buffer,
                         pipeline.layout,
@@ -239,14 +242,7 @@ fn main() {
                         0,
                         vk::IndexType::UINT32,
                     );
-                    device.cmd_draw_indexed(
-                        command_buffer,
-                        plane_vertices.len() as u32,
-                        1,
-                        0,
-                        0,
-                        1,
-                    );
+                    device.cmd_draw_indexed(command_buffer, plane_indices.len() as u32, 1, 0, 0, 1);
                 },
             );
 

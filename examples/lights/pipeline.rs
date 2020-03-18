@@ -6,7 +6,7 @@ use vulkan::{
 };
 
 use ash::{version::DeviceV1_0, vk};
-use cgmath::{Deg, Matrix4, Point3, Vector3};
+use cgmath::{ Deg, Matrix4, Point3, Vector3};
 use image::GenericImageView;
 
 use std::{default::Default, ffi::CString, mem, path::Path, ptr, sync::Arc};
@@ -24,9 +24,16 @@ pub struct PushConstantTransForm {
 }
 
 impl PushConstantTransForm {
-    pub fn new(rotation: cgmath::Deg<f32>) -> Self {
+    pub fn new(rotation: cgmath::Deg<f32>, transform: cgmath::Vector3<f32>) -> Self {
+        let model_transform: cgmath::Decomposed<cgmath::Vector3<f32>, cgmath::Basis3<f32>> =
+            cgmath::Decomposed {
+                scale: 1.0,
+                rot: cgmath::Rotation3::from_angle_z(rotation),
+                disp: transform,
+            };
+
         Self {
-            model: Matrix4::from_angle_z(rotation),
+            model: model_transform.into(),
         }
     }
 }
@@ -44,16 +51,16 @@ impl UniformBufferObject {
         UniformBufferObject {
             model: Matrix4::from_angle_z(Deg(90.0)),
             view: Matrix4::look_at(
-                Point3::new(2.0, 2.0, 6.5),
-                Point3::new(0.0, 0.0, 0.0),
-                Vector3::new(0.0, 0.5, 1.0),
+                Point3::new(4.0, -17.0, 5.5),
+                Point3::new(0.0, 0.0, 1.0),
+                Vector3::new(0.0, 0.0, 1.0),
             ),
             proj: {
                 let mut proj = cgmath::perspective(
                     Deg(45.0),
                     swapchain.extent.width as f32 / swapchain.extent.height as f32,
                     0.1,
-                    10.0,
+                    100.0,
                 );
                 proj[1][1] = proj[1][1] * -1.0;
                 proj
