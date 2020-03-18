@@ -11,4 +11,6 @@ and then you can choose examle with
 `cargo run --example` + example name 
 
 
+For building shaders i used `glslangValidator -V *shader glsl* -o shader.spv`
+
 Tested on `windows 10` and `linux 18.04`

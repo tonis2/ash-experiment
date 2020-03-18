@@ -1,11 +1,13 @@
 mod pipeline;
 mod renderpass;
 
-use vulkan::{prelude::*, utilities::FPSLimiter, Context, Queue, Swapchain, VkInstance};
+use vulkan::{
+    as_byte_slice, prelude::*, utilities::FPSLimiter, Context, Queue, Swapchain, VkInstance,
+};
 use winit::event::{ElementState, Event, KeyboardInput, VirtualKeyCode, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop};
 
-use pipeline::{Pipeline, Vertex};
+use pipeline::{Pipeline, PushConstantTransForm, Vertex};
 use std::sync::Arc;
 
 fn vertex(pos: [i8; 3], tc: [i8; 2]) -> Vertex {
@@ -81,7 +83,7 @@ fn main() {
     let swapchain = Swapchain::new(vulkan.clone(), &window);
     let render_pass = renderpass::create_render_pass(&swapchain, &instance);
 
-    let mut pipeline = Pipeline::create_pipeline(&swapchain, render_pass, &instance);
+    let pipeline = Pipeline::create_pipeline(&swapchain, render_pass, &instance);
 
     let command_buffers = instance.create_command_buffers(swapchain.image_views.len());
 
@@ -96,6 +98,9 @@ fn main() {
         instance.create_gpu_buffer(vk::BufferUsageFlags::INDEX_BUFFER, &plane_indices);
     let plane_vertex_buffer =
         instance.create_gpu_buffer(vk::BufferUsageFlags::VERTEX_BUFFER, &plane_vertices);
+
+    let cube_transform = PushConstantTransForm::new(cgmath::Deg(90.0));
+    let plane_transform = PushConstantTransForm::new(cgmath::Deg(0.0));
 
     event_loop.run(move |event, _, control_flow| match event {
         Event::WindowEvent { event, .. } => match event {
@@ -123,14 +128,14 @@ fn main() {
             let delta_time = tick_counter.delta_time();
 
             //Update uniform buffer
-            pipeline.uniform_transform.model = cgmath::Matrix4::from_axis_angle(
-                cgmath::Vector3::new(0.0, 0.0, 1.0),
-                cgmath::Deg(90.0) * delta_time,
-            ) * pipeline.uniform_transform.model;
+            // pipeline.uniform_transform.model = cgmath::Matrix4::from_axis_angle(
+            //     cgmath::Vector3::new(0.0, 0.0, 1.0),
+            //     cgmath::Deg(90.0) * delta_time,
+            // ) * pipeline.uniform_transform.model;
 
-            pipeline
-                .uniform_buffer
-                .upload_to_buffer(&[pipeline.uniform_transform.clone()], 0);
+            // pipeline
+            //     .uniform_buffer
+            //     .upload_to_buffer(&[pipeline.uniform_transform.clone()], 0);
 
             let extent = [vk::Rect2D {
                 offset: vk::Offset2D { x: 0, y: 0 },
@@ -190,6 +195,15 @@ fn main() {
                     );
                     device.cmd_set_viewport(command_buffer, 0, &viewports);
                     device.cmd_set_scissor(command_buffer, 0, &extent);
+
+                    //Draw cube
+                    device.cmd_push_constants(
+                        command_buffer,
+                        pipeline.layout,
+                        vk::ShaderStageFlags::VERTEX,
+                        0,
+                        as_byte_slice(&cube_transform),
+                    );
                     device.cmd_bind_vertex_buffers(
                         command_buffer,
                         0,
@@ -204,6 +218,15 @@ fn main() {
                     );
                     device.cmd_draw_indexed(command_buffer, cube_indices.len() as u32, 1, 0, 0, 1);
 
+                    //Draw plane
+
+                    device.cmd_push_constants(
+                        command_buffer,
+                        pipeline.layout,
+                        vk::ShaderStageFlags::VERTEX,
+                        0,
+                        as_byte_slice(&plane_transform),
+                    );
                     device.cmd_bind_vertex_buffers(
                         command_buffer,
                         0,

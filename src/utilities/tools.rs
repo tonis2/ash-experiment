@@ -90,3 +90,10 @@ pub fn find_memory_type(
 
     panic!("Failed to find suitable memory type!")
 }
+
+
+/// This method will convert any slice to a byte slice.
+/// Use with slices of number primitives.
+pub unsafe fn as_byte_slice<T: Sized>(p: &T) -> &[u8] {
+    ::std::slice::from_raw_parts((p as *const T) as *const u8, ::std::mem::size_of::<T>())
+}

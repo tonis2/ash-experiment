@@ -19,10 +19,47 @@ pub struct Vertex {
 
 #[repr(C)]
 #[derive(Clone, Debug, Copy)]
+pub struct PushConstantTransForm {
+    pub model: Matrix4<f32>,
+}
+
+impl PushConstantTransForm {
+    pub fn new(rotation: cgmath::Deg<f32>) -> Self {
+        Self {
+            model: Matrix4::from_angle_z(rotation),
+        }
+    }
+}
+
+#[repr(C)]
+#[derive(Clone, Debug, Copy)]
 pub struct UniformBufferObject {
     pub model: Matrix4<f32>,
     pub view: Matrix4<f32>,
     pub proj: Matrix4<f32>,
+}
+
+impl UniformBufferObject {
+    pub fn new(swapchain: &Swapchain) -> UniformBufferObject {
+        UniformBufferObject {
+            model: Matrix4::from_angle_z(Deg(90.0)),
+            view: Matrix4::look_at(
+                Point3::new(2.0, 2.0, 6.5),
+                Point3::new(0.0, 0.0, 0.0),
+                Vector3::new(0.0, 0.5, 1.0),
+            ),
+            proj: {
+                let mut proj = cgmath::perspective(
+                    Deg(45.0),
+                    swapchain.extent.width as f32 / swapchain.extent.height as f32,
+                    0.1,
+                    10.0,
+                );
+                proj[1][1] = proj[1][1] * -1.0;
+                proj
+            },
+        }
+    }
 }
 
 pub struct Pipeline {
@@ -250,7 +287,7 @@ impl Pipeline {
 
         //Create uniform buffer
 
-        let uniform_data = create_uniform_data(&swapchain);
+        let uniform_data = UniformBufferObject::new(&swapchain);
 
         let uniform_buffer = Buffer::new_mapped_basic(
             std::mem::size_of_val(&uniform_data) as u64,
@@ -272,8 +309,15 @@ impl Pipeline {
             &vulkan,
         );
 
-        let layout_create_info =
-            vk::PipelineLayoutCreateInfo::builder().set_layouts(&descriptor_layout);
+        let push_constant_range = vk::PushConstantRange::builder()
+            .stage_flags(vk::ShaderStageFlags::VERTEX)
+            .size(mem::size_of::<PushConstantTransForm>() as u32)
+            .build();
+
+        let layout_create_info = vk::PipelineLayoutCreateInfo::builder()
+            .set_layouts(&descriptor_layout)
+            .push_constant_ranges(&[push_constant_range])
+            .build();
 
         //Create pipeline stuff
         let pipeline_layout = unsafe {
@@ -361,27 +405,6 @@ impl Drop for Pipeline {
                 .device
                 .destroy_descriptor_set_layout(self.descriptor_layout[0], None);
         }
-    }
-}
-
-pub fn create_uniform_data(swapchain: &Swapchain) -> UniformBufferObject {
-    UniformBufferObject {
-        model: Matrix4::from_angle_z(Deg(90.0)),
-        view: Matrix4::look_at(
-            Point3::new(2.0, 2.0, 6.5),
-            Point3::new(0.0, 0.0, 0.0),
-            Vector3::new(0.0, 0.5, 1.0),
-        ),
-        proj: {
-            let mut proj = cgmath::perspective(
-                Deg(45.0),
-                swapchain.extent.width as f32 / swapchain.extent.height as f32,
-                0.1,
-                10.0,
-            );
-            proj[1][1] = proj[1][1] * -1.0;
-            proj
-        },
     }
 }
 
