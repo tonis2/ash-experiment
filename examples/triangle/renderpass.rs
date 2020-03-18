@@ -1,6 +1,6 @@
 use ash::{version::DeviceV1_0, vk};
-use vulkan::Swapchain;
 use std::ptr;
+use vulkan::Swapchain;
 
 pub fn create_render_pass<D: DeviceV1_0>(swapchain: &Swapchain, device: &D) -> vk::RenderPass {
     let color_attachment = vk::AttachmentDescription {
@@ -15,14 +15,12 @@ pub fn create_render_pass<D: DeviceV1_0>(swapchain: &Swapchain, device: &D) -> v
         final_layout: vk::ImageLayout::PRESENT_SRC_KHR,
     };
 
-    let color_attachment_ref = vk::AttachmentReference {
-        attachment: 0,
-        layout: vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL,
-    };
-
     let subpasses = [vk::SubpassDescription {
         color_attachment_count: 1,
-        p_color_attachments: &color_attachment_ref,
+        p_color_attachments: &vk::AttachmentReference {
+            attachment: 0,
+            layout: vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL,
+        },
         p_depth_stencil_attachment: ptr::null(),
         flags: vk::SubpassDescriptionFlags::empty(),
         pipeline_bind_point: vk::PipelineBindPoint::GRAPHICS,

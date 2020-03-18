@@ -35,7 +35,6 @@ pub struct Pipeline {
     pub layout: vk::PipelineLayout,
     pub descriptors: Vec<vk::DescriptorSet>,
     pub texture: (Image, vk::ImageView),
-    pub depth_image: (Image, vk::ImageView),
     pub sampler: vk::Sampler,
     pub uniform_buffer: Buffer,
     pub uniform_transform: UniformBufferObject,
@@ -312,8 +311,6 @@ impl Pipeline {
                 .expect("Unable to create graphics pipeline")
         };
 
-        let depth_image = create_depth_resources(&swapchain, &vulkan);
-
         //Destoy shader modules
         unsafe {
             vulkan
@@ -328,7 +325,6 @@ impl Pipeline {
             pipeline: pipeline[0],
             layout: pipeline_layout,
             texture,
-            depth_image,
             sampler,
             descriptors: descriptor_set,
             descriptor_pool,
@@ -354,9 +350,6 @@ impl Drop for Pipeline {
                 .destroy_descriptor_pool(self.descriptor_pool, None);
 
             self.context.device.destroy_image_view(self.texture.1, None);
-            self.context
-                .device
-                .destroy_image_view(self.depth_image.1, None);
 
             self.context
                 .device
@@ -566,77 +559,6 @@ fn create_descriptors(
     }
 
     (descriptor_sets, layouts)
-}
-
-//Creates depth image
-pub fn create_depth_resources(
-    swapchain: &Swapchain,
-    vulkan: &VkInstance,
-) -> (Image, vk::ImageView) {
-    let depth_format = vulkan.find_depth_format(
-        &[
-            vk::Format::D32_SFLOAT,
-            vk::Format::D32_SFLOAT_S8_UINT,
-            vk::Format::D24_UNORM_S8_UINT,
-        ],
-        vk::ImageTiling::OPTIMAL,
-        vk::FormatFeatureFlags::DEPTH_STENCIL_ATTACHMENT,
-    );
-    let depth_image_info = vk::ImageCreateInfo {
-        s_type: vk::StructureType::IMAGE_CREATE_INFO,
-        image_type: vk::ImageType::TYPE_2D,
-        format: depth_format,
-        mip_levels: 1,
-        array_layers: 1,
-        samples: vk::SampleCountFlags::TYPE_1,
-        tiling: vk::ImageTiling::OPTIMAL,
-        usage: vk::ImageUsageFlags::DEPTH_STENCIL_ATTACHMENT,
-        sharing_mode: vk::SharingMode::EXCLUSIVE,
-        extent: vk::Extent3D {
-            width: swapchain.extent.width,
-            height: swapchain.extent.height,
-            depth: 1,
-        },
-        ..Default::default()
-    };
-
-    let image = Image::create_image(
-        depth_image_info,
-        vk::MemoryPropertyFlags::DEVICE_LOCAL,
-        vulkan.context(),
-    );
-
-    let imageview_info = vk::ImageViewCreateInfo {
-        s_type: vk::StructureType::IMAGE_VIEW_CREATE_INFO,
-        view_type: vk::ImageViewType::TYPE_2D,
-        format: depth_format,
-        image: image.image,
-        subresource_range: vk::ImageSubresourceRange {
-            aspect_mask: vk::ImageAspectFlags::DEPTH,
-            base_mip_level: 0,
-            level_count: 1,
-            base_array_layer: 0,
-            layer_count: 1,
-        },
-        ..Default::default()
-    };
-
-    let image_view = unsafe {
-        vulkan
-            .device()
-            .create_image_view(&imageview_info, None)
-            .expect("Failed to create Image View!")
-    };
-
-    vulkan.transition_image_layout(
-        image.image,
-        depth_format,
-        vk::ImageLayout::UNDEFINED,
-        vk::ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
-        1,
-    );
-
-    (image, image_view)
 }
 
 //Creates descriptor pool for uniform buffers and stuff

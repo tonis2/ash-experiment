@@ -120,7 +120,6 @@ fn main() {
                 &clear_values,
                 vec![
                     swapchain.get_image(next_frame.image_index),
-                    pipeline.depth_image.1,
                 ],
                 render_pass,
                 &swapchain,

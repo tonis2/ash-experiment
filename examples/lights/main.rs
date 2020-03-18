@@ -1,11 +1,7 @@
 mod pipeline;
 mod renderpass;
 
-use vulkan::{
-    prelude::*,
-    utilities::{FPSLimiter},
-    Context, Queue, Swapchain, VkInstance,
-};
+use vulkan::{prelude::*, utilities::FPSLimiter, Context, Queue, Swapchain, VkInstance};
 use winit::event::{ElementState, Event, KeyboardInput, VirtualKeyCode, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop};
 
@@ -20,7 +16,7 @@ fn vertex(pos: [i8; 3], tc: [i8; 2]) -> Vertex {
 }
 fn main() {
     //Cube data
-    let vertices = vec![
+    let cube_vertices = vec![
         vertex([-1, -1, 1], [0, 0]),
         vertex([1, -1, 1], [1, 0]),
         vertex([1, 1, 1], [1, 1]),
@@ -52,7 +48,7 @@ fn main() {
         vertex([1, -1, -1], [0, 1]),
     ];
 
-    let indices = vec![
+    let cube_indices = vec![
         0, 1, 2, 2, 3, 0, // top
         4, 5, 6, 6, 7, 4, // bottom
         8, 9, 10, 10, 11, 8, // right
@@ -60,6 +56,15 @@ fn main() {
         16, 17, 18, 18, 19, 16, // front
         20, 21, 22, 22, 23, 20, // back
     ];
+
+    let plane_vertices = vec![
+        vertex([4, -4, 0], [0, 0]),
+        vertex([4, 4, 0], [0, 0]),
+        vertex([-4, -4, 0], [0, 0]),
+        vertex([-4, 4, 0], [0, 0]),
+    ];
+
+    let plane_indices = vec![0, 1, 2, 2, 1, 3];
 
     let event_loop = EventLoop::new();
     let window = winit::window::WindowBuilder::new()
@@ -82,8 +87,15 @@ fn main() {
 
     let mut tick_counter = FPSLimiter::new();
 
-    let index_buffer = instance.create_gpu_buffer(vk::BufferUsageFlags::INDEX_BUFFER, &indices);
-    let vertex_buffer = instance.create_gpu_buffer(vk::BufferUsageFlags::VERTEX_BUFFER, &vertices);
+    let cube_index_buffer =
+        instance.create_gpu_buffer(vk::BufferUsageFlags::INDEX_BUFFER, &cube_indices);
+    let cube_vertex_buffer =
+        instance.create_gpu_buffer(vk::BufferUsageFlags::VERTEX_BUFFER, &cube_vertices);
+
+    let plane_index_buffer =
+        instance.create_gpu_buffer(vk::BufferUsageFlags::INDEX_BUFFER, &plane_indices);
+    let plane_vertex_buffer =
+        instance.create_gpu_buffer(vk::BufferUsageFlags::VERTEX_BUFFER, &plane_vertices);
 
     event_loop.run(move |event, _, control_flow| match event {
         Event::WindowEvent { event, .. } => match event {
@@ -109,14 +121,15 @@ fn main() {
         }
         Event::RedrawRequested(_window_id) => {
             let delta_time = tick_counter.delta_time();
-            
+
             //Update uniform buffer
             pipeline.uniform_transform.model = cgmath::Matrix4::from_axis_angle(
                 cgmath::Vector3::new(0.0, 0.0, 1.0),
                 cgmath::Deg(90.0) * delta_time,
             ) * pipeline.uniform_transform.model;
-    
-            pipeline.uniform_buffer
+
+            pipeline
+                .uniform_buffer
                 .upload_to_buffer(&[pipeline.uniform_transform.clone()], 0);
 
             let extent = [vk::Rect2D {
@@ -180,16 +193,37 @@ fn main() {
                     device.cmd_bind_vertex_buffers(
                         command_buffer,
                         0,
-                        &[vertex_buffer.buffer],
+                        &[cube_vertex_buffer.buffer],
                         &[0],
                     );
                     device.cmd_bind_index_buffer(
                         command_buffer,
-                        index_buffer.buffer,
+                        cube_index_buffer.buffer,
                         0,
                         vk::IndexType::UINT32,
                     );
-                    device.cmd_draw_indexed(command_buffer, indices.len() as u32, 1, 0, 0, 1);
+                    device.cmd_draw_indexed(command_buffer, cube_indices.len() as u32, 1, 0, 0, 1);
+
+                    device.cmd_bind_vertex_buffers(
+                        command_buffer,
+                        0,
+                        &[plane_vertex_buffer.buffer],
+                        &[0],
+                    );
+                    device.cmd_bind_index_buffer(
+                        command_buffer,
+                        plane_index_buffer.buffer,
+                        0,
+                        vk::IndexType::UINT32,
+                    );
+                    device.cmd_draw_indexed(
+                        command_buffer,
+                        plane_vertices.len() as u32,
+                        1,
+                        0,
+                        0,
+                        1,
+                    );
                 },
             );
 
