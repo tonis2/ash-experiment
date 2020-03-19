@@ -110,14 +110,7 @@ fn main() {
                         color: vk::ClearColorValue {
                             float32: [0.0, 0.0, 0.0, 1.0],
                         },
-                    },
-                    vk::ClearValue {
-                        // clear value for depth buffer
-                        depth_stencil: vk::ClearDepthStencilValue {
-                            depth: 1.0,
-                            stencil: 0,
-                        },
-                    },
+                    }
                 ])
                 .render_area(extent)
                 .build();
