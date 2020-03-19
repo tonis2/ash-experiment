@@ -142,10 +142,10 @@ fn main() {
             .model
                 * cube_transform.model;
 
-            let extent = [vk::Rect2D {
+            let extent = vk::Rect2D {
                 offset: vk::Offset2D { x: 0, y: 0 },
                 extent: swapchain.extent,
-            }];
+            };
 
             let viewports = [vk::Viewport {
                 x: 0.0,
@@ -167,6 +167,7 @@ fn main() {
                     ],
                 ))
                 .render_pass(render_pass)
+                .render_area(extent)
                 .clear_values(&[
                     vk::ClearValue {
                         // clear value for color buffer
@@ -202,7 +203,7 @@ fn main() {
                         &[],
                     );
                     device.cmd_set_viewport(command_buffer, 0, &viewports);
-                    device.cmd_set_scissor(command_buffer, 0, &extent);
+                    device.cmd_set_scissor(command_buffer, 0, &[extent]);
 
                     //Draw cube
                     device.cmd_push_constants(
