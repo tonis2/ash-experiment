@@ -30,8 +30,8 @@ pub struct Pipeline {
     pub pipeline: vk::Pipeline,
     pub layout: vk::PipelineLayout,
     pub descriptors: Vec<vk::DescriptorSet>,
-    pub texture: (Image, vk::ImageView, u32),
-    pub depth_image: (Image, vk::ImageView),
+    pub texture: (Image, u32),
+    pub depth_image: Image,
     pub sampler: vk::Sampler,
     pub uniform_buffer: Buffer,
     pub uniform_transform: UniformBufferObject,
@@ -145,8 +145,7 @@ impl Pipeline {
         let dynamic_state_info =
             vk::PipelineDynamicStateCreateInfo::builder().dynamic_states(&dynamic_state);
 
-        let vertex_shader =
-            load_shader(&Path::new("examples/load_model/shaders/model.vert.spv"));
+        let vertex_shader = load_shader(&Path::new("examples/load_model/shaders/model.vert.spv"));
         let frag_shader = load_shader(&Path::new("examples/load_model/shaders/model.frag.spv"));
 
         let vertex_shader_module = unsafe {
@@ -207,31 +206,8 @@ impl Pipeline {
 
         //Create texture image
 
-        let mut imageview_info = vk::ImageViewCreateInfo {
-            s_type: vk::StructureType::IMAGE_VIEW_CREATE_INFO,
-            view_type: vk::ImageViewType::TYPE_2D,
-            format: vk::Format::R8G8B8A8_UNORM,
-            components: vk::ComponentMapping {
-                r: vk::ComponentSwizzle::IDENTITY,
-                g: vk::ComponentSwizzle::IDENTITY,
-                b: vk::ComponentSwizzle::IDENTITY,
-                a: vk::ComponentSwizzle::IDENTITY,
-            },
-            subresource_range: vk::ImageSubresourceRange {
-                aspect_mask: vk::ImageAspectFlags::COLOR,
-                base_mip_level: 0,
-                level_count: 1,
-                base_array_layer: 0,
-                layer_count: 1,
-            },
-            ..Default::default()
-        };
-
-        let texture = create_texture(
-            &Path::new("examples/assets/chalet.jpg"),
-            &mut imageview_info,
-            &vulkan,
-        );
+        let (texture, mip_levels) =
+            create_texture(&Path::new("examples/assets/chalet.jpg"), &vulkan);
 
         let sampler_create_info = vk::SamplerCreateInfo {
             s_type: vk::StructureType::SAMPLER_CREATE_INFO,
@@ -241,7 +217,7 @@ impl Pipeline {
             address_mode_u: vk::SamplerAddressMode::REPEAT,
             address_mode_v: vk::SamplerAddressMode::REPEAT,
             address_mode_w: vk::SamplerAddressMode::REPEAT,
-            max_lod: texture.2 as f32,
+            max_lod: mip_levels as f32,
             mip_lod_bias: 0.0,
             anisotropy_enable: vk::TRUE,
             max_anisotropy: 16.0,
@@ -274,7 +250,7 @@ impl Pipeline {
             descriptor_info,
             &uniform_buffer,
             sampler,
-            texture.1,
+            texture.view(),
             &descriptor_pool,
             &vulkan,
         );
@@ -329,7 +305,7 @@ impl Pipeline {
         Pipeline {
             pipeline: pipeline[0],
             layout: pipeline_layout,
-            texture,
+            texture: (texture, mip_levels),
             depth_image,
             sampler,
             descriptors: descriptor_set,
@@ -355,14 +331,6 @@ impl Drop for Pipeline {
             self.context
                 .device
                 .destroy_descriptor_pool(self.descriptor_pool, None);
-
-            self.context.device.destroy_image_view(self.texture.1, None);
-            self.context
-                .device
-                .destroy_image_view(self.depth_image.1, None);
-
-            self.depth_image.0.destroy(self.context.clone());
-            self.texture.0.destroy(self.context.clone());
 
             self.context
                 .device
@@ -392,11 +360,7 @@ pub fn create_uniform_data(swapchain: &Swapchain) -> UniformBufferObject {
     }
 }
 
-pub fn create_texture(
-    image_path: &Path,
-    image_info: &mut vk::ImageViewCreateInfo,
-    vulkan: &VkInstance,
-) -> (Image, vk::ImageView, u32) {
+pub fn create_texture(image_path: &Path, vulkan: &VkInstance) -> (Image, u32) {
     let mut image_object = image::open(image_path).unwrap(); // this function is slow in debug mode.
     image_object = image_object.flipv();
     let (image_width, image_height) = (image_object.width(), image_object.height());
@@ -448,11 +412,12 @@ pub fn create_texture(
         ..Default::default()
     };
 
-    let image = Image::create_image(
+    let mut image = Image::create_image(
         image_create_info,
         vk::MemoryPropertyFlags::DEVICE_LOCAL,
         vulkan.context(),
     );
+
     vulkan.transition_image_layout(
         image.image,
         vk::Format::R8G8B8A8_UNORM,
@@ -483,15 +448,28 @@ pub fn create_texture(
 
     vulkan.generate_mipmaps(image.image, image_width, image_height, mip_levels);
 
-    image_info.image = image.image;
-    let image_view = unsafe {
-        vulkan
-            .device()
-            .create_image_view(&image_info, None)
-            .expect("Failed to create Image View!")
-    };
+    image.attach_view(vk::ImageViewCreateInfo {
+        s_type: vk::StructureType::IMAGE_VIEW_CREATE_INFO,
+        view_type: vk::ImageViewType::TYPE_2D,
+        format: vk::Format::R8G8B8A8_UNORM,
+        image: image.image,
+        components: vk::ComponentMapping {
+            r: vk::ComponentSwizzle::IDENTITY,
+            g: vk::ComponentSwizzle::IDENTITY,
+            b: vk::ComponentSwizzle::IDENTITY,
+            a: vk::ComponentSwizzle::IDENTITY,
+        },
+        subresource_range: vk::ImageSubresourceRange {
+            aspect_mask: vk::ImageAspectFlags::COLOR,
+            base_mip_level: 0,
+            level_count: 1,
+            base_array_layer: 0,
+            layer_count: 1,
+        },
+        ..Default::default()
+    });
 
-    (image, image_view, mip_levels)
+    (image, mip_levels)
 }
 
 fn create_descriptors(
@@ -578,10 +556,7 @@ fn create_descriptors(
 }
 
 //Creates depth image
-pub fn create_depth_resources(
-    swapchain: &Swapchain,
-    vulkan: &VkInstance,
-) -> (Image, vk::ImageView) {
+pub fn create_depth_resources(swapchain: &Swapchain, vulkan: &VkInstance) -> Image {
     let depth_format = vulkan.find_depth_format(
         &[
             vk::Format::D32_SFLOAT,
@@ -609,13 +584,13 @@ pub fn create_depth_resources(
         ..Default::default()
     };
 
-    let image = Image::create_image(
+    let mut image = Image::create_image(
         depth_image_info,
         vk::MemoryPropertyFlags::DEVICE_LOCAL,
         vulkan.context(),
     );
 
-    let imageview_info = vk::ImageViewCreateInfo {
+    image.attach_view(vk::ImageViewCreateInfo {
         s_type: vk::StructureType::IMAGE_VIEW_CREATE_INFO,
         view_type: vk::ImageViewType::TYPE_2D,
         format: depth_format,
@@ -628,14 +603,7 @@ pub fn create_depth_resources(
             layer_count: 1,
         },
         ..Default::default()
-    };
-
-    let image_view = unsafe {
-        vulkan
-            .device()
-            .create_image_view(&imageview_info, None)
-            .expect("Failed to create Image View!")
-    };
+    });
 
     vulkan.transition_image_layout(
         image.image,
@@ -645,9 +613,8 @@ pub fn create_depth_resources(
         1,
     );
 
-    (image, image_view)
+    image
 }
-
 //Creates descriptor pool for uniform buffers and stuff
 pub fn create_descriptor_pool(vulkan: &VkInstance, size: u32) -> vk::DescriptorPool {
     let pool_sizes = [

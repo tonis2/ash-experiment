@@ -34,7 +34,7 @@ pub struct Pipeline {
     pub pipeline: vk::Pipeline,
     pub layout: vk::PipelineLayout,
     pub descriptors: Vec<vk::DescriptorSet>,
-    pub texture: (Image, vk::ImageView),
+    pub texture: Image,
     pub sampler: vk::Sampler,
     pub uniform_buffer: Buffer,
     pub uniform_transform: UniformBufferObject,
@@ -148,8 +148,7 @@ impl Pipeline {
         let dynamic_state_info =
             vk::PipelineDynamicStateCreateInfo::builder().dynamic_states(&dynamic_state);
 
-        let vertex_shader =
-            load_shader(&Path::new("examples/texture/shaders/textures.vert.spv"));
+        let vertex_shader = load_shader(&Path::new("examples/texture/shaders/textures.vert.spv"));
         let frag_shader = load_shader(&Path::new("examples/texture/shaders/textures.frag.spv"));
 
         let vertex_shader_module = unsafe {
@@ -210,31 +209,7 @@ impl Pipeline {
 
         //Create texture image
 
-        let mut imageview_info = vk::ImageViewCreateInfo {
-            s_type: vk::StructureType::IMAGE_VIEW_CREATE_INFO,
-            view_type: vk::ImageViewType::TYPE_2D,
-            format: vk::Format::R8G8B8A8_UNORM,
-            components: vk::ComponentMapping {
-                r: vk::ComponentSwizzle::IDENTITY,
-                g: vk::ComponentSwizzle::IDENTITY,
-                b: vk::ComponentSwizzle::IDENTITY,
-                a: vk::ComponentSwizzle::IDENTITY,
-            },
-            subresource_range: vk::ImageSubresourceRange {
-                aspect_mask: vk::ImageAspectFlags::COLOR,
-                base_mip_level: 0,
-                level_count: 1,
-                base_array_layer: 0,
-                layer_count: 1,
-            },
-            ..Default::default()
-        };
-
-        let texture = create_texture(
-            &Path::new("examples/assets/texture.jpg"),
-            &mut imageview_info,
-            &vulkan,
-        );
+        let texture = create_texture(&Path::new("examples/assets/texture.jpg"), &vulkan);
 
         let sampler_create_info = vk::SamplerCreateInfo {
             s_type: vk::StructureType::SAMPLER_CREATE_INFO,
@@ -271,7 +246,7 @@ impl Pipeline {
             descriptor_info,
             &uniform_buffer,
             sampler,
-            texture.1,
+            texture.view(),
             &descriptor_pool,
             &vulkan,
         );
@@ -349,8 +324,6 @@ impl Drop for Pipeline {
                 .device
                 .destroy_descriptor_pool(self.descriptor_pool, None);
 
-            self.context.device.destroy_image_view(self.texture.1, None);
-
             self.context
                 .device
                 .destroy_descriptor_set_layout(self.descriptor_layout[0], None);
@@ -378,11 +351,7 @@ pub fn create_uniform_data(swapchain: &Swapchain) -> UniformBufferObject {
     }
 }
 
-pub fn create_texture(
-    image_path: &Path,
-    image_info: &mut vk::ImageViewCreateInfo,
-    vulkan: &VkInstance,
-) -> (Image, vk::ImageView) {
+pub fn create_texture(image_path: &Path, vulkan: &VkInstance) -> Image {
     let mut image_object = image::open(image_path).unwrap(); // this function is slow in debug mode.
     image_object = image_object.flipv();
     let (image_width, image_height) = (image_object.width(), image_object.height());
@@ -428,11 +397,12 @@ pub fn create_texture(
         ..Default::default()
     };
 
-    let image = Image::create_image(
+    let mut image = Image::create_image(
         image_create_info,
         vk::MemoryPropertyFlags::DEVICE_LOCAL,
         vulkan.context(),
     );
+
     vulkan.transition_image_layout(
         image.image,
         vk::Format::R8G8B8A8_UNORM,
@@ -467,15 +437,28 @@ pub fn create_texture(
         1,
     );
 
-    image_info.image = image.image;
-    let image_view = unsafe {
-        vulkan
-            .device()
-            .create_image_view(&image_info, None)
-            .expect("Failed to create Image View!")
-    };
+    image.attach_view(vk::ImageViewCreateInfo {
+        s_type: vk::StructureType::IMAGE_VIEW_CREATE_INFO,
+        view_type: vk::ImageViewType::TYPE_2D,
+        format: vk::Format::R8G8B8A8_UNORM,
+        image: image.image,
+        components: vk::ComponentMapping {
+            r: vk::ComponentSwizzle::IDENTITY,
+            g: vk::ComponentSwizzle::IDENTITY,
+            b: vk::ComponentSwizzle::IDENTITY,
+            a: vk::ComponentSwizzle::IDENTITY,
+        },
+        subresource_range: vk::ImageSubresourceRange {
+            aspect_mask: vk::ImageAspectFlags::COLOR,
+            base_mip_level: 0,
+            level_count: 1,
+            base_array_layer: 0,
+            layer_count: 1,
+        },
+        ..Default::default()
+    });
 
-    (image, image_view)
+    image
 }
 
 fn create_descriptors(

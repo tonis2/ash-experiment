@@ -35,26 +35,10 @@ fn main() {
 
     let mut tick_counter = FPSLimiter::new();
 
-    let extent = [vk::Rect2D {
+    let extent = vk::Rect2D {
         offset: vk::Offset2D { x: 0, y: 0 },
         extent: swapchain.extent,
-    }];
-
-    let clear_values = [
-        vk::ClearValue {
-            // clear value for color buffer
-            color: vk::ClearColorValue {
-                float32: [0.0, 0.0, 0.0, 1.0],
-            },
-        },
-        vk::ClearValue {
-            // clear value for depth buffer
-            depth_stencil: vk::ClearDepthStencilValue {
-                depth: 1.0,
-                stencil: 0,
-            },
-        },
-    ];
+    };
 
     //Let's prebuild command buffers in this example
     for (image_index, image) in swapchain.image_views.iter().enumerate() {
@@ -67,13 +51,33 @@ fn main() {
             max_depth: 1.0,
         }];
 
+        let render_pass_info = vk::RenderPassBeginInfo::builder()
+            .framebuffer(
+                swapchain
+                    .build_color_buffer(render_pass, vec![*image, pipeline.depth_image.view()]),
+            )
+            .render_pass(render_pass)
+            .clear_values(&[
+                vk::ClearValue {
+                    // clear value for color buffer
+                    color: vk::ClearColorValue {
+                        float32: [0.0, 0.0, 0.0, 1.0],
+                    },
+                },
+                vk::ClearValue {
+                    // clear value for depth buffer
+                    depth_stencil: vk::ClearDepthStencilValue {
+                        depth: 1.0,
+                        stencil: 0,
+                    },
+                },
+            ])
+            .render_area(extent)
+            .build();
+
         vulkan.build_command(
             command_buffers[image_index],
-            extent[0],
-            &clear_values,
-            vec![*image, pipeline.depth_image.1],
-            render_pass,
-            &swapchain,
+            &render_pass_info,
             |command_buffer, device| unsafe {
                 device.cmd_bind_pipeline(
                     command_buffer,
@@ -89,7 +93,7 @@ fn main() {
                     &[],
                 );
                 device.cmd_set_viewport(command_buffer, 0, &viewports);
-                device.cmd_set_scissor(command_buffer, 0, &extent);
+                device.cmd_set_scissor(command_buffer, 0, &[extent]);
                 device.cmd_bind_vertex_buffers(command_buffer, 0, &[vertex_buffer.buffer], &[0]);
                 device.cmd_bind_index_buffer(
                     command_buffer,

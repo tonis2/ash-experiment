@@ -1,5 +1,6 @@
 mod pipeline;
 mod renderpass;
+mod shadowmap_pipeline;
 
 use vulkan::{
     as_byte_slice, prelude::*, utilities::FPSLimiter, Context, Queue, Swapchain, VkInstance,
@@ -146,22 +147,6 @@ fn main() {
                 extent: swapchain.extent,
             }];
 
-            let clear_values = [
-                vk::ClearValue {
-                    // clear value for color buffer
-                    color: vk::ClearColorValue {
-                        float32: [0.0, 0.0, 0.0, 1.0],
-                    },
-                },
-                vk::ClearValue {
-                    // clear value for depth buffer
-                    depth_stencil: vk::ClearDepthStencilValue {
-                        depth: 1.0,
-                        stencil: 0,
-                    },
-                },
-            ];
-
             let viewports = [vk::Viewport {
                 x: 0.0,
                 y: 0.0,
@@ -173,16 +158,35 @@ fn main() {
 
             let next_frame = queue.next_frame(&swapchain);
 
+            let render_pass_info = vk::RenderPassBeginInfo::builder()
+                .framebuffer(swapchain.build_color_buffer(
+                    render_pass,
+                    vec![
+                        swapchain.get_image(next_frame.image_index),
+                        pipeline.depth_image.1,
+                    ],
+                ))
+                .render_pass(render_pass)
+                .clear_values(&[
+                    vk::ClearValue {
+                        // clear value for color buffer
+                        color: vk::ClearColorValue {
+                            float32: [0.0, 0.0, 0.0, 1.0],
+                        },
+                    },
+                    vk::ClearValue {
+                        // clear value for depth buffer
+                        depth_stencil: vk::ClearDepthStencilValue {
+                            depth: 1.0,
+                            stencil: 0,
+                        },
+                    },
+                ])
+                .build();
+
             vulkan.build_command(
                 command_buffers[next_frame.image_index],
-                extent[0],
-                &clear_values,
-                vec![
-                    swapchain.get_image(next_frame.image_index),
-                    pipeline.depth_image.1,
-                ],
-                render_pass,
-                &swapchain,
+                &render_pass_info,
                 |command_buffer, device| unsafe {
                     device.cmd_bind_pipeline(
                         command_buffer,

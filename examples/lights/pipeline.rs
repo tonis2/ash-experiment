@@ -405,9 +405,6 @@ impl Drop for Pipeline {
                 .device
                 .destroy_image_view(self.depth_image.1, None);
 
-            self.depth_image.0.destroy(self.context.clone());
-            self.texture.0.destroy(self.context.clone());
-
             self.context
                 .device
                 .destroy_descriptor_set_layout(self.descriptor_layout[0], None);

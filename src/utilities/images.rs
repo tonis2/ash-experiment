@@ -10,6 +10,8 @@ use ash::version::DeviceV1_0;
 pub struct Image {
     pub image: vk::Image,
     pub memory: vk::DeviceMemory,
+    pub image_view: Option<vk::ImageView>,
+    pub context: Arc<Context>,
 }
 
 impl Image {
@@ -56,13 +58,30 @@ impl Image {
         Image {
             image: texture_image,
             memory: texture_image_memory,
+            image_view: None,
+            context: context.clone(),
         }
     }
 
-    pub fn destroy(&self, context: Arc<Context>) {
+    pub fn attach_view(&mut self, image_info: vk::ImageViewCreateInfo) {
+        self.image_view = Some(unsafe {
+            self.context
+                .device
+                .create_image_view(&image_info, None)
+                .expect("Failed to create Image View!")
+        });
+    }
+
+    pub fn view(&self) -> vk::ImageView {
+        self.image_view.expect("No image attached")
+    }
+}
+
+impl Drop for Image {
+    fn drop(&mut self) {
         unsafe {
-            context.device.destroy_image(self.image, None);
-            context.device.free_memory(self.memory, None);
+            self.context.device.destroy_image(self.image, None);
+            self.context.device.free_memory(self.memory, None);
         }
     }
 }

@@ -82,26 +82,10 @@ fn main() {
             tick_counter.tick_frame();
         }
         Event::RedrawRequested(_window_id) => {
-            let extent = [vk::Rect2D {
+            let extent = vk::Rect2D {
                 offset: vk::Offset2D { x: 0, y: 0 },
                 extent: swapchain.extent,
-            }];
-
-            let clear_values = [
-                vk::ClearValue {
-                    // clear value for color buffer
-                    color: vk::ClearColorValue {
-                        float32: [0.0, 0.0, 0.0, 1.0],
-                    },
-                },
-                vk::ClearValue {
-                    // clear value for depth buffer
-                    depth_stencil: vk::ClearDepthStencilValue {
-                        depth: 1.0,
-                        stencil: 0,
-                    },
-                },
-            ];
+            };
 
             let viewports = [vk::Viewport {
                 x: 0.0,
@@ -114,15 +98,33 @@ fn main() {
 
             let next_frame = queue.next_frame(&swapchain);
 
+            let render_pass_info = vk::RenderPassBeginInfo::builder()
+                .framebuffer(swapchain.build_color_buffer(
+                    render_pass,
+                    vec![swapchain.get_image(next_frame.image_index)],
+                ))
+                .render_pass(render_pass)
+                .clear_values(&[
+                    vk::ClearValue {
+                        // clear value for color buffer
+                        color: vk::ClearColorValue {
+                            float32: [0.0, 0.0, 0.0, 1.0],
+                        },
+                    },
+                    vk::ClearValue {
+                        // clear value for depth buffer
+                        depth_stencil: vk::ClearDepthStencilValue {
+                            depth: 1.0,
+                            stencil: 0,
+                        },
+                    },
+                ])
+                .render_area(extent)
+                .build();
+
             vulkan.build_command(
                 command_buffers[next_frame.image_index],
-                extent[0],
-                &clear_values,
-                vec![
-                    swapchain.get_image(next_frame.image_index),
-                ],
-                render_pass,
-                &swapchain,
+                &render_pass_info,
                 |command_buffer, device| unsafe {
                     device.cmd_bind_pipeline(
                         command_buffer,
@@ -138,7 +140,7 @@ fn main() {
                         &[],
                     );
                     device.cmd_set_viewport(command_buffer, 0, &viewports);
-                    device.cmd_set_scissor(command_buffer, 0, &extent);
+                    device.cmd_set_scissor(command_buffer, 0, &[extent]);
                     device.cmd_bind_vertex_buffers(
                         command_buffer,
                         0,
