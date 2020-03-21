@@ -104,14 +104,12 @@ fn main() {
                     vec![swapchain.get_image(next_frame.image_index)],
                 ))
                 .render_pass(render_pass)
-                .clear_values(&[
-                    vk::ClearValue {
-                        // clear value for color buffer
-                        color: vk::ClearColorValue {
-                            float32: [0.0, 0.0, 0.0, 1.0],
-                        },
-                    }
-                ])
+                .clear_values(&[vk::ClearValue {
+                    // clear value for color buffer
+                    color: vk::ClearColorValue {
+                        float32: [0.0, 0.0, 0.0, 1.0],
+                    },
+                }])
                 .render_area(extent)
                 .build();
 
@@ -129,7 +127,7 @@ fn main() {
                         vk::PipelineBindPoint::GRAPHICS,
                         pipeline.layout,
                         0,
-                        &pipeline.descriptors,
+                        &[pipeline.descriptor_set],
                         &[],
                     );
                     device.cmd_set_viewport(command_buffer, 0, &viewports);

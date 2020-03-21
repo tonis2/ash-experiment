@@ -246,45 +246,43 @@ impl Pipeline {
             },
         ];
 
-        let mut descriptor_write_sets = vec![
-            vk::WriteDescriptorSet {
-                // transform uniform
-                s_type: vk::StructureType::WRITE_DESCRIPTOR_SET,
-                dst_binding: 0,
-                dst_array_element: 0,
-                descriptor_count: 1,
-                descriptor_type: vk::DescriptorType::UNIFORM_BUFFER,
-                p_buffer_info: [vk::DescriptorBufferInfo {
-                    buffer: uniform_buffer.buffer,
-                    offset: 0,
-                    range: uniform_buffer.size() as u64
-                        - std::mem::size_of::<UniformBufferObject>() as u64,
-                }]
-                .as_ptr(),
-                ..Default::default()
-            },
-            vk::WriteDescriptorSet {
-                // sampler uniform
-                s_type: vk::StructureType::WRITE_DESCRIPTOR_SET,
-                dst_binding: 1,
-                dst_array_element: 0,
-                descriptor_count: 1,
-                descriptor_type: vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
-                p_image_info: [vk::DescriptorImageInfo {
-                    sampler: sampler,
-                    image_view: texture.view(),
-                    image_layout: vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
-                }]
-                .as_ptr(),
-                ..Default::default()
-            },
-        ];
-
         let (descriptor_layout, descriptor_set, descriptor_pool) =
             vulkan.context.create_descriptor(
                 swapchain.image_views.len() as u32,
                 descriptor_binding,
-                &mut descriptor_write_sets,
+                &mut vec![
+                    vk::WriteDescriptorSet {
+                        // transform uniform
+                        s_type: vk::StructureType::WRITE_DESCRIPTOR_SET,
+                        dst_binding: 0,
+                        dst_array_element: 0,
+                        descriptor_count: 1,
+                        descriptor_type: vk::DescriptorType::UNIFORM_BUFFER,
+                        p_buffer_info: [vk::DescriptorBufferInfo {
+                            buffer: uniform_buffer.buffer,
+                            offset: 0,
+                            range: uniform_buffer.size() as u64
+                                - std::mem::size_of::<UniformBufferObject>() as u64,
+                        }]
+                        .as_ptr(),
+                        ..Default::default()
+                    },
+                    vk::WriteDescriptorSet {
+                        // sampler uniform
+                        s_type: vk::StructureType::WRITE_DESCRIPTOR_SET,
+                        dst_binding: 1,
+                        dst_array_element: 0,
+                        descriptor_count: 1,
+                        descriptor_type: vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
+                        p_image_info: [vk::DescriptorImageInfo {
+                            sampler: sampler,
+                            image_view: texture.view(),
+                            image_layout: vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
+                        }]
+                        .as_ptr(),
+                        ..Default::default()
+                    },
+                ],
             );
 
         let layout = &[descriptor_layout];

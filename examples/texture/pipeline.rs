@@ -33,15 +33,15 @@ pub struct UniformBufferObject {
 pub struct Pipeline {
     pub pipeline: vk::Pipeline,
     pub layout: vk::PipelineLayout,
-    pub descriptors: Vec<vk::DescriptorSet>,
     pub texture: Image,
     pub sampler: vk::Sampler,
     pub uniform_buffer: Buffer,
     pub uniform_transform: UniformBufferObject,
     context: Arc<Context>,
 
-    descriptor_pool: vk::DescriptorPool,
-    descriptor_layout: Vec<vk::DescriptorSetLayout>,
+    pub descriptor_layout: vk::DescriptorSetLayout,
+    pub descriptor_set: vk::DescriptorSet,
+    pub descriptor_pool: vk::DescriptorPool,
 }
 
 impl Pipeline {
@@ -188,25 +188,6 @@ impl Pipeline {
             },
         ];
 
-        let descriptor_info = vec![
-            vk::DescriptorSetLayoutBinding {
-                // transform uniform
-                binding: 0,
-                descriptor_type: vk::DescriptorType::UNIFORM_BUFFER,
-                descriptor_count: 1,
-                stage_flags: vk::ShaderStageFlags::VERTEX,
-                p_immutable_samplers: ptr::null(),
-            },
-            vk::DescriptorSetLayoutBinding {
-                // sampler uniform
-                binding: 1,
-                descriptor_type: vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
-                descriptor_count: 1,
-                stage_flags: vk::ShaderStageFlags::FRAGMENT,
-                p_immutable_samplers: ptr::null(),
-            },
-        ];
-
         //Create texture image
 
         let texture = create_texture(&Path::new("examples/assets/texture.jpg"), &vulkan);
@@ -241,18 +222,66 @@ impl Pipeline {
             &[uniform_data],
         );
 
-        let descriptor_pool = create_descriptor_pool(&vulkan, swapchain.image_views.len() as u32);
-        let (descriptor_set, descriptor_layout) = create_descriptors(
-            descriptor_info,
-            &uniform_buffer,
-            sampler,
-            texture.view(),
-            &descriptor_pool,
-            &vulkan,
-        );
+        let descriptor_binding = vec![
+            vk::DescriptorSetLayoutBinding {
+                // transform uniform
+                binding: 0,
+                descriptor_type: vk::DescriptorType::UNIFORM_BUFFER,
+                descriptor_count: 1,
+                stage_flags: vk::ShaderStageFlags::VERTEX,
+                p_immutable_samplers: ptr::null(),
+            },
+            vk::DescriptorSetLayoutBinding {
+                // sampler uniform
+                binding: 1,
+                descriptor_type: vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
+                descriptor_count: 1,
+                stage_flags: vk::ShaderStageFlags::FRAGMENT,
+                p_immutable_samplers: ptr::null(),
+            },
+        ];
 
-        let layout_create_info =
-            vk::PipelineLayoutCreateInfo::builder().set_layouts(&descriptor_layout);
+        let (descriptor_layout, descriptor_set, descriptor_pool) =
+            vulkan.context.create_descriptor(
+                swapchain.image_views.len() as u32,
+                descriptor_binding,
+                &mut vec![
+                    vk::WriteDescriptorSet {
+                        // transform uniform
+                        s_type: vk::StructureType::WRITE_DESCRIPTOR_SET,
+                        dst_binding: 0,
+                        dst_array_element: 0,
+                        descriptor_count: 1,
+                        descriptor_type: vk::DescriptorType::UNIFORM_BUFFER,
+                        p_buffer_info: [vk::DescriptorBufferInfo {
+                            buffer: uniform_buffer.buffer,
+                            offset: 0,
+                            range: uniform_buffer.size() as u64
+                                - std::mem::size_of::<UniformBufferObject>() as u64,
+                        }]
+                        .as_ptr(),
+                        ..Default::default()
+                    },
+                    vk::WriteDescriptorSet {
+                        // sampler uniform
+                        s_type: vk::StructureType::WRITE_DESCRIPTOR_SET,
+                        dst_binding: 1,
+                        dst_array_element: 0,
+                        descriptor_count: 1,
+                        descriptor_type: vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
+                        p_image_info: [vk::DescriptorImageInfo {
+                            sampler: sampler,
+                            image_view: texture.view(),
+                            image_layout: vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
+                        }]
+                        .as_ptr(),
+                        ..Default::default()
+                    },
+                ],
+            );
+
+        let layout = &[descriptor_layout];
+        let layout_create_info = vk::PipelineLayoutCreateInfo::builder().set_layouts(layout);
 
         //Create pipeline stuff
         let pipeline_layout = unsafe {
@@ -301,7 +330,7 @@ impl Pipeline {
             layout: pipeline_layout,
             texture,
             sampler,
-            descriptors: descriptor_set,
+            descriptor_set,
             descriptor_pool,
             descriptor_layout,
             uniform_buffer,
@@ -323,10 +352,6 @@ impl Drop for Pipeline {
             self.context
                 .device
                 .destroy_descriptor_pool(self.descriptor_pool, None);
-
-            self.context
-                .device
-                .destroy_descriptor_set_layout(self.descriptor_layout[0], None);
         }
     }
 }
@@ -459,119 +484,4 @@ pub fn create_texture(image_path: &Path, vulkan: &VkInstance) -> Image {
     });
 
     image
-}
-
-fn create_descriptors(
-    bindings: Vec<vk::DescriptorSetLayoutBinding>,
-    buffer: &Buffer,
-    sampler: vk::Sampler,
-    image_view: vk::ImageView,
-    descriptor_pool: &vk::DescriptorPool,
-    vulkan: &VkInstance,
-) -> (Vec<vk::DescriptorSet>, Vec<vk::DescriptorSetLayout>) {
-    let ubo_layout_create_info = vk::DescriptorSetLayoutCreateInfo {
-        s_type: vk::StructureType::DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
-        flags: vk::DescriptorSetLayoutCreateFlags::empty(),
-        binding_count: bindings.len() as u32,
-        p_bindings: bindings.as_ptr(),
-        ..Default::default()
-    };
-    let layouts = unsafe {
-        vec![vulkan
-            .device()
-            .create_descriptor_set_layout(&ubo_layout_create_info, None)
-            .expect("Failed to create Descriptor Set Layout!")]
-    };
-
-    let descriptor_set_allocate_info = vk::DescriptorSetAllocateInfo {
-        s_type: vk::StructureType::DESCRIPTOR_SET_ALLOCATE_INFO,
-        descriptor_pool: *descriptor_pool,
-        descriptor_set_count: 1 as u32,
-        p_set_layouts: layouts.as_ptr(),
-        ..Default::default()
-    };
-
-    let descriptor_sets = unsafe {
-        vulkan
-            .device()
-            .allocate_descriptor_sets(&descriptor_set_allocate_info)
-            .expect("Failed to allocate descriptor sets!")
-    };
-
-    let descriptor_image_infos = [vk::DescriptorImageInfo {
-        sampler: sampler,
-        image_view: image_view,
-        image_layout: vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
-    }];
-
-    let buffer_info = vec![vk::DescriptorBufferInfo {
-        buffer: buffer.buffer,
-        offset: 0,
-        range: buffer.size() - std::mem::size_of::<UniformBufferObject>() as u64,
-    }];
-
-    let descriptor_write_sets = [
-        vk::WriteDescriptorSet {
-            // transform uniform
-            s_type: vk::StructureType::WRITE_DESCRIPTOR_SET,
-            dst_set: descriptor_sets[0],
-            dst_binding: 0,
-            dst_array_element: 0,
-            descriptor_count: 1,
-            descriptor_type: vk::DescriptorType::UNIFORM_BUFFER,
-            p_buffer_info: buffer_info.as_ptr(),
-            ..Default::default()
-        },
-        vk::WriteDescriptorSet {
-            // sampler uniform
-            s_type: vk::StructureType::WRITE_DESCRIPTOR_SET,
-            dst_set: descriptor_sets[0],
-            dst_binding: 1,
-            dst_array_element: 0,
-            descriptor_count: 1,
-            descriptor_type: vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
-            p_image_info: descriptor_image_infos.as_ptr(),
-            ..Default::default()
-        },
-    ];
-
-    unsafe {
-        vulkan
-            .device()
-            .update_descriptor_sets(&descriptor_write_sets, &[]);
-    }
-
-    (descriptor_sets, layouts)
-}
-
-//Creates descriptor pool for uniform buffers and stuff
-pub fn create_descriptor_pool(vulkan: &VkInstance, size: u32) -> vk::DescriptorPool {
-    let pool_sizes = [
-        vk::DescriptorPoolSize {
-            // transform descriptor pool
-            ty: vk::DescriptorType::UNIFORM_BUFFER,
-            descriptor_count: size,
-        },
-        vk::DescriptorPoolSize {
-            // sampler descriptor pool
-            ty: vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
-            descriptor_count: size,
-        },
-    ];
-
-    let descriptor_pool_create_info = vk::DescriptorPoolCreateInfo {
-        s_type: vk::StructureType::DESCRIPTOR_POOL_CREATE_INFO,
-        p_next: ptr::null(),
-        flags: vk::DescriptorPoolCreateFlags::empty(),
-        max_sets: size,
-        pool_size_count: pool_sizes.len() as u32,
-        p_pool_sizes: pool_sizes.as_ptr(),
-    };
-
-    unsafe {
-        vulkan
-            .device()
-            .create_descriptor_pool(&descriptor_pool_create_info, None)
-            .expect("Failed to create Descriptor Pool!")
-    }
 }
