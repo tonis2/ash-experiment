@@ -1,8 +1,4 @@
-use vulkan::{
-    modules::swapchain::Swapchain,
-    offset_of,
-    utilities::tools::load_shader, Context
-};
+use vulkan::{modules::swapchain::Swapchain, offset_of, utilities::tools::load_shader, Context};
 
 use std::sync::Arc;
 
@@ -26,33 +22,27 @@ pub fn create_pipeline(
     renderpass: vk::RenderPass,
     context: Arc<Context>,
 ) -> (vk::Pipeline, vk::PipelineLayout) {
-    let vertex_binding = vec![vk::VertexInputBindingDescription {
-        binding: 0,
-        stride: mem::size_of::<Vertex>() as u32,
-        input_rate: vk::VertexInputRate::VERTEX,
-    }];
-    let vertex_attributes = vec![
-        vk::VertexInputAttributeDescription {
-            location: 0,
+    let vertex_input_state_info = vk::PipelineVertexInputStateCreateInfo::builder()
+        .vertex_binding_descriptions(&[vk::VertexInputBindingDescription {
             binding: 0,
-            format: vk::Format::R32G32B32A32_SFLOAT,
-            offset: offset_of!(Vertex, pos) as u32,
-        },
-        vk::VertexInputAttributeDescription {
-            location: 1,
-            binding: 0,
-            format: vk::Format::R32G32B32A32_SFLOAT,
-            offset: offset_of!(Vertex, color) as u32,
-        },
-    ];
-
-    let vertex_input_state_info = vk::PipelineVertexInputStateCreateInfo {
-        vertex_attribute_description_count: vertex_attributes.len() as u32,
-        p_vertex_attribute_descriptions: vertex_attributes.as_ptr(),
-        vertex_binding_description_count: vertex_binding.len() as u32,
-        p_vertex_binding_descriptions: vertex_binding.as_ptr(),
-        ..Default::default()
-    };
+            stride: mem::size_of::<Vertex>() as u32,
+            input_rate: vk::VertexInputRate::VERTEX,
+        }])
+        .vertex_attribute_descriptions(&[
+            vk::VertexInputAttributeDescription {
+                binding: 0,
+                location: 0,
+                format: vk::Format::R32G32B32_SFLOAT,
+                offset: offset_of!(Vertex, pos) as u32,
+            },
+            vk::VertexInputAttributeDescription {
+                binding: 0,
+                location: 1,
+                format: vk::Format::R32G32B32_SFLOAT,
+                offset: offset_of!(Vertex, color) as u32,
+            },
+        ])
+        .build();
 
     let vertex_input_assembly_state_info = vk::PipelineInputAssemblyStateCreateInfo {
         topology: vk::PrimitiveTopology::TRIANGLE_LIST,
@@ -198,7 +188,7 @@ pub fn create_pipeline(
         context
             .device
             .destroy_shader_module(vertex_shader_module, None);
-            context
+        context
             .device
             .destroy_shader_module(fragment_shader_module, None);
     }

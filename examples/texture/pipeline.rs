@@ -51,39 +51,33 @@ impl Pipeline {
         renderpass: vk::RenderPass,
         vulkan: &VkInstance,
     ) -> Pipeline {
-        let vertex_binding = vec![vk::VertexInputBindingDescription {
-            binding: 0,
-            stride: mem::size_of::<Vertex>() as u32,
-            input_rate: vk::VertexInputRate::VERTEX,
-        }];
-        let vertex_attributes = vec![
-            vk::VertexInputAttributeDescription {
+        let vertex_input_state_info = vk::PipelineVertexInputStateCreateInfo::builder()
+            .vertex_binding_descriptions(&[vk::VertexInputBindingDescription {
                 binding: 0,
-                location: 0,
-                format: vk::Format::R32G32B32_SFLOAT,
-                offset: offset_of!(Vertex, pos) as u32,
-            },
-            vk::VertexInputAttributeDescription {
-                binding: 0,
-                location: 1,
-                format: vk::Format::R32G32B32_SFLOAT,
-                offset: offset_of!(Vertex, color) as u32,
-            },
-            vk::VertexInputAttributeDescription {
-                binding: 0,
-                location: 2,
-                format: vk::Format::R32G32_SFLOAT,
-                offset: offset_of!(Vertex, tex_coord) as u32,
-            },
-        ];
-
-        let vertex_input_state_info = vk::PipelineVertexInputStateCreateInfo {
-            vertex_attribute_description_count: vertex_attributes.len() as u32,
-            p_vertex_attribute_descriptions: vertex_attributes.as_ptr(),
-            vertex_binding_description_count: vertex_binding.len() as u32,
-            p_vertex_binding_descriptions: vertex_binding.as_ptr(),
-            ..Default::default()
-        };
+                stride: mem::size_of::<Vertex>() as u32,
+                input_rate: vk::VertexInputRate::VERTEX,
+            }])
+            .vertex_attribute_descriptions(&[
+                vk::VertexInputAttributeDescription {
+                    binding: 0,
+                    location: 0,
+                    format: vk::Format::R32G32B32_SFLOAT,
+                    offset: offset_of!(Vertex, pos) as u32,
+                },
+                vk::VertexInputAttributeDescription {
+                    binding: 0,
+                    location: 1,
+                    format: vk::Format::R32G32B32_SFLOAT,
+                    offset: offset_of!(Vertex, color) as u32,
+                },
+                vk::VertexInputAttributeDescription {
+                    binding: 0,
+                    location: 2,
+                    format: vk::Format::R32G32_SFLOAT,
+                    offset: offset_of!(Vertex, tex_coord) as u32,
+                },
+            ])
+            .build();
         let vertex_input_assembly_state_info = vk::PipelineInputAssemblyStateCreateInfo {
             topology: vk::PrimitiveTopology::TRIANGLE_LIST,
             ..Default::default()
