@@ -137,7 +137,7 @@ fn main() {
 
             pipeline
                 .uniform_buffer
-                .upload_to_buffer(&[pipeline.uniform_transform.clone()], 0);
+                .upload_to_buffer(&[pipeline.uniform_transform], 0);
 
             let next_frame = queue.next_frame(&swapchain);
 
