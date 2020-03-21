@@ -1,6 +1,4 @@
-mod pipeline;
-mod renderpass;
-mod shadowmap_pipeline;
+mod pipelines;
 
 use vulkan::{
     as_byte_slice, prelude::*, utilities::FPSLimiter, Context, Queue, Swapchain, VkInstance,
@@ -8,7 +6,10 @@ use vulkan::{
 use winit::event::{ElementState, Event, KeyboardInput, VirtualKeyCode, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop};
 
-use pipeline::{Pipeline, PushConstantTransForm, Vertex};
+use pipelines::{
+    mesh_pipeline::{self, PushConstantTransForm, Vertex},
+    mesh_renderpass,
+};
 use std::sync::Arc;
 
 fn vertex(pos: [i8; 3], tc: [i8; 2]) -> Vertex {
@@ -86,9 +87,9 @@ fn main() {
     let instance = VkInstance::new(vulkan.clone());
 
     let swapchain = Swapchain::new(vulkan.clone(), &window);
-    let render_pass = renderpass::create_render_pass(&swapchain, &instance);
+    let render_pass = mesh_renderpass::create_render_pass(&swapchain, &instance);
 
-    let pipeline = Pipeline::create_pipeline(&swapchain, render_pass, &instance);
+    let pipeline = mesh_pipeline::Pipeline::create_pipeline(&swapchain, render_pass, &instance);
 
     let command_buffers = instance.create_command_buffers(swapchain.image_views.len());
 
@@ -163,7 +164,7 @@ fn main() {
                     render_pass,
                     vec![
                         swapchain.get_image(next_frame.image_index),
-                        pipeline.depth_image.1,
+                        pipeline.depth_image.view(),
                     ],
                 ))
                 .render_pass(render_pass)
@@ -199,7 +200,7 @@ fn main() {
                         vk::PipelineBindPoint::GRAPHICS,
                         pipeline.layout,
                         0,
-                        &pipeline.descriptors,
+                        &[pipeline.descriptor_set],
                         &[],
                     );
                     device.cmd_set_viewport(command_buffer, 0, &viewports);
