@@ -112,6 +112,82 @@ impl Context {
                 .expect("Failed to record Command Buffer at Ending!");
         }
     }
+
+    pub fn create_descriptor(
+        &self,
+        images_count: u32,
+        bindings: Vec<vk::DescriptorSetLayoutBinding>,
+        descriptor_write_sets: &mut Vec<vk::WriteDescriptorSet>,
+    ) -> (
+        vk::DescriptorSetLayout,
+        vk::DescriptorSet,
+        vk::DescriptorPool,
+    ) {
+        let pool_sizes: Vec<vk::DescriptorPoolSize> = bindings
+            .iter()
+            .map(|binding| {
+                vk::DescriptorPoolSize {
+                    // transform descriptor pool
+                    ty: binding.descriptor_type,
+                    descriptor_count: images_count,
+                }
+            })
+            .collect();
+
+        let descriptor_pool_create_info = vk::DescriptorPoolCreateInfo {
+            s_type: vk::StructureType::DESCRIPTOR_POOL_CREATE_INFO,
+            p_next: ptr::null(),
+            flags: vk::DescriptorPoolCreateFlags::empty(),
+            max_sets: images_count,
+            pool_size_count: pool_sizes.len() as u32,
+            p_pool_sizes: pool_sizes.as_ptr(),
+        };
+
+        let descriptor_pool = unsafe {
+            self.device
+                .create_descriptor_pool(&descriptor_pool_create_info, None)
+                .expect("Failed to create Descriptor Pool!")
+        };
+
+        let layout_create_info = vk::DescriptorSetLayoutCreateInfo {
+            s_type: vk::StructureType::DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
+            flags: vk::DescriptorSetLayoutCreateFlags::empty(),
+            binding_count: bindings.len() as u32,
+            p_bindings: bindings.as_ptr(),
+            ..Default::default()
+        };
+        let layouts = unsafe {
+            vec![self
+                .device
+                .create_descriptor_set_layout(&layout_create_info, None)
+                .expect("Failed to create Descriptor Set Layout!")]
+        };
+
+        let descriptor_set_allocate_info = vk::DescriptorSetAllocateInfo {
+            s_type: vk::StructureType::DESCRIPTOR_SET_ALLOCATE_INFO,
+            descriptor_pool,
+            descriptor_set_count: 1 as u32,
+            p_set_layouts: layouts.as_ptr(),
+            ..Default::default()
+        };
+
+        let descriptor_sets = unsafe {
+            self.device
+                .allocate_descriptor_sets(&descriptor_set_allocate_info)
+                .expect("Failed to allocate descriptor sets!")
+        };
+
+        for descriptor in descriptor_write_sets.iter_mut() {
+            descriptor.dst_set = descriptor_sets[0]
+        }
+
+        unsafe {
+            self.device
+                .update_descriptor_sets(&descriptor_write_sets, &[]);
+        }
+
+        (layouts[0], descriptor_sets[0], descriptor_pool)
+    }
 }
 
 impl Drop for Context {

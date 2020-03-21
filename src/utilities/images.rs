@@ -10,8 +10,8 @@ use ash::version::DeviceV1_0;
 pub struct Image {
     pub image: vk::Image,
     pub memory: vk::DeviceMemory,
-    pub image_view: Option<vk::ImageView>,
-    pub context: Arc<Context>,
+    image_view: Option<vk::ImageView>,
+    context: Arc<Context>,
 }
 
 impl Image {

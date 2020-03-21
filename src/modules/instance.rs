@@ -66,29 +66,6 @@ impl VkInstance {
         }
     }
 
-    pub fn create_descriptor_pool(&self, amount: usize) -> vk::DescriptorPool {
-        let pool_sizes = [vk::DescriptorPoolSize {
-            ty: vk::DescriptorType::UNIFORM_BUFFER,
-            descriptor_count: amount as u32,
-        }];
-
-        let descriptor_pool_create_info = vk::DescriptorPoolCreateInfo {
-            s_type: vk::StructureType::DESCRIPTOR_POOL_CREATE_INFO,
-            p_next: ptr::null(),
-            flags: vk::DescriptorPoolCreateFlags::empty(),
-            max_sets: amount as u32,
-            pool_size_count: pool_sizes.len() as u32,
-            p_pool_sizes: pool_sizes.as_ptr(),
-        };
-
-        unsafe {
-            self.context
-                .device
-                .create_descriptor_pool(&descriptor_pool_create_info, None)
-                .expect("Failed to create Descriptor Pool!")
-        }
-    }
-
     pub fn copy_buffer_to_buffer(
         &self,
         src_buffer: Buffer,

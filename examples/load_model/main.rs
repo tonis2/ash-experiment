@@ -89,7 +89,7 @@ fn main() {
                     vk::PipelineBindPoint::GRAPHICS,
                     pipeline.layout,
                     0,
-                    &pipeline.descriptors,
+                    &[pipeline.descriptor_set],
                     &[],
                 );
                 device.cmd_set_viewport(command_buffer, 0, &viewports);
