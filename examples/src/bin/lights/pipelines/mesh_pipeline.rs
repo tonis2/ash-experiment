@@ -1,26 +1,41 @@
 use vulkan::{
     modules::swapchain::Swapchain,
     offset_of,
+    prelude::*,
     utilities::{tools::load_shader, Buffer, Image},
     Context, VkInstance,
-    prelude::*
 };
 
 use cgmath::{Deg, Matrix4, Point3, Vector3};
 use image::GenericImageView;
-
 use std::{default::Default, ffi::CString, mem, path::Path, ptr, sync::Arc};
 
 #[derive(Clone, Debug, Copy)]
 pub struct Vertex {
     pub pos: [f32; 3],
     pub tex_cord: [f32; 2],
+    pub color: [f32; 3],
+    pub normal: [f32; 3],
+}
+
+struct Light {
+    projection: Matrix4<f32>,
+    pos: Matrix4<f32>,
+    color: [f32; 3],
 }
 
 #[repr(C)]
 #[derive(Clone, Debug, Copy)]
 pub struct PushConstantTransForm {
     pub model: Matrix4<f32>,
+}
+
+#[repr(C)]
+#[derive(Clone, Debug, Copy)]
+pub struct UniformBufferObject {
+    pub model: Matrix4<f32>,
+    pub view: Matrix4<f32>,
+    pub proj: Matrix4<f32>,
 }
 
 impl PushConstantTransForm {
@@ -38,14 +53,6 @@ impl PushConstantTransForm {
     }
 }
 
-#[repr(C)]
-#[derive(Clone, Debug, Copy)]
-pub struct UniformBufferObject {
-    pub model: Matrix4<f32>,
-    pub view: Matrix4<f32>,
-    pub proj: Matrix4<f32>,
-}
-
 impl UniformBufferObject {
     pub fn new(swapchain: &Swapchain) -> UniformBufferObject {
         UniformBufferObject {
@@ -56,17 +63,20 @@ impl UniformBufferObject {
                 Vector3::new(0.0, 0.0, 1.0),
             ),
             proj: {
-                let mut proj = cgmath::perspective(
+                let proj = cgmath::perspective(
                     Deg(45.0),
                     swapchain.extent.width as f32 / swapchain.extent.height as f32,
                     0.1,
                     100.0,
                 );
-                proj[1][1] = proj[1][1] * -1.0;
-                proj
+                examples::OPENGL_TO_VULKAN_MATRIX * proj
             },
         }
     }
+}
+
+impl Light {
+    pub fn new() {}
 }
 
 pub struct Pipeline {
@@ -111,6 +121,18 @@ impl Pipeline {
                     location: 1,
                     format: vk::Format::R32G32_SFLOAT,
                     offset: offset_of!(Vertex, tex_cord) as u32,
+                },
+                vk::VertexInputAttributeDescription {
+                    binding: 0,
+                    location: 2,
+                    format: vk::Format::R32G32_SFLOAT,
+                    offset: offset_of!(Vertex, color) as u32,
+                },
+                vk::VertexInputAttributeDescription {
+                    binding: 0,
+                    location: 3,
+                    format: vk::Format::R32G32_SFLOAT,
+                    offset: offset_of!(Vertex, normal) as u32,
                 },
             ])
             .build();
@@ -583,4 +605,95 @@ pub fn create_depth_resources(swapchain: &Swapchain, vulkan: &VkInstance) -> Ima
     );
 
     image
+}
+
+pub fn create_render_pass(swapchain: &Swapchain, vulkan: &VkInstance) -> vk::RenderPass {
+    let color_attachment = vk::AttachmentDescription {
+        flags: vk::AttachmentDescriptionFlags::empty(),
+        format: swapchain.format,
+        samples: vk::SampleCountFlags::TYPE_1,
+        load_op: vk::AttachmentLoadOp::CLEAR,
+        store_op: vk::AttachmentStoreOp::STORE,
+        stencil_load_op: vk::AttachmentLoadOp::DONT_CARE,
+        stencil_store_op: vk::AttachmentStoreOp::DONT_CARE,
+        initial_layout: vk::ImageLayout::UNDEFINED,
+        final_layout: vk::ImageLayout::PRESENT_SRC_KHR,
+    };
+
+    let depth_format = vulkan.find_depth_format(
+        &[
+            vk::Format::D32_SFLOAT,
+            vk::Format::D32_SFLOAT_S8_UINT,
+            vk::Format::D24_UNORM_S8_UINT,
+        ],
+        vk::ImageTiling::OPTIMAL,
+        vk::FormatFeatureFlags::DEPTH_STENCIL_ATTACHMENT,
+    );
+
+    let depth_attachment = vk::AttachmentDescription {
+        flags: vk::AttachmentDescriptionFlags::empty(),
+        format: depth_format,
+        samples: vk::SampleCountFlags::TYPE_1,
+        load_op: vk::AttachmentLoadOp::CLEAR,
+        store_op: vk::AttachmentStoreOp::DONT_CARE,
+        stencil_load_op: vk::AttachmentLoadOp::DONT_CARE,
+        stencil_store_op: vk::AttachmentStoreOp::DONT_CARE,
+        initial_layout: vk::ImageLayout::UNDEFINED,
+        final_layout: vk::ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+    };
+
+    let color_attachment_ref = vk::AttachmentReference {
+        attachment: 0,
+        layout: vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL,
+    };
+
+    let depth_attachment_ref = vk::AttachmentReference {
+        attachment: 1,
+        layout: vk::ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+    };
+
+    let subpasses = [vk::SubpassDescription {
+        color_attachment_count: 1,
+        p_color_attachments: &color_attachment_ref,
+        p_depth_stencil_attachment: &depth_attachment_ref,
+        flags: vk::SubpassDescriptionFlags::empty(),
+        pipeline_bind_point: vk::PipelineBindPoint::GRAPHICS,
+        input_attachment_count: 0,
+        p_input_attachments: ptr::null(),
+        p_resolve_attachments: ptr::null(),
+        preserve_attachment_count: 0,
+        p_preserve_attachments: ptr::null(),
+    }];
+
+    let render_pass_attachments = [color_attachment, depth_attachment];
+
+    let subpass_dependencies = [vk::SubpassDependency {
+        src_subpass: vk::SUBPASS_EXTERNAL,
+        dst_subpass: 0,
+        src_stage_mask: vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT,
+        dst_stage_mask: vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT,
+        src_access_mask: vk::AccessFlags::empty(),
+        dst_access_mask: vk::AccessFlags::COLOR_ATTACHMENT_READ
+            | vk::AccessFlags::COLOR_ATTACHMENT_WRITE,
+        dependency_flags: vk::DependencyFlags::empty(),
+    }];
+
+    let renderpass_create_info = vk::RenderPassCreateInfo {
+        s_type: vk::StructureType::RENDER_PASS_CREATE_INFO,
+        flags: vk::RenderPassCreateFlags::empty(),
+        p_next: ptr::null(),
+        attachment_count: render_pass_attachments.len() as u32,
+        p_attachments: render_pass_attachments.as_ptr(),
+        subpass_count: subpasses.len() as u32,
+        p_subpasses: subpasses.as_ptr(),
+        dependency_count: subpass_dependencies.len() as u32,
+        p_dependencies: subpass_dependencies.as_ptr(),
+    };
+
+    unsafe {
+        vulkan
+            .device()
+            .create_render_pass(&renderpass_create_info, None)
+            .expect("Failed to create render pass!")
+    }
 }

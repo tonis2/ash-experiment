@@ -173,3 +173,11 @@ pub fn create_depth_resources(swapchain: &Swapchain, vulkan: &VkInstance) -> Ima
 
     image
 }
+
+
+pub const OPENGL_TO_VULKAN_MATRIX: cgmath::Matrix4<f32> = cgmath::Matrix4::new(
+    1.0, 0.0, 0.0, 0.0,
+    0.0, -1.0, 0.0, 0.0,
+    0.0, 0.0, 0.5, 0.0,
+    0.0, 0.0, 0.5, 1.0,
+);

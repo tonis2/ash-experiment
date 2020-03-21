@@ -374,14 +374,14 @@ pub fn create_uniform_data(swapchain: &Swapchain) -> UniformBufferObject {
             Vector3::new(0.0, 0.0, 1.0),
         ),
         proj: {
-            let mut proj = cgmath::perspective(
+            let proj = cgmath::perspective(
                 Deg(45.0),
                 swapchain.extent.width as f32 / swapchain.extent.height as f32,
                 0.1,
                 10.0,
             );
-            proj[1][1] = proj[1][1] * -1.0;
-            proj
+           
+            examples::OPENGL_TO_VULKAN_MATRIX * proj
         },
     }
 }

@@ -6,60 +6,59 @@ use vulkan::{
 use winit::event::{ElementState, Event, KeyboardInput, VirtualKeyCode, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop};
 
-use pipelines::{
-    mesh_pipeline::{self, PushConstantTransForm, Vertex},
-    mesh_renderpass,
-};
+use pipelines::mesh_pipeline::{self, PushConstantTransForm, Vertex};
 use std::sync::Arc;
 
-fn vertex(pos: [i8; 3], tc: [i8; 2]) -> Vertex {
+fn vertex(pos: [i8; 3], tc: [i8; 2], normal: [i8; 3]) -> Vertex {
     Vertex {
         pos: [pos[0] as f32, pos[1] as f32, pos[2] as f32],
         tex_cord: [tc[0] as f32, tc[1] as f32],
+        color: [1.0, 1.0, 1.0],
+        normal: [normal[0] as f32, normal[1] as f32, normal[2] as f32],
     }
 }
 
 fn create_plane(size: i8) -> Vec<Vertex> {
     vec![
-        vertex([-size, -size, 0], [0, 0]),
-        vertex([size, -size, 0], [0, 0]),
-        vertex([size, size, 0], [0, 0]),
-        vertex([-size, size, 0], [0, 0]),
+        vertex([-size, -size, 0], [0, 0], [0, 0, 1]),
+        vertex([size, -size, 0], [0, 0], [0, 0, 1]),
+        vertex([size, size, 0], [0, 0], [0, 0, 1]),
+        vertex([-size, size, 0], [0, 0], [0, 0, 1]),
     ]
 }
 fn main() {
     //Cube data
     let cube_vertices = vec![
         //top
-        vertex([-1, -1, 1], [0, 0]),
-        vertex([1, -1, 1], [1, 0]),
-        vertex([1, 1, 1], [1, 1]),
-        vertex([-1, 1, 1], [0, 1]),
+        vertex([-1, -1, 1], [0, 0], [0, 0, 1]),
+        vertex([1, -1, 1], [1, 0], [0, 0, 1]),
+        vertex([1, 1, 1], [1, 1], [0, 0, 1]),
+        vertex([-1, 1, 1], [0, 1], [0, 0, 1]),
         // bottom (0, 0, -1)
-        vertex([-1, 1, -1], [1, 0]),
-        vertex([1, 1, -1], [0, 0]),
-        vertex([1, -1, -1], [0, 1]),
-        vertex([-1, -1, -1], [1, 1]),
+        vertex([-1, 1, -1], [1, 0], [0, 0, -1]),
+        vertex([1, 1, -1], [0, 0], [0, 0, -1]),
+        vertex([1, -1, -1], [0, 1], [0, 0, -1]),
+        vertex([-1, -1, -1], [1, 1], [0, 0, -1]),
         // right (1, 0, 0)
-        vertex([1, -1, -1], [0, 0]),
-        vertex([1, 1, -1], [1, 0]),
-        vertex([1, 1, 1], [1, 1]),
-        vertex([1, -1, 1], [0, 1]),
+        vertex([1, -1, -1], [0, 0], [1, 0, 0]),
+        vertex([1, 1, -1], [1, 0], [1, 0, 0]),
+        vertex([1, 1, 1], [1, 1], [1, 0, 0]),
+        vertex([1, -1, 1], [0, 1], [1, 0, 0]),
         // left (-1, 0, 0)
-        vertex([-1, -1, 1], [1, 0]),
-        vertex([-1, 1, 1], [0, 0]),
-        vertex([-1, 1, -1], [0, 1]),
-        vertex([-1, -1, -1], [1, 1]),
+        vertex([-1, -1, 1], [1, 0], [-1, 0, 0]),
+        vertex([-1, 1, 1], [0, 0], [-1, 0, 0]),
+        vertex([-1, 1, -1], [0, 1], [-1, 0, 0]),
+        vertex([-1, -1, -1], [1, 1], [-1, 0, 0]),
         // front (0, 1, 0)
-        vertex([1, 1, -1], [1, 0]),
-        vertex([-1, 1, -1], [0, 0]),
-        vertex([-1, 1, 1], [0, 1]),
-        vertex([1, 1, 1], [1, 1]),
+        vertex([1, 1, -1], [1, 0], [0, 1, 0]),
+        vertex([-1, 1, -1], [0, 0], [0, 1, 0]),
+        vertex([-1, 1, 1], [0, 1], [0, 1, 0]),
+        vertex([1, 1, 1], [1, 1], [0, 1, 0]),
         // back (0, -1, 0)
-        vertex([1, -1, 1], [0, 0]),
-        vertex([-1, -1, 1], [1, 0]),
-        vertex([-1, -1, -1], [1, 1]),
-        vertex([1, -1, -1], [0, 1]),
+        vertex([1, -1, 1], [0, 0], [0, -1, 0]),
+        vertex([-1, -1, 1], [1, 0], [0, -1, 0]),
+        vertex([-1, -1, -1], [1, 1], [0, -1, 0]),
+        vertex([1, -1, -1], [0, 1], [0, -1, 0]),
     ];
 
     let cube_indices = vec![
@@ -87,7 +86,7 @@ fn main() {
     let instance = VkInstance::new(vulkan.clone());
 
     let swapchain = Swapchain::new(vulkan.clone(), &window);
-    let render_pass = mesh_renderpass::create_render_pass(&swapchain, &instance);
+    let render_pass = mesh_pipeline::create_render_pass(&swapchain, &instance);
 
     let pipeline = mesh_pipeline::Pipeline::create_pipeline(&swapchain, render_pass, &instance);
 
