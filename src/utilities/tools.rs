@@ -20,11 +20,11 @@ pub fn vk_to_string(raw_string_array: &[c_char]) -> String {
 pub fn load_shader(shader_path: &Path) -> Vec<u32> {
     use std::fs::File;
     use std::io::Read;
-    let mut shader_data = File::open(shader_path).expect("failed to read font");
+    let mut shader_data = File::open(shader_path).expect(&format!("failed to read shader {:?}", shader_path));
     let mut buffer = Vec::new();
     shader_data
         .read_to_end(&mut buffer)
-        .expect("failed to read file");
+        .expect("Failed to load shader data");
 
     read_spv(&mut shader_data).expect("Failed to read vertex shader spv file")
 }
@@ -90,7 +90,6 @@ pub fn find_memory_type(
 
     panic!("Failed to find suitable memory type!")
 }
-
 
 /// This method will convert any slice to a byte slice.
 /// Use with slices of number primitives.

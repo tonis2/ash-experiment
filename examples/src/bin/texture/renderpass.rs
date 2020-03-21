@@ -1,11 +1,10 @@
-use ash::{version::DeviceV1_0, vk};
 use std::ptr;
-use vulkan::Swapchain;
+use vulkan::{Swapchain, VkInstance, prelude::*};
 
-pub fn create_render_pass<D: DeviceV1_0>(swapchain: &Swapchain, device: &D) -> vk::RenderPass {
+pub fn create_render_pass(swapchain: &Swapchain, vulkan: &VkInstance) -> vk::RenderPass {
     let color_attachment = vk::AttachmentDescription {
-        format: swapchain.format,
         flags: vk::AttachmentDescriptionFlags::empty(),
+        format: swapchain.format,
         samples: vk::SampleCountFlags::TYPE_1,
         load_op: vk::AttachmentLoadOp::CLEAR,
         store_op: vk::AttachmentStoreOp::STORE,
@@ -57,7 +56,8 @@ pub fn create_render_pass<D: DeviceV1_0>(swapchain: &Swapchain, device: &D) -> v
     };
 
     unsafe {
-        device
+        vulkan
+            .device()
             .create_render_pass(&renderpass_create_info, None)
             .expect("Failed to create render pass!")
     }

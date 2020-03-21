@@ -1,11 +1,10 @@
-use vulkan::{modules::swapchain::Swapchain, offset_of, utilities::tools::load_shader, Context};
+use vulkan::{
+    modules::swapchain::Swapchain, offset_of, prelude::*, utilities::tools::load_shader, Context,
+};
 
 use std::sync::Arc;
 
-use ash::version::DeviceV1_0;
 use std::mem;
-
-use ash::vk;
 
 use std::ffi::CString;
 use std::path::Path;
@@ -117,12 +116,8 @@ pub fn create_pipeline(
             .unwrap()
     };
 
-    let vertex_shader = load_shader(&Path::new(
-        "examples/triangle/shaders/spv/triangle.vert.spv",
-    ));
-    let frag_shader = load_shader(&Path::new(
-        "examples/triangle/shaders/spv/triangle.frag.spv",
-    ));
+    let vertex_shader = load_shader(&Path::new("src/bin/triangle/shaders/triangle.vert.spv"));
+    let frag_shader = load_shader(&Path::new("src/bin/triangle/shaders/triangle.frag.spv"));
 
     let vertex_shader_module = unsafe {
         context

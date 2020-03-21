@@ -1,7 +1,5 @@
-use ash::version::DeviceV1_0;
-use ash::vk;
 use std::sync::Arc;
-use vulkan::{Context, Image, Swapchain};
+use vulkan::{prelude::*, Context, Image, Swapchain};
 const DEPTH_FORMAT: vk::Format = vk::Format::D16_UNORM;
 
 pub struct ShadowMap {

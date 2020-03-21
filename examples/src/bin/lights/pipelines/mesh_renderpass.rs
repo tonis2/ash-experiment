@@ -1,6 +1,6 @@
-use ash::{version::DeviceV1_0, vk};
+
 use std::ptr;
-use vulkan::{Swapchain, VkInstance};
+use vulkan::{Swapchain, VkInstance, prelude::*};
 
 pub fn create_render_pass(swapchain: &Swapchain, vulkan: &VkInstance) -> vk::RenderPass {
     let color_attachment = vk::AttachmentDescription {

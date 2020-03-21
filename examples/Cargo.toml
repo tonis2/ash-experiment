@@ -1,0 +1,16 @@
+[package]
+name = "examples"
+version = "0.1.0"
+authors = ["tonis"]
+edition = "2018"
+
+[dependencies]
+tobj      = "0.1.10"
+image     = "0.22"
+winit     = "0.20.0"
+cgmath    = "0.17.0"
+vulkan = { path = "../" }
+
+[dependencies.gltf]
+version = "0.15"
+features = ["names"]

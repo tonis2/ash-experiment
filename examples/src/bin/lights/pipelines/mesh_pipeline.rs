@@ -3,9 +3,9 @@ use vulkan::{
     offset_of,
     utilities::{tools::load_shader, Buffer, Image},
     Context, VkInstance,
+    prelude::*
 };
 
-use ash::{version::DeviceV1_0, vk};
 use cgmath::{Deg, Matrix4, Point3, Vector3};
 use image::GenericImageView;
 
@@ -178,8 +178,8 @@ impl Pipeline {
         let dynamic_state_info =
             vk::PipelineDynamicStateCreateInfo::builder().dynamic_states(&dynamic_state);
 
-        let vertex_shader = load_shader(&Path::new("examples/lights/shaders/lights.vert.spv"));
-        let frag_shader = load_shader(&Path::new("examples/lights/shaders/lights.frag.spv"));
+        let vertex_shader = load_shader(&Path::new("src/bin/lights/shaders/lights.vert.spv"));
+        let frag_shader = load_shader(&Path::new("src/bin/lights/shaders/lights.frag.spv"));
 
         let vertex_shader_module = unsafe {
             vulkan
@@ -218,7 +218,7 @@ impl Pipeline {
             },
         ];
 
-        let texture = create_texture(&Path::new("examples/assets/texture.jpg"), &vulkan);
+        let texture = create_texture(&Path::new("assets/texture.jpg"), &vulkan);
 
         let depth_image = create_depth_resources(&swapchain, &vulkan);
 

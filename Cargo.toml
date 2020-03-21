@@ -6,20 +6,17 @@ authors = ["tonis"]
 
 [dependencies]
 winit     = "0.20.0"
-ash       = "0.29.0"
 cgmath    = "0.17.0"
+ash       = "0.29.0"
 memoffset = "0.5.1"
 num       = "0.2"
-tobj      = "0.1.10"
-image     = "0.22"
+
 vk-mem    = "0.2.0"
 
 [dependencies.bitflags]
 version = ">= 1.0.4"
 
-[dependencies.gltf]
-version = "0.15"
-features = ["names"]
+
 
 [target.'cfg(target_os = "macos")'.dependencies]
 metal = "0.17.0"

@@ -27,7 +27,7 @@ fn main() {
 
     let mut pipeline = Pipeline::create_pipeline(&swapchain, render_pass, &instance);
 
-    let (vertices, indices) = load_model(Path::new("examples/assets/chalet.obj"));
+    let (vertices, indices) = load_model(Path::new("assets/chalet.obj"));
     let index_buffer = instance.create_gpu_buffer(vk::BufferUsageFlags::INDEX_BUFFER, &indices);
     let vertex_buffer = instance.create_gpu_buffer(vk::BufferUsageFlags::VERTEX_BUFFER, &vertices);
 
@@ -152,6 +152,7 @@ fn main() {
         _ => {}
     });
 }
+
 
 fn load_model(model_path: &Path) -> (Vec<Vertex>, Vec<u32>) {
     let model_obj = tobj::load_obj(model_path).expect("Failed to load model object!");
