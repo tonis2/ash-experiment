@@ -7,7 +7,7 @@ Many thanks to these [vulkan examples](https://github.com/unknownue/vulkan-tutor
 
 
 To run examples download assets running `python3 ./download_assets.py`  
-and then you can choose examle with 
+then you can run in examples folder 
 `cargo run --bin` + example name 
 
 
