@@ -33,7 +33,6 @@ pub struct PushConstantTransForm {
 #[repr(C)]
 #[derive(Clone, Debug, Copy)]
 pub struct UniformBufferObject {
-    pub model: Matrix4<f32>,
     pub view: Matrix4<f32>,
     pub proj: Matrix4<f32>,
 }
@@ -56,7 +55,6 @@ impl PushConstantTransForm {
 impl UniformBufferObject {
     pub fn new(swapchain: &Swapchain) -> UniformBufferObject {
         UniformBufferObject {
-            model: Matrix4::from_angle_z(Deg(90.0)),
             view: Matrix4::look_at(
                 Point3::new(4.0, -17.0, 5.5),
                 Point3::new(0.0, 0.0, 1.0),
@@ -200,8 +198,8 @@ impl Pipeline {
         let dynamic_state_info =
             vk::PipelineDynamicStateCreateInfo::builder().dynamic_states(&dynamic_state);
 
-        let vertex_shader = load_shader(&Path::new("src/bin/lights/shaders/lights.vert.spv"));
-        let frag_shader = load_shader(&Path::new("src/bin/lights/shaders/lights.frag.spv"));
+        let vertex_shader = load_shader(&Path::new("src/bin/lights/shaders/mesh.vert.spv"));
+        let frag_shader = load_shader(&Path::new("src/bin/lights/shaders/mesh.frag.spv"));
 
         let vertex_shader_module = unsafe {
             vulkan
