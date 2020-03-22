@@ -14,10 +14,10 @@ use std::{default::Default, ffi::CString, mem, path::Path, ptr, sync::Arc};
 pub struct Vertex {
     pub pos: [f32; 3],
     pub tex_cord: [f32; 2],
-    pub color: [f32; 3],
     pub normal: [f32; 3],
 }
 
+#[repr(C)]
 #[derive(Clone, Debug, Copy)]
 pub struct Light {
     pub projection: Matrix4<f32>,
@@ -27,8 +27,9 @@ pub struct Light {
 
 #[repr(C)]
 #[derive(Clone, Debug, Copy)]
-pub struct PushConstantTransForm {
+pub struct PushConstantModel {
     pub model: Matrix4<f32>,
+    pub color: [f32; 4],
 }
 
 #[repr(C)]
@@ -38,8 +39,12 @@ pub struct UniformBufferObject {
     pub proj: Matrix4<f32>,
 }
 
-impl PushConstantTransForm {
-    pub fn new(rotation: cgmath::Deg<f32>, transform: cgmath::Vector3<f32>) -> Self {
+impl PushConstantModel {
+    pub fn new(
+        rotation: cgmath::Deg<f32>,
+        transform: cgmath::Vector3<f32>,
+        color: [f32; 3],
+    ) -> Self {
         let model_transform: cgmath::Decomposed<cgmath::Vector3<f32>, cgmath::Basis3<f32>> =
             cgmath::Decomposed {
                 scale: 1.0,
@@ -49,7 +54,19 @@ impl PushConstantTransForm {
 
         Self {
             model: model_transform.into(),
+            color: [color[0], color[1], color[2], 1.0],
         }
+    }
+
+    pub fn update_rotation(&mut self, rotation: cgmath::Deg<f32>) {
+        use cgmath::Zero;
+        let new_rotation: cgmath::Decomposed<cgmath::Vector3<f32>, cgmath::Basis3<f32>> =
+            cgmath::Decomposed {
+                scale: 1.0,
+                rot: cgmath::Rotation3::from_angle_z(rotation),
+                disp: cgmath::Vector3::zero(),
+            };
+        self.model = self.model * cgmath::Matrix4::from(new_rotation);
     }
 }
 
@@ -75,11 +92,13 @@ impl UniformBufferObject {
 }
 
 impl Light {
-    pub fn new(pos: cgmath::Point3<f32>, aspect: usize, color: [f32; 3]) -> Light {
-        use cgmath::EuclideanSpace;
-
-        let view = Matrix4::look_at(pos, cgmath::Point3::origin(), Vector3::unit_z());
-        let projection = cgmath::perspective(Deg(45.0), aspect as f32, 0.1, 100.0);
+    pub fn new(pos: cgmath::Point3<f32>, aspect: f32, color: [f32; 3]) -> Light {
+        let view = Matrix4::look_at(
+            pos,
+            Point3::new(0.0, 0.0, 1.0),
+            Vector3::new(0.0, 0.0, 1.0),
+        );
+        let projection = cgmath::perspective(Deg(15.0), aspect, 0.1, 10.0);
 
         Light {
             projection: examples::OPENGL_TO_VULKAN_MATRIX * projection * view,
@@ -98,6 +117,8 @@ pub struct Pipeline {
     pub sampler: vk::Sampler,
     pub uniform_buffer: Buffer,
     pub uniform_transform: UniformBufferObject,
+
+    pub light_buffer: Buffer,
 
     pub descriptor_layout: vk::DescriptorSetLayout,
     pub descriptor_set: vk::DescriptorSet,
@@ -135,12 +156,6 @@ impl Pipeline {
                 vk::VertexInputAttributeDescription {
                     binding: 0,
                     location: 2,
-                    format: vk::Format::R32G32_SFLOAT,
-                    offset: offset_of!(Vertex, color) as u32,
-                },
-                vk::VertexInputAttributeDescription {
-                    binding: 0,
-                    location: 3,
                     format: vk::Format::R32G32_SFLOAT,
                     offset: offset_of!(Vertex, normal) as u32,
                 },
@@ -206,9 +221,8 @@ impl Pipeline {
             .logic_op(vk::LogicOp::CLEAR)
             .attachments(&color_blend_attachment_states);
 
-        let dynamic_state = [vk::DynamicState::VIEWPORT, vk::DynamicState::SCISSOR];
-        let dynamic_state_info =
-            vk::PipelineDynamicStateCreateInfo::builder().dynamic_states(&dynamic_state);
+        let dynamic_state_info = vk::PipelineDynamicStateCreateInfo::builder()
+            .dynamic_states(&[vk::DynamicState::VIEWPORT, vk::DynamicState::SCISSOR]);
 
         let vertex_shader = load_shader(&Path::new("src/bin/lights/shaders/mesh.vert.spv"));
         let frag_shader = load_shader(&Path::new("src/bin/lights/shaders/mesh.frag.spv"));
@@ -281,9 +295,9 @@ impl Pipeline {
 
         let uniform_data = UniformBufferObject::new(&swapchain);
         let light_data = Light::new(
-            cgmath::Point3::new(1.0, 1.0, 1.0),
-            1000 / 600,
-            [241.0, 196.0, 15.0],
+            cgmath::Point3::new(10.0, -15.0, 5.0),
+            800.0 / 600.0,
+            [1.0, 1.5, 1.0],
         );
 
         let uniform_buffer = Buffer::new_mapped_basic(
@@ -337,7 +351,6 @@ impl Pipeline {
                 &mut vec![
                     vk::WriteDescriptorSet {
                         // transform uniform
-                        s_type: vk::StructureType::WRITE_DESCRIPTOR_SET,
                         dst_binding: 0,
                         dst_array_element: 0,
                         descriptor_count: 1,
@@ -351,8 +364,7 @@ impl Pipeline {
                         ..Default::default()
                     },
                     vk::WriteDescriptorSet {
-                        // transform uniform
-                        s_type: vk::StructureType::WRITE_DESCRIPTOR_SET,
+                        // light uniform
                         dst_binding: 1,
                         dst_array_element: 0,
                         descriptor_count: 1,
@@ -367,7 +379,6 @@ impl Pipeline {
                     },
                     vk::WriteDescriptorSet {
                         // sampler uniform
-                        s_type: vk::StructureType::WRITE_DESCRIPTOR_SET,
                         dst_binding: 2,
                         dst_array_element: 0,
                         descriptor_count: 1,
@@ -387,7 +398,7 @@ impl Pipeline {
 
         let push_constant_range = vk::PushConstantRange::builder()
             .stage_flags(vk::ShaderStageFlags::VERTEX)
-            .size(mem::size_of::<PushConstantTransForm>() as u32)
+            .size(mem::size_of::<PushConstantModel>() as u32)
             .build();
 
         let layout_create_info = vk::PipelineLayoutCreateInfo::builder()
@@ -445,6 +456,7 @@ impl Pipeline {
             sampler,
             context: vulkan.context(),
             uniform_buffer,
+            light_buffer,
             uniform_transform: uniform_data,
 
             descriptor_set,

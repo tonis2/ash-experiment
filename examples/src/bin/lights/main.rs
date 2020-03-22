@@ -6,14 +6,13 @@ use vulkan::{
 use winit::event::{ElementState, Event, KeyboardInput, VirtualKeyCode, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop};
 
-use pipelines::mesh_pipeline::{self, Light, PushConstantTransForm, Vertex};
+use pipelines::mesh_pipeline::{self, Light, PushConstantModel, Vertex};
 use std::sync::Arc;
 
 fn vertex(pos: [i8; 3], tc: [i8; 2], normal: [i8; 3]) -> Vertex {
     Vertex {
         pos: [pos[0] as f32, pos[1] as f32, pos[2] as f32],
         tex_cord: [tc[0] as f32, tc[1] as f32],
-        color: [1.0, 1.0, 1.0],
         normal: [normal[0] as f32, normal[1] as f32, normal[2] as f32],
     }
 }
@@ -104,10 +103,16 @@ fn main() {
     let plane_vertex_buffer =
         instance.create_gpu_buffer(vk::BufferUsageFlags::VERTEX_BUFFER, &plane_vertices);
 
-    let mut cube_transform =
-        PushConstantTransForm::new(cgmath::Deg(90.0), cgmath::Vector3::new(0.0, 0.0, 1.0));
-    let plane_transform =
-        PushConstantTransForm::new(cgmath::Deg(0.0), cgmath::Vector3::new(-0.5, 0.0, 0.0));
+    let mut cube_data = PushConstantModel::new(
+        cgmath::Deg(90.0),
+        cgmath::Vector3::new(0.0, 0.0, 1.0),
+        [1.0, 1.0, 1.0],
+    );
+    let plane_data = PushConstantModel::new(
+        cgmath::Deg(10.0),
+        cgmath::Vector3::new(0.0, 0.0, 0.0),
+        [1.0, 1.0, 0.0],
+    );
 
     event_loop.run(move |event, _, control_flow| match event {
         Event::WindowEvent { event, .. } => match event {
@@ -135,12 +140,7 @@ fn main() {
             let delta_time = tick_counter.delta_time();
 
             // rotate cube
-            cube_transform.model = PushConstantTransForm::new(
-                cgmath::Deg(90.0) * delta_time,
-                cgmath::Vector3::new(0.0, 0.0, 0.0),
-            )
-            .model
-                * cube_transform.model;
+            cube_data.update_rotation(cgmath::Deg(90.0) * delta_time);
 
             let extent = vk::Rect2D {
                 offset: vk::Offset2D { x: 0, y: 0 },
@@ -216,7 +216,7 @@ fn main() {
                         pipeline.layout,
                         vk::ShaderStageFlags::VERTEX,
                         0,
-                        as_byte_slice(&cube_transform),
+                        as_byte_slice(&cube_data),
                     );
                     device.cmd_bind_vertex_buffers(
                         command_buffer,
@@ -238,7 +238,7 @@ fn main() {
                         pipeline.layout,
                         vk::ShaderStageFlags::VERTEX,
                         0,
-                        as_byte_slice(&plane_transform),
+                        as_byte_slice(&plane_data),
                     );
                     device.cmd_bind_vertex_buffers(
                         command_buffer,
