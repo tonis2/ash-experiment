@@ -1,6 +1,12 @@
 #version 450
 
-layout (binding = 1) uniform sampler2D texSampler;
+layout (binding = 1) uniform UniformBufferObject {
+    mat4 projection;
+    vec3 pos;
+    vec3 color;
+} light;
+
+layout (binding = 2) uniform sampler2D texSampler;
 
 layout (location = 0) in vec2 text_cord;
 layout (location = 1) in vec3 normal;

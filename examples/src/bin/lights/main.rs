@@ -6,7 +6,7 @@ use vulkan::{
 use winit::event::{ElementState, Event, KeyboardInput, VirtualKeyCode, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop};
 
-use pipelines::mesh_pipeline::{self, PushConstantTransForm, Vertex};
+use pipelines::mesh_pipeline::{self, Light, PushConstantTransForm, Vertex};
 use std::sync::Arc;
 
 fn vertex(pos: [i8; 3], tc: [i8; 2], normal: [i8; 3]) -> Vertex {
@@ -206,6 +206,7 @@ fn main() {
                         &[pipeline.descriptor_set],
                         &[],
                     );
+
                     device.cmd_set_viewport(command_buffer, 0, &viewports);
                     device.cmd_set_scissor(command_buffer, 0, &[extent]);
 

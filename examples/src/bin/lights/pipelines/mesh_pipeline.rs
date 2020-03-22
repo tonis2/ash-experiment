@@ -18,10 +18,11 @@ pub struct Vertex {
     pub normal: [f32; 3],
 }
 
-struct Light {
-    projection: Matrix4<f32>,
-    pos: Matrix4<f32>,
-    color: [f32; 3],
+#[derive(Clone, Debug, Copy)]
+pub struct Light {
+    pub projection: Matrix4<f32>,
+    pub pos: cgmath::Point3<f32>,
+    pub color: [f32; 3],
 }
 
 #[repr(C)]
@@ -74,7 +75,18 @@ impl UniformBufferObject {
 }
 
 impl Light {
-    pub fn new() {}
+    pub fn new(pos: cgmath::Point3<f32>, aspect: usize, color: [f32; 3]) -> Light {
+        use cgmath::EuclideanSpace;
+
+        let view = Matrix4::look_at(pos, cgmath::Point3::origin(), Vector3::unit_z());
+        let projection = cgmath::perspective(Deg(45.0), aspect as f32, 0.1, 100.0);
+
+        Light {
+            projection: examples::OPENGL_TO_VULKAN_MATRIX * projection * view,
+            pos,
+            color,
+        }
+    }
 }
 
 pub struct Pipeline {
@@ -268,6 +280,11 @@ impl Pipeline {
         //Create uniform buffer
 
         let uniform_data = UniformBufferObject::new(&swapchain);
+        let light_data = Light::new(
+            cgmath::Point3::new(1.0, 1.0, 1.0),
+            1000 / 600,
+            [241.0, 196.0, 15.0],
+        );
 
         let uniform_buffer = Buffer::new_mapped_basic(
             std::mem::size_of_val(&uniform_data) as u64,
@@ -276,7 +293,15 @@ impl Pipeline {
             vulkan.context(),
         );
 
+        let light_buffer = Buffer::new_mapped_basic(
+            std::mem::size_of_val(&light_data) as u64,
+            vk::BufferUsageFlags::UNIFORM_BUFFER,
+            vk_mem::MemoryUsage::CpuOnly,
+            vulkan.context(),
+        );
+
         uniform_buffer.upload_to_buffer(&[uniform_data], 0);
+        light_buffer.upload_to_buffer(&[light_data], 0);
 
         let descriptor_binding = vec![
             vk::DescriptorSetLayoutBinding {
@@ -288,8 +313,16 @@ impl Pipeline {
                 p_immutable_samplers: ptr::null(),
             },
             vk::DescriptorSetLayoutBinding {
-                // sampler uniform
+                // transform uniform
                 binding: 1,
+                descriptor_type: vk::DescriptorType::UNIFORM_BUFFER,
+                descriptor_count: 1,
+                stage_flags: vk::ShaderStageFlags::FRAGMENT,
+                p_immutable_samplers: ptr::null(),
+            },
+            vk::DescriptorSetLayoutBinding {
+                // sampler uniform
+                binding: 2,
                 descriptor_type: vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
                 descriptor_count: 1,
                 stage_flags: vk::ShaderStageFlags::FRAGMENT,
@@ -312,8 +345,22 @@ impl Pipeline {
                         p_buffer_info: [vk::DescriptorBufferInfo {
                             buffer: uniform_buffer.buffer,
                             offset: 0,
-                            range: uniform_buffer.size() as u64
-                                - std::mem::size_of::<UniformBufferObject>() as u64,
+                            range: std::mem::size_of_val(&uniform_data) as u64,
+                        }]
+                        .as_ptr(),
+                        ..Default::default()
+                    },
+                    vk::WriteDescriptorSet {
+                        // transform uniform
+                        s_type: vk::StructureType::WRITE_DESCRIPTOR_SET,
+                        dst_binding: 1,
+                        dst_array_element: 0,
+                        descriptor_count: 1,
+                        descriptor_type: vk::DescriptorType::UNIFORM_BUFFER,
+                        p_buffer_info: [vk::DescriptorBufferInfo {
+                            buffer: light_buffer.buffer,
+                            offset: 0,
+                            range: std::mem::size_of_val(&light_data) as u64,
                         }]
                         .as_ptr(),
                         ..Default::default()
@@ -321,7 +368,7 @@ impl Pipeline {
                     vk::WriteDescriptorSet {
                         // sampler uniform
                         s_type: vk::StructureType::WRITE_DESCRIPTOR_SET,
-                        dst_binding: 1,
+                        dst_binding: 2,
                         dst_array_element: 0,
                         descriptor_count: 1,
                         descriptor_type: vk::DescriptorType::COMBINED_IMAGE_SAMPLER,

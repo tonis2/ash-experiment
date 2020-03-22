@@ -79,6 +79,7 @@ impl Buffer {
     }
 
     pub fn size(&self) -> u64 {
+        println!("{}", self.allocation_info.get_size() as u64);
         self.allocation_info.get_size() as u64
     }
 

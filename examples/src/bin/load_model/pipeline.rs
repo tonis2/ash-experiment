@@ -1,11 +1,10 @@
 use vulkan::{
     modules::swapchain::Swapchain,
     offset_of,
+    prelude::*,
     utilities::{tools::load_shader, Buffer, Image},
     Context, VkInstance,
-    prelude::*
 };
-
 
 use cgmath::{Deg, Matrix4, Point3, Vector3};
 use image::GenericImageView;
@@ -51,32 +50,32 @@ impl Pipeline {
         vulkan: &VkInstance,
     ) -> Pipeline {
         let vertex_input_state_info = vk::PipelineVertexInputStateCreateInfo::builder()
-        .vertex_binding_descriptions(&[vk::VertexInputBindingDescription {
-            binding: 0,
-            stride: mem::size_of::<Vertex>() as u32,
-            input_rate: vk::VertexInputRate::VERTEX,
-        }])
-        .vertex_attribute_descriptions(&[
-            vk::VertexInputAttributeDescription {
+            .vertex_binding_descriptions(&[vk::VertexInputBindingDescription {
                 binding: 0,
-                location: 0,
-                format: vk::Format::R32G32B32_SFLOAT,
-                offset: offset_of!(Vertex, pos) as u32,
-            },
-            vk::VertexInputAttributeDescription {
-                binding: 0,
-                location: 1,
-                format: vk::Format::R32G32B32_SFLOAT,
-                offset: offset_of!(Vertex, color) as u32,
-            },
-            vk::VertexInputAttributeDescription {
-                binding: 0,
-                location: 2,
-                format: vk::Format::R32G32_SFLOAT,
-                offset: offset_of!(Vertex, tex_coord) as u32,
-            },
-        ])
-        .build();
+                stride: mem::size_of::<Vertex>() as u32,
+                input_rate: vk::VertexInputRate::VERTEX,
+            }])
+            .vertex_attribute_descriptions(&[
+                vk::VertexInputAttributeDescription {
+                    binding: 0,
+                    location: 0,
+                    format: vk::Format::R32G32B32_SFLOAT,
+                    offset: offset_of!(Vertex, pos) as u32,
+                },
+                vk::VertexInputAttributeDescription {
+                    binding: 0,
+                    location: 1,
+                    format: vk::Format::R32G32B32_SFLOAT,
+                    offset: offset_of!(Vertex, color) as u32,
+                },
+                vk::VertexInputAttributeDescription {
+                    binding: 0,
+                    location: 2,
+                    format: vk::Format::R32G32_SFLOAT,
+                    offset: offset_of!(Vertex, tex_coord) as u32,
+                },
+            ])
+            .build();
         let vertex_input_assembly_state_info = vk::PipelineInputAssemblyStateCreateInfo {
             topology: vk::PrimitiveTopology::TRIANGLE_LIST,
             ..Default::default()
@@ -183,8 +182,7 @@ impl Pipeline {
 
         //Create texture image
 
-        let (texture, mip_levels) =
-            create_texture(&Path::new("assets/chalet.jpg"), &vulkan);
+        let (texture, mip_levels) = create_texture(&Path::new("assets/chalet.jpg"), &vulkan);
 
         let sampler_create_info = vk::SamplerCreateInfo {
             s_type: vk::StructureType::SAMPLER_CREATE_INFO,
@@ -256,8 +254,7 @@ impl Pipeline {
                         p_buffer_info: [vk::DescriptorBufferInfo {
                             buffer: uniform_buffer.buffer,
                             offset: 0,
-                            range: uniform_buffer.size() as u64
-                                - std::mem::size_of::<UniformBufferObject>() as u64,
+                            range: std::mem::size_of_val(&uniform_data) as u64,
                         }]
                         .as_ptr(),
                         ..Default::default()
@@ -380,7 +377,7 @@ pub fn create_uniform_data(swapchain: &Swapchain) -> UniformBufferObject {
                 0.1,
                 10.0,
             );
-           
+
             examples::OPENGL_TO_VULKAN_MATRIX * proj
         },
     }

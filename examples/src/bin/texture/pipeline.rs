@@ -1,12 +1,11 @@
+use cgmath::{Deg, Matrix4, Point3, Vector3};
 use vulkan::{
     modules::swapchain::Swapchain,
     offset_of,
+    prelude::*,
     utilities::{tools::load_shader, Buffer, Image},
     Context, VkInstance,
-    prelude::*
 };
-use cgmath::{Deg, Matrix4, Point3, Vector3};
-
 
 use std::default::Default;
 use std::ffi::CString;
@@ -250,8 +249,7 @@ impl Pipeline {
                         p_buffer_info: [vk::DescriptorBufferInfo {
                             buffer: uniform_buffer.buffer,
                             offset: 0,
-                            range: uniform_buffer.size() as u64
-                                - std::mem::size_of::<UniformBufferObject>() as u64,
+                            range: std::mem::size_of_val(&uniform_data) as u64,
                         }]
                         .as_ptr(),
                         ..Default::default()
@@ -368,5 +366,3 @@ pub fn create_uniform_data(swapchain: &Swapchain) -> UniformBufferObject {
         },
     }
 }
-
-
