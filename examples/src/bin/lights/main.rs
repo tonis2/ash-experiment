@@ -187,8 +187,12 @@ fn main() {
 
             vulkan.build_command(
                 command_buffers[next_frame.image_index],
-                &render_pass_info,
                 |command_buffer, device| unsafe {
+                    device.cmd_begin_render_pass(
+                        command_buffer,
+                        &render_pass_info,
+                        vk::SubpassContents::INLINE,
+                    );
                     device.cmd_bind_pipeline(
                         command_buffer,
                         vk::PipelineBindPoint::GRAPHICS,
@@ -248,6 +252,7 @@ fn main() {
                         vk::IndexType::UINT32,
                     );
                     device.cmd_draw_indexed(command_buffer, plane_indices.len() as u32, 1, 0, 0, 1);
+                    device.cmd_end_render_pass(command_buffer);
                 },
             );
 

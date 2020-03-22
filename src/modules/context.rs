@@ -79,7 +79,6 @@ impl Context {
     pub fn build_command<F: Fn(vk::CommandBuffer, &ash::Device)>(
         &self,
         command_buffer: vk::CommandBuffer,
-        render_pass_info: &vk::RenderPassBeginInfo,
         apply: F,
     ) {
         //Build frame buffer
@@ -97,15 +96,7 @@ impl Context {
                 .begin_command_buffer(command_buffer, &command_buffer_begin_info)
                 .expect("Failed to begin recording Command Buffer at beginning!");
 
-            self.device.cmd_begin_render_pass(
-                command_buffer,
-                render_pass_info,
-                vk::SubpassContents::INLINE,
-            );
-
             apply(command_buffer, &self.device);
-
-            self.device.cmd_end_render_pass(command_buffer);
 
             self.device
                 .end_command_buffer(command_buffer)
