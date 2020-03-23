@@ -6,7 +6,7 @@ layout (location = 2) in vec3 normal;
 
 layout (location = 0) out vec2 out_tex_cords;
 layout (location = 1) out vec3 out_normal;
-layout (location = 2) out vec4 out_position;
+layout (location = 2) out vec3 out_position;
 layout (location = 3) out vec4 out_color;
 
 layout (binding = 0) uniform UniformBufferObject {
@@ -15,16 +15,19 @@ layout (binding = 0) uniform UniformBufferObject {
 } ubo;
 
 layout(push_constant) uniform Constants {
-    mat4 model;
+    mat4 model_transform;
     vec4 color;
 } constants;
 
 
 void main() {
-    out_normal = mat3(constants.model) * vec3(normal.xyz);
-    out_position = ubo.proj * ubo.view * constants.model * vec4(pos, 1.0);
+    vec4 mesh_world_position = constants.model_transform * vec4(pos, 1.0);
+
     out_color = constants.color;
     out_tex_cords = text_cord;
 
-    gl_Position = out_position;
+    out_position = mesh_world_position.xyz;
+    out_normal = (constants.model_transform * vec4(normal, 0.0)).xyz;
+
+    gl_Position = ubo.proj * ubo.view * mesh_world_position;
 }

@@ -87,7 +87,7 @@ fn main() {
     let swapchain = Swapchain::new(vulkan.clone(), &window);
     let render_pass = mesh_pipeline::create_render_pass(&swapchain, &instance);
 
-    let pipeline = mesh_pipeline::Pipeline::create_pipeline(&swapchain, render_pass, &instance);
+    let mut pipeline = mesh_pipeline::Pipeline::create_pipeline(&swapchain, render_pass, &instance);
 
     let command_buffers = instance.create_command_buffers(swapchain.image_views.len());
 
@@ -104,14 +104,24 @@ fn main() {
         instance.create_gpu_buffer(vk::BufferUsageFlags::VERTEX_BUFFER, &plane_vertices);
 
     let mut cube_data = PushConstantModel::new(
-        cgmath::Deg(90.0),
+        cgmath::Deg(0.0),
         cgmath::Vector3::new(0.0, 0.0, 1.0),
         [1.0, 1.0, 1.0],
     );
+
     let plane_data = PushConstantModel::new(
-        cgmath::Deg(10.0),
+        cgmath::Deg(0.0),
         cgmath::Vector3::new(0.0, 0.0, 0.0),
         [1.0, 1.0, 0.0],
+    );
+
+    //Tweak light settings
+    pipeline.light = Light::new(
+        cgmath::Point3::new(0.0, 15.0, 10.0),
+        800.0 / 600.0,
+        [1.0, 1.5, 1.0],
+        1.0,
+        0.5,
     );
 
     event_loop.run(move |event, _, control_flow| match event {

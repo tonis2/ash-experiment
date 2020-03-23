@@ -23,6 +23,8 @@ pub struct Light {
     pub projection: Matrix4<f32>,
     pub pos: cgmath::Point3<f32>,
     pub color: [f32; 3],
+    pub ambient: f32,
+    pub specular: f32,
 }
 
 #[repr(C)]
@@ -74,7 +76,7 @@ impl UniformBufferObject {
     pub fn new(swapchain: &Swapchain) -> UniformBufferObject {
         UniformBufferObject {
             view: Matrix4::look_at(
-                Point3::new(4.0, -17.0, 5.5),
+                Point3::new(0.0, 15.0, 10.5),
                 Point3::new(0.0, 0.0, 1.0),
                 Vector3::new(0.0, 0.0, 1.0),
             ),
@@ -92,18 +94,22 @@ impl UniformBufferObject {
 }
 
 impl Light {
-    pub fn new(pos: cgmath::Point3<f32>, aspect: f32, color: [f32; 3]) -> Light {
-        let view = Matrix4::look_at(
-            pos,
-            Point3::new(0.0, 0.0, 1.0),
-            Vector3::new(0.0, 0.0, 1.0),
-        );
-        let projection = cgmath::perspective(Deg(15.0), aspect, 0.1, 10.0);
+    pub fn new(
+        pos: cgmath::Point3<f32>,
+        aspect: f32,
+        color: [f32; 3],
+        ambient: f32,
+        specular: f32,
+    ) -> Light {
+        let view = Matrix4::look_at(pos, Point3::new(0.0, 0.0, 1.0), Vector3::new(0.0, 0.0, 1.0));
+        let projection = cgmath::perspective(Deg(45.0), aspect, 0.1, 15.0);
 
         Light {
             projection: examples::OPENGL_TO_VULKAN_MATRIX * projection * view,
             pos,
             color,
+            ambient,
+            specular,
         }
     }
 }
@@ -119,6 +125,7 @@ pub struct Pipeline {
     pub uniform_transform: UniformBufferObject,
 
     pub light_buffer: Buffer,
+    pub light: Light,
 
     pub descriptor_layout: vk::DescriptorSetLayout,
     pub descriptor_set: vk::DescriptorSet,
@@ -294,10 +301,13 @@ impl Pipeline {
         //Create uniform buffer
 
         let uniform_data = UniformBufferObject::new(&swapchain);
+
         let light_data = Light::new(
-            cgmath::Point3::new(10.0, -15.0, 5.0),
+            cgmath::Point3::new(0.0, 15.0, 10.0),
             800.0 / 600.0,
             [1.0, 1.5, 1.0],
+            1.0,
+            0.5,
         );
 
         let uniform_buffer = Buffer::new_mapped_basic(
@@ -457,6 +467,7 @@ impl Pipeline {
             context: vulkan.context(),
             uniform_buffer,
             light_buffer,
+            light: light_data,
             uniform_transform: uniform_data,
 
             descriptor_set,
