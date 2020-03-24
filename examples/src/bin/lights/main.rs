@@ -6,7 +6,7 @@ use vulkan::{
 use winit::event::{ElementState, Event, KeyboardInput, VirtualKeyCode, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop};
 
-use pipelines::mesh_pipeline::{self, Light, PushConstantModel, Vertex};
+use pipelines::mesh_pipeline::{self, PushConstantModel, Vertex};
 use std::sync::Arc;
 
 fn vertex(pos: [i8; 3], tc: [i8; 2], normal: [i8; 3]) -> Vertex {
@@ -19,10 +19,10 @@ fn vertex(pos: [i8; 3], tc: [i8; 2], normal: [i8; 3]) -> Vertex {
 
 fn create_plane(size: i8) -> Vec<Vertex> {
     vec![
-        vertex([-size, -size, 0], [0, 0], [0, 0, 1]),
-        vertex([size, -size, 0], [0, 0], [0, 0, 1]),
-        vertex([size, size, 0], [0, 0], [0, 0, 1]),
-        vertex([-size, size, 0], [0, 0], [0, 0, 1]),
+        vertex([-size, -size, 0], [0, 0], [0, 1, 0]),
+        vertex([size, -size, 0], [0, 0], [0, 1, 0]),
+        vertex([size, size, 0], [0, 0], [0, 1, 0]),
+        vertex([-size, size, 0], [0, 0], [0, 1, 0]),
     ]
 }
 fn main() {
@@ -87,7 +87,7 @@ fn main() {
     let swapchain = Swapchain::new(vulkan.clone(), &window);
     let render_pass = mesh_pipeline::create_render_pass(&swapchain, &instance);
 
-    let mut pipeline = mesh_pipeline::Pipeline::create_pipeline(&swapchain, render_pass, &instance);
+    let pipeline = mesh_pipeline::Pipeline::create_pipeline(&swapchain, render_pass, &instance);
 
     let command_buffers = instance.create_command_buffers(swapchain.image_views.len());
 
@@ -113,15 +113,6 @@ fn main() {
         cgmath::Deg(0.0),
         cgmath::Vector3::new(0.0, 0.0, 0.0),
         [1.0, 1.0, 0.0],
-    );
-
-    //Tweak light settings
-    pipeline.light = Light::new(
-        cgmath::Point3::new(0.0, 15.0, 10.0),
-        800.0 / 600.0,
-        [1.0, 1.5, 1.0],
-        1.0,
-        0.5,
     );
 
     event_loop.run(move |event, _, control_flow| match event {
@@ -195,7 +186,7 @@ fn main() {
                 ])
                 .build();
 
-            vulkan.build_command(
+            instance.build_command(
                 command_buffers[next_frame.image_index],
                 |command_buffer, device| unsafe {
                     device.cmd_begin_render_pass(
@@ -263,6 +254,7 @@ fn main() {
                         vk::IndexType::UINT32,
                     );
                     device.cmd_draw_indexed(command_buffer, plane_indices.len() as u32, 1, 0, 0, 1);
+
                     device.cmd_end_render_pass(command_buffer);
                 },
             );

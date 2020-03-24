@@ -303,10 +303,10 @@ impl Pipeline {
         let uniform_data = UniformBufferObject::new(&swapchain);
 
         let light_data = Light::new(
-            cgmath::Point3::new(0.0, 15.0, 10.0),
-            800.0 / 600.0,
+            cgmath::Point3::new(0.0, 3.0, 3.0),
+            0.5,
             [1.0, 1.5, 1.0],
-            1.0,
+            0.5,
             0.5,
         );
 

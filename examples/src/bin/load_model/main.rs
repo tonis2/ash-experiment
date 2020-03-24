@@ -75,7 +75,7 @@ fn main() {
             .render_area(extent)
             .build();
 
-        vulkan.build_command(
+        instance.build_command(
             command_buffers[image_index],
             |command_buffer, device| unsafe {
                 device.cmd_begin_render_pass(

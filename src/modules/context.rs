@@ -76,33 +76,7 @@ impl Context {
         }
     }
 
-    pub fn build_command<F: Fn(vk::CommandBuffer, &ash::Device)>(
-        &self,
-        command_buffer: vk::CommandBuffer,
-        apply: F,
-    ) {
-        //Build frame buffer
-
-        //build command buffer
-        let command_buffer_begin_info = vk::CommandBufferBeginInfo {
-            s_type: vk::StructureType::COMMAND_BUFFER_BEGIN_INFO,
-            p_next: ptr::null(),
-            p_inheritance_info: ptr::null(),
-            flags: vk::CommandBufferUsageFlags::SIMULTANEOUS_USE,
-        };
-
-        unsafe {
-            self.device
-                .begin_command_buffer(command_buffer, &command_buffer_begin_info)
-                .expect("Failed to begin recording Command Buffer at beginning!");
-
-            apply(command_buffer, &self.device);
-
-            self.device
-                .end_command_buffer(command_buffer)
-                .expect("Failed to record Command Buffer at Ending!");
-        }
-    }
+   
 
     pub fn create_descriptor(
         &self,

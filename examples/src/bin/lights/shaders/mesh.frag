@@ -21,7 +21,7 @@ layout (location = 0) out vec4 outColor;
 
 void main() {
     //Lets find the vector ray between light source and model position
-    vec3 light_ray_vector = normalize(light.pos - model_position.xyz);
+    vec3 light_ray_vector = normalize((vec4(light.pos, 0.0) * light.projection).xyz - model_position.xyz);
 
     //Lets normalize some values
     vec3 _model_pos = normalize(model_position);
@@ -31,9 +31,9 @@ void main() {
     float light_dot_function = dot(_normal, light_ray_vector);
 
     // Lets make sure light dot is > -1 and calculate with light color
-    vec3 light_color = max(light_dot_function, 0.0) * light.color;
+    vec3 light_color = max(light_dot_function, 0.0) * light.color ;
 
-    vec4 result_color = vec4(light.ambient + light_color, 1.0);
+    vec4 result_color = vec4(light.ambient + light_color, 1.0) ;
 
-    outColor = result_color * texture(texSampler, text_cord);
+    outColor = result_color * texture(texSampler, text_cord) * color;
 }
