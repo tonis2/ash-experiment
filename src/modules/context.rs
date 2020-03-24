@@ -76,8 +76,6 @@ impl Context {
         }
     }
 
-   
-
     pub fn create_descriptor(
         &self,
         images_count: u32,
@@ -184,10 +182,10 @@ pub fn create_entry() -> (Entry, Instance) {
 
     let appinfo = vk::ApplicationInfo::builder()
         .application_name(&app_name)
-        .application_version(API_VERSION)
+        .application_version(0)
         .engine_name(&app_name)
-        .engine_version(ENGINE_VERSION)
-        .api_version(APPLICATION_VERSION);
+        .engine_version(0)
+        .api_version(vk::make_version(1, 0, 0));
 
     let create_info = vk::InstanceCreateInfo::builder()
         .application_info(&appinfo)

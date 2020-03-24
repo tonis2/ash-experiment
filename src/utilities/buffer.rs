@@ -19,7 +19,7 @@ impl Buffer {
     ) -> Buffer {
         let (buffer, allocation, allocation_info) = context
             .memory
-            .create_buffer(&buffer_create_info, &allocation_create_info)
+            .create_buffer(buffer_create_info, &allocation_create_info)
             .expect("Failed to create buffer!");
 
         Buffer {

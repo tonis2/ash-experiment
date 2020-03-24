@@ -1,13 +1,9 @@
 use crate::modules::debug::ValidationInfo;
 use crate::utilities::platform::DeviceExtension;
-use ash::vk_make_version;
+
 use std::os::raw::c_char;
 
 pub const APP_NAME: &str = "VULKAN_RENDER";
-pub const APPLICATION_VERSION: u32 = vk_make_version!(1, 0, 0);
-pub const ENGINE_VERSION: u32 = vk_make_version!(1, 0, 0);
-pub const API_VERSION: u32 = vk_make_version!(1, 0, 92);
-
 pub const VALIDATION: ValidationInfo = ValidationInfo {
     is_enable: true,
     required_validation_layers: ["VK_LAYER_KHRONOS_validation"],

@@ -164,7 +164,7 @@ pub fn find_queue_family(
                 surface.surface,
             )
         };
-        if queue_family.queue_count > 0 && is_present_support {
+        if queue_family.queue_count > 0 && is_present_support.unwrap() {
             queue_family_indices.present_family = Some(index);
         }
 

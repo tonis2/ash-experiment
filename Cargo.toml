@@ -6,11 +6,9 @@ authors = ["tonis"]
 
 [dependencies]
 winit     = "0.20.0"
-cgmath    = "0.17.0"
-ash       = "0.29.0"
+ash       = "0.30.0"
 memoffset = "0.5.1"
 num       = "0.2"
-
 vk-mem    = "0.2.0"
 
 [dependencies.bitflags]
