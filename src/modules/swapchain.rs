@@ -16,6 +16,7 @@ pub struct Swapchain {
     pub extent: vk::Extent2D,
     pub context: Arc<Context>,
 }
+
 impl Swapchain {
     pub fn new(context: Arc<Context>, window: &Window) -> Swapchain {
         unsafe {
@@ -124,21 +125,18 @@ impl Swapchain {
         }
     }
 
-    pub fn build_color_buffer(
+    pub fn build_framebuffer(
         &self,
         render_pass: vk::RenderPass,
         attachments: Vec<vk::ImageView>,
     ) -> vk::Framebuffer {
-        let framebuffer_create_info = vk::FramebufferCreateInfo {
-            flags: vk::FramebufferCreateFlags::empty(),
-            render_pass,
-            attachment_count: attachments.len() as u32,
-            p_attachments: attachments.as_ptr(),
-            width: self.extent.width,
-            height: self.extent.height,
-            layers: 1,
-            ..Default::default()
-        };
+        let framebuffer_create_info = vk::FramebufferCreateInfo::builder()
+            .layers(1)
+            .render_pass(render_pass)
+            .attachments(&attachments[..])
+            .width(self.extent.width)
+            .height(self.extent.height)
+            .build();
 
         return unsafe {
             self.context

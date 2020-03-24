@@ -33,6 +33,14 @@ fn main() {
 
     let command_buffers = instance.create_command_buffers(swapchain.image_views.len());
 
+    let framebuffers: Vec<vk::Framebuffer> = swapchain
+        .image_views
+        .iter()
+        .map(|image| {
+            swapchain.build_framebuffer(render_pass, vec![*image, pipeline.depth_image.view()])
+        })
+        .collect();
+
     let mut tick_counter = FPSLimiter::new();
 
     let extent = vk::Rect2D {
@@ -41,7 +49,7 @@ fn main() {
     };
 
     //Let's prebuild command buffers in this example
-    for (image_index, image) in swapchain.image_views.iter().enumerate() {
+    for (image_index, _image) in swapchain.image_views.iter().enumerate() {
         let viewports = [vk::Viewport {
             x: 0.0,
             y: 0.0,
@@ -52,10 +60,7 @@ fn main() {
         }];
 
         let render_pass_info = vk::RenderPassBeginInfo::builder()
-            .framebuffer(
-                swapchain
-                    .build_color_buffer(render_pass, vec![*image, pipeline.depth_image.view()]),
-            )
+            .framebuffer(framebuffers[image_index])
             .render_pass(render_pass)
             .clear_values(&[
                 vk::ClearValue {
@@ -157,7 +162,6 @@ fn main() {
         _ => {}
     });
 }
-
 
 fn load_model(model_path: &Path) -> (Vec<Vertex>, Vec<u32>) {
     let model_obj = tobj::load_obj(model_path).expect("Failed to load model object!");

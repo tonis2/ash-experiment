@@ -48,6 +48,12 @@ fn main() {
     let command_buffers = instance.create_command_buffers(swapchain.image_views.len());
     let mut tick_counter = FPSLimiter::new();
 
+    let framebuffers: Vec<vk::Framebuffer> = swapchain
+        .image_views
+        .iter()
+        .map(|image| swapchain.build_framebuffer(render_pass, vec![*image]))
+        .collect();
+
     event_loop.run(move |event, _, control_flow| match event {
         Event::WindowEvent { event, .. } => match event {
             WindowEvent::CloseRequested => *control_flow = ControlFlow::Exit,
@@ -89,10 +95,7 @@ fn main() {
             let next_frame = queue.next_frame(&swapchain);
 
             let render_pass_info = vk::RenderPassBeginInfo::builder()
-                .framebuffer(swapchain.build_color_buffer(
-                    render_pass,
-                    vec![swapchain.get_image(next_frame.image_index)],
-                ))
+                .framebuffer(framebuffers[next_frame.image_index])
                 .render_pass(render_pass)
                 .clear_values(&[vk::ClearValue {
                     color: vk::ClearColorValue {
@@ -110,7 +113,7 @@ fn main() {
                         &render_pass_info,
                         vk::SubpassContents::INLINE,
                     );
-        
+
                     device.cmd_bind_pipeline(
                         command_buffer,
                         vk::PipelineBindPoint::GRAPHICS,
@@ -131,7 +134,6 @@ fn main() {
                         vk::IndexType::UINT32,
                     );
                     device.cmd_draw_indexed(command_buffer, indices.len() as u32, 1, 0, 0, 1);
-
 
                     device.cmd_end_render_pass(command_buffer);
                 },

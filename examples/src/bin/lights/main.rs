@@ -91,6 +91,14 @@ fn main() {
 
     let command_buffers = instance.create_command_buffers(swapchain.image_views.len());
 
+    let framebuffers: Vec<vk::Framebuffer> = swapchain
+    .image_views
+    .iter()
+    .map(|image| {
+        swapchain.build_framebuffer(render_pass, vec![*image, pipeline.depth_image.view()])
+    })
+    .collect();
+
     let mut tick_counter = FPSLimiter::new();
 
     let cube_index_buffer =
@@ -158,15 +166,9 @@ fn main() {
             }];
 
             let next_frame = queue.next_frame(&swapchain);
-
+            
             let render_pass_info = vk::RenderPassBeginInfo::builder()
-                .framebuffer(swapchain.build_color_buffer(
-                    render_pass,
-                    vec![
-                        swapchain.get_image(next_frame.image_index),
-                        pipeline.depth_image.view(),
-                    ],
-                ))
+                .framebuffer(framebuffers[next_frame.image_index])
                 .render_pass(render_pass)
                 .render_area(extent)
                 .clear_values(&[
@@ -185,7 +187,7 @@ fn main() {
                     },
                 ])
                 .build();
-
+               
             instance.build_command(
                 command_buffers[next_frame.image_index],
                 |command_buffer, device| unsafe {

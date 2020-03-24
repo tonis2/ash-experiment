@@ -56,6 +56,12 @@ fn main() {
     let vertex_buffer = instance.create_gpu_buffer(vk::BufferUsageFlags::VERTEX_BUFFER, &vertices);
 
     let command_buffers = instance.create_command_buffers(swapchain.image_views.len());
+    let framebuffers: Vec<vk::Framebuffer> = swapchain
+        .image_views
+        .iter()
+        .map(|image| swapchain.build_framebuffer(render_pass, vec![*image]))
+        .collect();
+
     let mut tick_counter = FPSLimiter::new();
 
     event_loop.run(move |event, _, control_flow| match event {
@@ -99,10 +105,7 @@ fn main() {
             let next_frame = queue.next_frame(&swapchain);
 
             let render_pass_info = vk::RenderPassBeginInfo::builder()
-                .framebuffer(swapchain.build_color_buffer(
-                    render_pass,
-                    vec![swapchain.get_image(next_frame.image_index)],
-                ))
+                .framebuffer(framebuffers[next_frame.image_index])
                 .render_pass(render_pass)
                 .clear_values(&[vk::ClearValue {
                     // clear value for color buffer
@@ -113,7 +116,7 @@ fn main() {
                 .render_area(extent)
                 .build();
 
-                instance.build_command(
+            instance.build_command(
                 command_buffers[next_frame.image_index],
                 |command_buffer, device| unsafe {
                     device.cmd_begin_render_pass(

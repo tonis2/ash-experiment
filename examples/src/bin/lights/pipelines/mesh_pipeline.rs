@@ -489,13 +489,6 @@ impl Drop for Pipeline {
 
             self.context
                 .device
-                .destroy_image_view(self.texture.view(), None);
-            self.context
-                .device
-                .destroy_image_view(self.depth_image.view(), None);
-
-            self.context
-                .device
                 .destroy_descriptor_set_layout(self.descriptor_layout, None);
             self.context
                 .device
