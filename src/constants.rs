@@ -1,13 +1,6 @@
-use crate::modules::debug::ValidationInfo;
 use crate::utilities::platform::DeviceExtension;
-
 use std::os::raw::c_char;
 
-pub const APP_NAME: &str = "VULKAN_RENDER";
-pub const VALIDATION: ValidationInfo = ValidationInfo {
-    is_enable: true,
-    required_validation_layers: ["VK_LAYER_KHRONOS_validation"],
-};
 pub const DEVICE_EXTENSIONS: DeviceExtension = DeviceExtension {
     names: ["VK_KHR_swapchain"],
 };

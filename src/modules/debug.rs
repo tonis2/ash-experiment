@@ -23,7 +23,6 @@ unsafe extern "system" fn vulkan_debug_callback(
     vk::FALSE
 }
 
-
 pub struct Debugger {
     pub report_loader: DebugReport,
     pub reporter: vk::DebugReportCallbackEXT,
@@ -58,15 +57,6 @@ impl Debugger {
         }
     }
 }
-
-// impl Drop for Debugger {
-//     fn drop(&mut self) {
-//         unsafe {
-//             self.report_loader
-//                 .destroy_debug_report_callback(self.reporter, None);
-//         }
-//     }
-// }
 
 pub unsafe fn create_debugger(entry: &Entry, instance: &Instance) -> vk::DebugReportCallbackEXT {
     let debug_info = vk::DebugReportCallbackCreateInfoEXT::builder()

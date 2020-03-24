@@ -7,6 +7,25 @@ use std::ptr;
 use super::device::query_swapchain_support;
 use winit::window::Window;
 
+pub struct Framebuffer {
+    buffer: vk::Framebuffer,
+    context: Arc<Context>,
+}
+
+impl Framebuffer {
+    pub fn buffer(&self) -> vk::Framebuffer {
+        self.buffer
+    }
+}
+
+impl Drop for Framebuffer {
+    fn drop(&mut self) {
+        unsafe {
+            self.context.device.destroy_framebuffer(self.buffer, None);
+        }
+    }
+}
+
 pub struct Swapchain {
     pub swapchain_loader: ash::extensions::khr::Swapchain,
     pub swapchain: vk::SwapchainKHR,
@@ -129,7 +148,7 @@ impl Swapchain {
         &self,
         render_pass: vk::RenderPass,
         attachments: Vec<vk::ImageView>,
-    ) -> vk::Framebuffer {
+    ) -> Framebuffer {
         let framebuffer_create_info = vk::FramebufferCreateInfo::builder()
             .layers(1)
             .render_pass(render_pass)
@@ -138,12 +157,17 @@ impl Swapchain {
             .height(self.extent.height)
             .build();
 
-        return unsafe {
+        let buffer = unsafe {
             self.context
                 .device
                 .create_framebuffer(&framebuffer_create_info, None)
                 .expect("Failed to create Framebuffer!")
         };
+
+        Framebuffer {
+            buffer,
+            context: self.context.clone(),
+        }
     }
 
     pub fn get_image(&self, image_index: usize) -> vk::ImageView {

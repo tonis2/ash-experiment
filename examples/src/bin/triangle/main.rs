@@ -1,7 +1,6 @@
 mod pipeline;
-mod renderpass;
 
-use vulkan::{prelude::*, Context, FPSLimiter, Queue, Swapchain, VkInstance};
+use vulkan::{prelude::*, Context, FPSLimiter, Framebuffer, Queue, Swapchain, VkInstance};
 use winit::event::{ElementState, Event, KeyboardInput, VirtualKeyCode, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop};
 
@@ -32,15 +31,14 @@ fn main() {
         .build(&event_loop)
         .expect("Failed to create window.");
 
-    let vulkan = Arc::new(Context::new(&window));
+    let vulkan = Arc::new(Context::new(&window, "vulkan test", true));
     let mut queue = Queue::new(vulkan.clone());
 
     let instance = VkInstance::new(vulkan.clone());
 
     let swapchain = Swapchain::new(vulkan.clone(), &window);
-    let render_pass = renderpass::create_render_pass(&swapchain, &vulkan.device);
 
-    let (pipeline, _layout) = pipeline::create_pipeline(&swapchain, render_pass, vulkan.clone());
+    let pipeline = pipeline::Pipeline::new(&swapchain, vulkan.clone());
 
     let index_buffer = instance.create_gpu_buffer(vk::BufferUsageFlags::INDEX_BUFFER, &indices);
     let vertex_buffer = instance.create_gpu_buffer(vk::BufferUsageFlags::VERTEX_BUFFER, &vertices);
@@ -48,10 +46,10 @@ fn main() {
     let command_buffers = instance.create_command_buffers(swapchain.image_views.len());
     let mut tick_counter = FPSLimiter::new();
 
-    let framebuffers: Vec<vk::Framebuffer> = swapchain
+    let framebuffers: Vec<Framebuffer> = swapchain
         .image_views
         .iter()
-        .map(|image| swapchain.build_framebuffer(render_pass, vec![*image]))
+        .map(|image| swapchain.build_framebuffer(pipeline.renderpass, vec![*image]))
         .collect();
 
     event_loop.run(move |event, _, control_flow| match event {
@@ -95,8 +93,8 @@ fn main() {
             let next_frame = queue.next_frame(&swapchain);
 
             let render_pass_info = vk::RenderPassBeginInfo::builder()
-                .framebuffer(framebuffers[next_frame.image_index])
-                .render_pass(render_pass)
+                .framebuffer(framebuffers[next_frame.image_index].buffer())
+                .render_pass(pipeline.renderpass)
                 .clear_values(&[vk::ClearValue {
                     color: vk::ClearColorValue {
                         float32: [0.0, 0.0, 0.0, 1.0],
@@ -117,7 +115,7 @@ fn main() {
                     device.cmd_bind_pipeline(
                         command_buffer,
                         vk::PipelineBindPoint::GRAPHICS,
-                        pipeline,
+                        pipeline.pipeline,
                     );
                     device.cmd_set_viewport(command_buffer, 0, &viewports);
                     device.cmd_set_scissor(command_buffer, 0, &[extent]);

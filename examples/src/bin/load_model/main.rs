@@ -1,7 +1,9 @@
 mod pipeline;
 mod renderpass;
 
-use vulkan::{prelude::*, utilities::FPSLimiter, Context, Queue, Swapchain, VkInstance};
+use vulkan::{
+    prelude::*, utilities::FPSLimiter, Context, Framebuffer, Queue, Swapchain, VkInstance,
+};
 use winit::event::{ElementState, Event, KeyboardInput, VirtualKeyCode, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop};
 
@@ -17,7 +19,7 @@ fn main() {
         .build(&event_loop)
         .expect("Failed to create window.");
 
-    let vulkan = Arc::new(Context::new(&window));
+    let vulkan = Arc::new(Context::new(&window, "load_model", true));
     let mut queue = Queue::new(vulkan.clone());
 
     let instance = VkInstance::new(vulkan.clone());
@@ -33,7 +35,7 @@ fn main() {
 
     let command_buffers = instance.create_command_buffers(swapchain.image_views.len());
 
-    let framebuffers: Vec<vk::Framebuffer> = swapchain
+    let framebuffers: Vec<Framebuffer> = swapchain
         .image_views
         .iter()
         .map(|image| {
@@ -60,7 +62,7 @@ fn main() {
         }];
 
         let render_pass_info = vk::RenderPassBeginInfo::builder()
-            .framebuffer(framebuffers[image_index])
+            .framebuffer(framebuffers[image_index].buffer())
             .render_pass(render_pass)
             .clear_values(&[
                 vk::ClearValue {

@@ -1,7 +1,8 @@
 mod pipelines;
 
 use vulkan::{
-    as_byte_slice, prelude::*, utilities::FPSLimiter, Context, Queue, Swapchain, VkInstance,
+    as_byte_slice, prelude::*, utilities::FPSLimiter, Context, Framebuffer, Queue, Swapchain,
+    VkInstance,
 };
 use winit::event::{ElementState, Event, KeyboardInput, VirtualKeyCode, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop};
@@ -79,7 +80,7 @@ fn main() {
         .build(&event_loop)
         .expect("Failed to create window.");
 
-    let vulkan = Arc::new(Context::new(&window));
+    let vulkan = Arc::new(Context::new(&window, "lights", true));
     let mut queue = Queue::new(vulkan.clone());
 
     let instance = VkInstance::new(vulkan.clone());
@@ -91,13 +92,13 @@ fn main() {
 
     let command_buffers = instance.create_command_buffers(swapchain.image_views.len());
 
-    let framebuffers: Vec<vk::Framebuffer> = swapchain
-    .image_views
-    .iter()
-    .map(|image| {
-        swapchain.build_framebuffer(render_pass, vec![*image, pipeline.depth_image.view()])
-    })
-    .collect();
+    let framebuffers: Vec<Framebuffer> = swapchain
+        .image_views
+        .iter()
+        .map(|image| {
+            swapchain.build_framebuffer(render_pass, vec![*image, pipeline.depth_image.view()])
+        })
+        .collect();
 
     let mut tick_counter = FPSLimiter::new();
 
@@ -166,9 +167,9 @@ fn main() {
             }];
 
             let next_frame = queue.next_frame(&swapchain);
-            
+
             let render_pass_info = vk::RenderPassBeginInfo::builder()
-                .framebuffer(framebuffers[next_frame.image_index])
+                .framebuffer(framebuffers[next_frame.image_index].buffer())
                 .render_pass(render_pass)
                 .render_area(extent)
                 .clear_values(&[
@@ -187,7 +188,7 @@ fn main() {
                     },
                 ])
                 .build();
-               
+
             instance.build_command(
                 command_buffers[next_frame.image_index],
                 |command_buffer, device| unsafe {

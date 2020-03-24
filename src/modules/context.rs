@@ -3,7 +3,12 @@ use ash::{
     vk, Device, Entry, Instance,
 };
 
-use super::{debug::Debugger, device, queue::QueueFamilyIndices, surface::VkSurface};
+use super::{
+    debug::{Debugger, ValidationInfo},
+    device,
+    queue::QueueFamilyIndices,
+    surface::VkSurface,
+};
 use crate::constants::*;
 use crate::utilities::platform::extension_names;
 use std::ptr;
@@ -13,7 +18,7 @@ use winit::window::Window;
 
 pub struct Context {
     _entry: Entry,
-    _debugger: Debugger,
+    _debugger: Option<Debugger>,
     pub instance: Instance,
     pub surface: VkSurface,
     pub physical_device: vk::PhysicalDevice,
@@ -25,15 +30,20 @@ pub struct Context {
 }
 
 impl Context {
-    pub fn new(window: &Window) -> Self {
-        let (entry, instance) = create_entry();
-        let debugger = Debugger::new(&entry, &instance);
+    pub fn new(window: &Window, app_name: &str, validation_enabled: bool) -> Self {
+        let (entry, instance) = create_entry(app_name);
+
         let surface = VkSurface::new(&window, &instance, &entry);
         let physical_device = device::pick_physical_device(&instance, &surface, &DEVICE_EXTENSIONS);
+        let validation: ValidationInfo = ValidationInfo {
+            is_enable: validation_enabled,
+            required_validation_layers: ["VK_LAYER_KHRONOS_validation"],
+        };
+
         let (device, queue) = device::create_logical_device(
             &instance,
             physical_device,
-            &VALIDATION,
+            &validation,
             &DEVICE_EXTENSIONS,
             &surface,
         );
@@ -44,6 +54,11 @@ impl Context {
             instance: instance.clone(),
             ..Default::default()
         };
+
+        let mut debugger: Option<Debugger> = None;
+        if validation_enabled == true {
+            debugger = Some(Debugger::new(&entry, &instance));
+        }
 
         unsafe {
             Context {
@@ -160,17 +175,24 @@ impl Drop for Context {
             self.surface
                 .surface_loader
                 .destroy_surface(self.surface.surface, None);
+
+            if self._debugger.is_some() {
+                let debugger = self._debugger.as_ref().unwrap();
+                debugger
+                    .report_loader
+                    .destroy_debug_report_callback(debugger.reporter, None);
+            }
+
             self.device.destroy_device(None);
-            self._debugger.destroy();
             self.instance.destroy_instance(None);
         }
     }
 }
 
 //Create vulkan entry
-pub fn create_entry() -> (Entry, Instance) {
+pub fn create_entry(app_name: &str) -> (Entry, Instance) {
     let entry = Entry::new().unwrap();
-    let app_name = CString::new(APP_NAME).unwrap();
+    let app_name = CString::new(app_name).unwrap();
 
     let layer_names = [CString::new("VK_LAYER_LUNARG_standard_validation").unwrap()];
     let layers_names_raw: Vec<*const i8> = layer_names

@@ -490,8 +490,10 @@ impl VkInstance {
 
         self.end_single_time_command(command_buffer);
     }
+}
 
-    pub fn destroy(&self) {
+impl Drop for VkInstance {
+    fn drop(&mut self) {
         unsafe {
             self.context.wait_idle();
             self.context
