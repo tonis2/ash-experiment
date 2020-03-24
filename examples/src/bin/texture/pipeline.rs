@@ -371,9 +371,6 @@ pub fn create_uniform_data(swapchain: &Swapchain) -> UniformBufferObject {
     }
 }
 
-// use std::ptr;
-// use vulkan::{Swapchain, VkInstance, prelude::*};
-
 pub fn create_render_pass(swapchain: &Swapchain, vulkan: &VkInstance) -> vk::RenderPass {
     let color_attachment = vk::AttachmentDescription {
         flags: vk::AttachmentDescriptionFlags::empty(),

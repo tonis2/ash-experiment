@@ -1,5 +1,4 @@
 mod pipeline;
-mod renderpass;
 
 use vulkan::{
     prelude::*, utilities::FPSLimiter, Context, Framebuffer, Queue, Swapchain, VkInstance,
@@ -25,9 +24,8 @@ fn main() {
     let instance = VkInstance::new(vulkan.clone());
 
     let swapchain = Swapchain::new(vulkan.clone(), &window);
-    let render_pass = renderpass::create_render_pass(&swapchain, &instance);
 
-    let mut pipeline = Pipeline::create_pipeline(&swapchain, render_pass, &instance);
+    let mut pipeline = Pipeline::create_pipeline(&swapchain, &instance);
 
     let (vertices, indices) = load_model(Path::new("assets/chalet.obj"));
     let index_buffer = instance.create_gpu_buffer(vk::BufferUsageFlags::INDEX_BUFFER, &indices);
@@ -39,7 +37,10 @@ fn main() {
         .image_views
         .iter()
         .map(|image| {
-            swapchain.build_framebuffer(render_pass, vec![*image, pipeline.depth_image.view()])
+            swapchain.build_framebuffer(
+                pipeline.renderpass,
+                vec![*image, pipeline.depth_image.view()],
+            )
         })
         .collect();
 
@@ -63,7 +64,7 @@ fn main() {
 
         let render_pass_info = vk::RenderPassBeginInfo::builder()
             .framebuffer(framebuffers[image_index].buffer())
-            .render_pass(render_pass)
+            .render_pass(pipeline.renderpass)
             .clear_values(&[
                 vk::ClearValue {
                     // clear value for color buffer

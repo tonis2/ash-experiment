@@ -76,13 +76,6 @@ impl Context {
         }
     }
 
-    pub fn get_physical_device_memory_properties(&self) -> vk::PhysicalDeviceMemoryProperties {
-        unsafe {
-            self.instance
-                .get_physical_device_memory_properties(self.physical_device)
-        }
-    }
-
     pub fn wait_idle(&self) {
         unsafe {
             self.device
