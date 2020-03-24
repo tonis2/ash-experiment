@@ -32,7 +32,7 @@ impl ShadowMap {
 
         let mut shadow_map_image = Image::create_image(
             shadowmap_image_info,
-            vk::MemoryPropertyFlags::DEVICE_LOCAL,
+            vk_mem::MemoryUsage::GpuOnly,
             context.clone(),
         );
 

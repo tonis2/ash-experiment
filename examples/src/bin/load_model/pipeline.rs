@@ -437,10 +437,9 @@ pub fn create_texture(image_path: &Path, vulkan: &VkInstance) -> (Image, u32) {
 
     let mut image = Image::create_image(
         image_create_info,
-        vk::MemoryPropertyFlags::DEVICE_LOCAL,
+        vk_mem::MemoryUsage::GpuOnly,
         vulkan.context(),
     );
-
     vulkan.transition_image_layout(
         image.image,
         vk::Format::R8G8B8A8_UNORM,

@@ -545,7 +545,7 @@ pub fn create_texture(image_path: &Path, vulkan: &VkInstance) -> Image {
 
     let mut image = Image::create_image(
         image_create_info,
-        vk::MemoryPropertyFlags::DEVICE_LOCAL,
+        vk_mem::MemoryUsage::GpuOnly,
         vulkan.context(),
     );
 
