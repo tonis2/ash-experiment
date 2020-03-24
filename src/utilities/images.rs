@@ -1,15 +1,12 @@
 use crate::Context;
+use ash::version::DeviceV1_0;
 use ash::vk;
 use std::sync::Arc;
 
-use std::ptr;
-
-use super::tools::find_memory_type;
-use ash::version::DeviceV1_0;
-
 pub struct Image {
     pub image: vk::Image,
-    pub memory: vk::DeviceMemory,
+    pub allocation: vk_mem::Allocation,
+    pub allication_info: vk_mem::AllocationInfo,
     image_view: Option<vk::ImageView>,
     context: Arc<Context>,
 }
@@ -17,47 +14,22 @@ pub struct Image {
 impl Image {
     pub fn create_image(
         image_info: vk::ImageCreateInfo,
-        required_memory_properties: vk::MemoryPropertyFlags,
+        usage: vk_mem::MemoryUsage,
         context: Arc<Context>,
     ) -> Image {
-        let texture_image = unsafe {
-            context
-                .device
-                .create_image(&image_info, None)
-                .expect("Failed to create Texture Image!")
+        let allocation_create_info = vk_mem::AllocationCreateInfo {
+            usage,
+            ..Default::default()
         };
-
-        let image_memory_requirement =
-            unsafe { context.device.get_image_memory_requirements(texture_image) };
-
-        let memory_allocate_info = vk::MemoryAllocateInfo {
-            s_type: vk::StructureType::MEMORY_ALLOCATE_INFO,
-            p_next: ptr::null(),
-            allocation_size: image_memory_requirement.size,
-            memory_type_index: find_memory_type(
-                image_memory_requirement.memory_type_bits,
-                required_memory_properties,
-                &context.get_physical_device_memory_properties(),
-            ),
-        };
-
-        let texture_image_memory = unsafe {
-            context
-                .device
-                .allocate_memory(&memory_allocate_info, None)
-                .expect("Failed to allocate Texture Image memory!")
-        };
-
-        unsafe {
-            context
-                .device
-                .bind_image_memory(texture_image, texture_image_memory, 0)
-                .expect("Failed to bind Image Memmory!");
-        };
+        let (image, allocation, info) = context
+            .memory
+            .create_image(&image_info, &allocation_create_info)
+            .expect("Failed to create image");
 
         Image {
-            image: texture_image,
-            memory: texture_image_memory,
+            image,
+            allocation,
+            allication_info: info,
             image_view: None,
             context: context.clone(),
         }
@@ -80,8 +52,15 @@ impl Image {
 impl Drop for Image {
     fn drop(&mut self) {
         unsafe {
-            self.context.device.destroy_image(self.image, None);
-            self.context.device.free_memory(self.memory, None);
+            self.context
+                .memory
+                .destroy_image(self.image, &self.allocation)
+                .expect("Failed to destroy image!");
+            if self.image_view.is_some() {
+                self.context
+                    .device
+                    .destroy_image_view(self.image_view.unwrap(), None);
+            }
         }
     }
 }

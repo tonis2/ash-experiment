@@ -51,7 +51,7 @@ pub fn create_texture(image_path: &Path, vulkan: &VkInstance) -> Image {
 
     let mut image = Image::create_image(
         image_create_info,
-        vk::MemoryPropertyFlags::DEVICE_LOCAL,
+        vk_mem::MemoryUsage::GpuOnly,
         vulkan.context(),
     );
 
@@ -144,7 +144,7 @@ pub fn create_depth_resources(swapchain: &Swapchain, vulkan: &VkInstance) -> Ima
 
     let mut image = Image::create_image(
         depth_image_info,
-        vk::MemoryPropertyFlags::DEVICE_LOCAL,
+        vk_mem::MemoryUsage::GpuOnly,
         vulkan.context(),
     );
 
@@ -163,13 +163,13 @@ pub fn create_depth_resources(swapchain: &Swapchain, vulkan: &VkInstance) -> Ima
         ..Default::default()
     });
 
-    vulkan.transition_image_layout(
-        image.image,
-        depth_format,
-        vk::ImageLayout::UNDEFINED,
-        vk::ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
-        1,
-    );
+    // vulkan.transition_image_layout(
+    //     image.image,
+    //     depth_format,
+    //     vk::ImageLayout::UNDEFINED,
+    //     vk::ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+    //     1,
+    // );
 
     image
 }

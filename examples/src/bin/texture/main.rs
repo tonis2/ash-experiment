@@ -1,5 +1,4 @@
 mod pipeline;
-mod renderpass;
 
 use vulkan::{
     prelude::*, utilities::FPSLimiter, Context, Framebuffer, Queue, Swapchain, VkInstance,
@@ -50,9 +49,8 @@ fn main() {
     let mut queue = Queue::new(vulkan.clone());
 
     let swapchain = Swapchain::new(vulkan.clone(), &window);
-    let render_pass = renderpass::create_render_pass(&swapchain, &instance);
 
-    let pipeline = Pipeline::create_pipeline(&swapchain, render_pass, &instance);
+    let pipeline = Pipeline::create_pipeline(&swapchain, &instance);
 
     let index_buffer = instance.create_gpu_buffer(vk::BufferUsageFlags::INDEX_BUFFER, &indices);
     let vertex_buffer = instance.create_gpu_buffer(vk::BufferUsageFlags::VERTEX_BUFFER, &vertices);
@@ -61,7 +59,7 @@ fn main() {
     let framebuffers: Vec<Framebuffer> = swapchain
         .image_views
         .iter()
-        .map(|image| swapchain.build_framebuffer(render_pass, vec![*image]))
+        .map(|image| swapchain.build_framebuffer(pipeline.renderpass, vec![*image]))
         .collect();
 
     let mut tick_counter = FPSLimiter::new();
@@ -108,7 +106,7 @@ fn main() {
 
             let render_pass_info = vk::RenderPassBeginInfo::builder()
                 .framebuffer(framebuffers[next_frame.image_index].buffer())
-                .render_pass(render_pass)
+                .render_pass(pipeline.renderpass)
                 .clear_values(&[vk::ClearValue {
                     // clear value for color buffer
                     color: vk::ClearColorValue {
