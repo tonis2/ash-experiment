@@ -3,8 +3,8 @@ use ash::{version::DeviceV1_0, vk};
 use std::sync::Arc;
 
 use super::swapchain::Swapchain;
-use std::ptr;
 use crate::constants::MAX_FRAMES_IN_FLIGHT;
+use std::ptr;
 
 #[derive(Debug)]
 pub struct Frame {
@@ -92,7 +92,6 @@ impl Queue {
         }
     }
 
- 
     pub fn render_frame(
         &mut self,
         frame: &Frame,

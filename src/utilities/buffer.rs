@@ -1,6 +1,5 @@
 use crate::Context;
 use ash::vk;
-
 use std::sync::Arc;
 
 #[derive(Clone)]
