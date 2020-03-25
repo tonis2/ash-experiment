@@ -61,7 +61,7 @@ fn main() {
 
     use cgmath::Zero;
 
-    let scene_data = PushConstantModel::new(
+    let mut scene_data = PushConstantModel::new(
         cgmath::Decomposed {
             scale: 1.0,
             rot: cgmath::Rotation3::from_angle_x(cgmath::Deg(80.0)),
@@ -70,7 +70,7 @@ fn main() {
         [2.0, 2.5, 1.0],
     );
 
-    let mut ball_data = PushConstantModel::new(
+    let ball_data = PushConstantModel::new(
         cgmath::Decomposed {
             scale: 0.2,
             rot: cgmath::Rotation3::from_angle_z(cgmath::Deg(0.0)),
@@ -115,11 +115,11 @@ fn main() {
             let transform: cgmath::Decomposed<cgmath::Vector3<f32>, cgmath::Basis3<f32>> =
                 cgmath::Decomposed {
                     scale: 1.0,
-                    rot: cgmath::Rotation3::from_angle_z(cgmath::Deg(90.0) * delta_time),
+                    rot: cgmath::Rotation3::from_angle_y(cgmath::Deg(90.0) * delta_time),
                     disp: cgmath::Vector3::zero(),
                 };
 
-            ball_data.update_transform(transform);
+            scene_data.update_transform(transform);
 
             let extent = vk::Rect2D {
                 offset: vk::Offset2D { x: 0, y: 0 },
