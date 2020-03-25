@@ -7,13 +7,12 @@ use vulkan::{
 };
 
 use cgmath::{Deg, Matrix4, Point3, Vector3};
-use image::GenericImageView;
+
 use std::{default::Default, ffi::CString, mem, path::Path, ptr, sync::Arc};
 
 #[derive(Clone, Debug, Copy)]
 pub struct Vertex {
     pub pos: [f32; 3],
-    pub tex_cord: [f32; 2],
     pub normal: [f32; 3],
 }
 
@@ -105,10 +104,7 @@ impl Light {
 pub struct Pipeline {
     pub pipeline: vk::Pipeline,
     pub layout: vk::PipelineLayout,
-
-    pub texture: Image,
     pub depth_image: Image,
-    pub sampler: vk::Sampler,
     pub uniform_buffer: Buffer,
     pub uniform_transform: UniformBufferObject,
 
@@ -146,12 +142,6 @@ impl Pipeline {
                 vk::VertexInputAttributeDescription {
                     binding: 0,
                     location: 1,
-                    format: vk::Format::R32G32_SFLOAT,
-                    offset: offset_of!(Vertex, tex_cord) as u32,
-                },
-                vk::VertexInputAttributeDescription {
-                    binding: 0,
-                    location: 2,
                     format: vk::Format::R32G32_SFLOAT,
                     offset: offset_of!(Vertex, normal) as u32,
                 },
@@ -260,32 +250,7 @@ impl Pipeline {
             },
         ];
 
-        let texture = create_texture(&Path::new("assets/texture.jpg"), &vulkan);
-
         let depth_image = examples::create_depth_resources(&swapchain, &vulkan);
-
-        let sampler_create_info = vk::SamplerCreateInfo {
-            s_type: vk::StructureType::SAMPLER_CREATE_INFO,
-            mag_filter: vk::Filter::LINEAR,
-            min_filter: vk::Filter::LINEAR,
-            mipmap_mode: vk::SamplerMipmapMode::LINEAR,
-            address_mode_u: vk::SamplerAddressMode::REPEAT,
-            address_mode_v: vk::SamplerAddressMode::REPEAT,
-            address_mode_w: vk::SamplerAddressMode::REPEAT,
-            max_lod: 1.0,
-            mip_lod_bias: 0.0,
-            anisotropy_enable: vk::TRUE,
-            max_anisotropy: 16.0,
-            ..Default::default()
-        };
-
-        let sampler = unsafe {
-            vulkan
-                .context
-                .device
-                .create_sampler(&sampler_create_info, None)
-                .expect("Failed to create Sampler!")
-        };
 
         //Create uniform buffer
 
@@ -333,14 +298,6 @@ impl Pipeline {
                 stage_flags: vk::ShaderStageFlags::FRAGMENT,
                 p_immutable_samplers: ptr::null(),
             },
-            vk::DescriptorSetLayoutBinding {
-                // sampler uniform
-                binding: 2,
-                descriptor_type: vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
-                descriptor_count: 1,
-                stage_flags: vk::ShaderStageFlags::FRAGMENT,
-                p_immutable_samplers: ptr::null(),
-            },
         ];
 
         let (descriptor_layout, descriptor_set, descriptor_pool) =
@@ -372,20 +329,6 @@ impl Pipeline {
                             buffer: light_buffer.buffer,
                             offset: 0,
                             range: std::mem::size_of_val(&light_data) as u64,
-                        }]
-                        .as_ptr(),
-                        ..Default::default()
-                    },
-                    vk::WriteDescriptorSet {
-                        // sampler uniform
-                        dst_binding: 2,
-                        dst_array_element: 0,
-                        descriptor_count: 1,
-                        descriptor_type: vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
-                        p_image_info: [vk::DescriptorImageInfo {
-                            sampler: sampler,
-                            image_view: texture.view(),
-                            image_layout: vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
                         }]
                         .as_ptr(),
                         ..Default::default()
@@ -450,9 +393,7 @@ impl Pipeline {
         Pipeline {
             pipeline: pipeline[0],
             layout: pipeline_layout,
-            texture,
             depth_image,
-            sampler,
             context: vulkan.context(),
             uniform_buffer,
             light_buffer,
@@ -474,7 +415,6 @@ impl Drop for Pipeline {
             self.context
                 .device
                 .destroy_pipeline_layout(self.layout, None);
-            self.context.device.destroy_sampler(self.sampler, None);
 
             self.context
                 .device
@@ -488,116 +428,6 @@ impl Drop for Pipeline {
                 .destroy_render_pass(self.renderpass, None);
         }
     }
-}
-
-pub fn create_texture(image_path: &Path, vulkan: &VkInstance) -> Image {
-    let mut image_object = image::open(image_path).unwrap(); // this function is slow in debug mode.
-    image_object = image_object.flipv();
-    let (image_width, image_height) = (image_object.width(), image_object.height());
-    let image_size =
-        (std::mem::size_of::<u8>() as u32 * image_width * image_height * 4) as vk::DeviceSize;
-    let image_data = match &image_object {
-        image::DynamicImage::ImageLuma8(_)
-        | image::DynamicImage::ImageBgr8(_)
-        | image::DynamicImage::ImageRgb8(_) => image_object.to_rgba().into_raw(),
-        image::DynamicImage::ImageLumaA8(_)
-        | image::DynamicImage::ImageBgra8(_)
-        | image::DynamicImage::ImageRgba8(_) => image_object.raw_pixels(),
-    };
-
-    if image_size <= 0 {
-        panic!("Failed to load texture image!")
-    }
-
-    let buffer = Buffer::new_mapped_basic(
-        image_size,
-        vk::BufferUsageFlags::TRANSFER_SRC,
-        vk_mem::MemoryUsage::CpuOnly,
-        vulkan.context(),
-    );
-
-    buffer.upload_to_buffer::<u8>(&image_data, 0);
-
-    let image_create_info = vk::ImageCreateInfo {
-        s_type: vk::StructureType::IMAGE_CREATE_INFO,
-        image_type: vk::ImageType::TYPE_2D,
-        format: vk::Format::R8G8B8A8_UNORM,
-        extent: vk::Extent3D {
-            width: image_width,
-            height: image_height,
-            depth: 1,
-        },
-        mip_levels: 1,
-        array_layers: 1,
-        samples: vk::SampleCountFlags::TYPE_1,
-        tiling: vk::ImageTiling::OPTIMAL,
-        usage: vk::ImageUsageFlags::TRANSFER_DST | vk::ImageUsageFlags::SAMPLED,
-        sharing_mode: vk::SharingMode::EXCLUSIVE,
-        ..Default::default()
-    };
-
-    let mut image = Image::create_image(
-        image_create_info,
-        vk_mem::MemoryUsage::GpuOnly,
-        vulkan.context(),
-    );
-
-    vulkan.transition_image_layout(
-        image.image,
-        vk::Format::R8G8B8A8_UNORM,
-        vk::ImageLayout::UNDEFINED,
-        vk::ImageLayout::TRANSFER_DST_OPTIMAL,
-        1,
-    );
-    let buffer_image_regions = vec![vk::BufferImageCopy {
-        image_subresource: vk::ImageSubresourceLayers {
-            aspect_mask: vk::ImageAspectFlags::COLOR,
-            mip_level: 0,
-            base_array_layer: 0,
-            layer_count: 1,
-        },
-        image_extent: vk::Extent3D {
-            width: image_width,
-            height: image_height,
-            depth: 1,
-        },
-        buffer_offset: 0,
-        buffer_image_height: 0,
-        buffer_row_length: 0,
-        image_offset: vk::Offset3D { x: 0, y: 0, z: 0 },
-    }];
-    vulkan.copy_buffer_to_image(buffer.buffer, image.image, buffer_image_regions);
-
-    vulkan.transition_image_layout(
-        image.image,
-        vk::Format::R8G8B8A8_UNORM,
-        vk::ImageLayout::TRANSFER_DST_OPTIMAL,
-        vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
-        1,
-    );
-
-    image.attach_view(vk::ImageViewCreateInfo {
-        s_type: vk::StructureType::IMAGE_VIEW_CREATE_INFO,
-        view_type: vk::ImageViewType::TYPE_2D,
-        format: vk::Format::R8G8B8A8_UNORM,
-        image: image.image,
-        components: vk::ComponentMapping {
-            r: vk::ComponentSwizzle::IDENTITY,
-            g: vk::ComponentSwizzle::IDENTITY,
-            b: vk::ComponentSwizzle::IDENTITY,
-            a: vk::ComponentSwizzle::IDENTITY,
-        },
-        subresource_range: vk::ImageSubresourceRange {
-            aspect_mask: vk::ImageAspectFlags::COLOR,
-            base_mip_level: 0,
-            level_count: 1,
-            base_array_layer: 0,
-            layer_count: 1,
-        },
-        ..Default::default()
-    });
-
-    image
 }
 
 pub fn create_render_pass(swapchain: &Swapchain, vulkan: &VkInstance) -> vk::RenderPass {

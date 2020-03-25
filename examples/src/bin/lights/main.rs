@@ -67,7 +67,7 @@ fn main() {
             rot: cgmath::Rotation3::from_angle_x(cgmath::Deg(80.0)),
             disp: cgmath::Vector3::new(0.0, 0.0, -2.0),
         },
-        [2.0, 2.5, 1.0],
+        [0.3, 0.2, 0.1],
     );
 
     let ball_data = PushConstantModel::new(
@@ -76,14 +76,14 @@ fn main() {
             rot: cgmath::Rotation3::from_angle_z(cgmath::Deg(0.0)),
             disp: cgmath::Vector3::new(0.0, 0.0, -1.5),
         },
-        [10.5, 10.5, 10.0],
+        [1.5, 1.5, 1.0],
     );
 
     pipeline.update_light(Light::new(
         cgmath::Point3::new(0.0, 0.0, -3.0),
         0.8,
-        [1.0, 1.5, 1.0],
-        0.5,
+        [0.2, 0.2, 1.0],
+        0.8,
         0.5,
     ));
 
@@ -277,7 +277,6 @@ fn load_model(model_path: &Path) -> Batch<Vertex> {
                     mesh.normals[i * 3 + 1],
                     mesh.normals[i * 3 + 2],
                 ],
-                tex_cord: [0.0, 0.0],
             };
             mesh_data.vertices.push(vertex);
         }

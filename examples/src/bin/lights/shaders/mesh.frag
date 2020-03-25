@@ -8,13 +8,10 @@ layout (binding = 1) uniform UniformBufferObject {
     float specular;
 } light;
 
-layout (binding = 2) uniform sampler2D texSampler;
 
-layout (location = 0) in vec2 text_cord;
-layout (location = 1) in vec3 normal;
-layout (location = 2) in vec3 model_position;
-
-layout (location = 3) in vec4 color;
+layout (location = 0) in vec3 normal;
+layout (location = 1) in vec3 model_position;
+layout (location = 2) in vec4 color;
 
 layout (location = 0) out vec4 outColor;
 
@@ -35,5 +32,5 @@ void main() {
 
     vec4 result_color = vec4(light.ambient + light_color, 1.0) ;
 
-    outColor = result_color * texture(texSampler, text_cord) * color;
+    outColor = result_color * color;
 }
