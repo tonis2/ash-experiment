@@ -88,7 +88,6 @@ impl Buffer {
 
 impl Drop for Buffer {
     fn drop(&mut self) {
-        println!("drop memory");
         self.context
             .memory
             .destroy_buffer(self.buffer, &self.allocation)

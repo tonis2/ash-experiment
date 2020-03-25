@@ -7,6 +7,5 @@ pub use modules::swapchain::{Swapchain, Framebuffer};
 pub use modules::context::Context;
 pub use modules::queue::Queue;
 pub use utilities::images::Image;
-pub use utilities::fps_meter::FPSLimiter;
-pub use utilities::tools::as_byte_slice;
+
 pub use utilities::buffer::Buffer;

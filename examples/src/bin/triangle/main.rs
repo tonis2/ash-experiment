@@ -1,6 +1,6 @@
 mod pipeline;
 
-use vulkan::{prelude::*, Context, FPSLimiter, Framebuffer, Queue, Swapchain, VkInstance};
+use vulkan::{prelude::*, Context, utilities::FPSLimiter, Framebuffer, Queue, Swapchain, VkInstance};
 use winit::event::{ElementState, Event, KeyboardInput, VirtualKeyCode, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop};
 
@@ -132,7 +132,6 @@ fn main() {
                         vk::IndexType::UINT32,
                     );
                     device.cmd_draw_indexed(command_buffer, indices.len() as u32, 1, 0, 0, 1);
-
                     device.cmd_end_render_pass(command_buffer);
                 },
             );

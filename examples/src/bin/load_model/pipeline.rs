@@ -45,10 +45,7 @@ pub struct Pipeline {
 
 impl Pipeline {
     //Creates a new pipeline
-    pub fn create_pipeline(
-        swapchain: &Swapchain,
-        vulkan: &VkInstance,
-    ) -> Pipeline {
+    pub fn create_pipeline(swapchain: &Swapchain, vulkan: &VkInstance) -> Pipeline {
         let vertex_input_state_info = vk::PipelineVertexInputStateCreateInfo::builder()
             .vertex_binding_descriptions(&[vk::VertexInputBindingDescription {
                 binding: 0,
@@ -359,7 +356,7 @@ impl Drop for Pipeline {
                 .device
                 .destroy_descriptor_pool(self.descriptor_pool, None);
 
-                self.context
+            self.context
                 .device
                 .destroy_render_pass(self.renderpass, None);
         }

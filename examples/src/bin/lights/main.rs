@@ -1,78 +1,20 @@
 mod pipelines;
 
 use vulkan::{
-    as_byte_slice, prelude::*, utilities::FPSLimiter, Context, Framebuffer, Queue, Swapchain,
-    VkInstance,
+    prelude::*,
+    utilities::{as_byte_slice, Batch, FPSLimiter, Mesh},
+    Context, Framebuffer, Queue, Swapchain, VkInstance,
 };
+
+use std::path::Path;
+
 use winit::event::{ElementState, Event, KeyboardInput, VirtualKeyCode, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop};
 
-use pipelines::mesh_pipeline::{self, PushConstantModel, Vertex};
+use pipelines::mesh_pipeline::{self, Light, PushConstantModel, Vertex};
 use std::sync::Arc;
 
-fn vertex(pos: [i8; 3], tc: [i8; 2], normal: [i8; 3]) -> Vertex {
-    Vertex {
-        pos: [pos[0] as f32, pos[1] as f32, pos[2] as f32],
-        tex_cord: [tc[0] as f32, tc[1] as f32],
-        normal: [normal[0] as f32, normal[1] as f32, normal[2] as f32],
-    }
-}
-
-fn create_plane(size: i8) -> Vec<Vertex> {
-    vec![
-        vertex([-size, -size, 0], [0, 0], [0, 1, 0]),
-        vertex([size, -size, 0], [0, 0], [0, 1, 0]),
-        vertex([size, size, 0], [0, 0], [0, 1, 0]),
-        vertex([-size, size, 0], [0, 0], [0, 1, 0]),
-    ]
-}
 fn main() {
-    //Cube data
-    let cube_vertices = vec![
-        //top
-        vertex([-1, -1, 1], [0, 0], [0, 0, 1]),
-        vertex([1, -1, 1], [1, 0], [0, 0, 1]),
-        vertex([1, 1, 1], [1, 1], [0, 0, 1]),
-        vertex([-1, 1, 1], [0, 1], [0, 0, 1]),
-        // bottom (0, 0, -1)
-        vertex([-1, 1, -1], [1, 0], [0, 0, -1]),
-        vertex([1, 1, -1], [0, 0], [0, 0, -1]),
-        vertex([1, -1, -1], [0, 1], [0, 0, -1]),
-        vertex([-1, -1, -1], [1, 1], [0, 0, -1]),
-        // right (1, 0, 0)
-        vertex([1, -1, -1], [0, 0], [1, 0, 0]),
-        vertex([1, 1, -1], [1, 0], [1, 0, 0]),
-        vertex([1, 1, 1], [1, 1], [1, 0, 0]),
-        vertex([1, -1, 1], [0, 1], [1, 0, 0]),
-        // left (-1, 0, 0)
-        vertex([-1, -1, 1], [1, 0], [-1, 0, 0]),
-        vertex([-1, 1, 1], [0, 0], [-1, 0, 0]),
-        vertex([-1, 1, -1], [0, 1], [-1, 0, 0]),
-        vertex([-1, -1, -1], [1, 1], [-1, 0, 0]),
-        // front (0, 1, 0)
-        vertex([1, 1, -1], [1, 0], [0, 1, 0]),
-        vertex([-1, 1, -1], [0, 0], [0, 1, 0]),
-        vertex([-1, 1, 1], [0, 1], [0, 1, 0]),
-        vertex([1, 1, 1], [1, 1], [0, 1, 0]),
-        // back (0, -1, 0)
-        vertex([1, -1, 1], [0, 0], [0, -1, 0]),
-        vertex([-1, -1, 1], [1, 0], [0, -1, 0]),
-        vertex([-1, -1, -1], [1, 1], [0, -1, 0]),
-        vertex([1, -1, -1], [0, 1], [0, -1, 0]),
-    ];
-
-    let cube_indices = vec![
-        0, 1, 2, 2, 3, 0, // top
-        4, 5, 6, 6, 7, 4, // bottom
-        8, 9, 10, 10, 11, 8, // right
-        12, 13, 14, 14, 15, 12, // left
-        16, 17, 18, 18, 19, 16, // front
-        20, 21, 22, 22, 23, 20, // back
-    ];
-
-    let plane_vertices = create_plane(6);
-    let plane_indices = vec![0, 1, 2, 2, 3, 0];
-
     let event_loop = EventLoop::new();
     let window = winit::window::WindowBuilder::new()
         .with_title("test")
@@ -86,9 +28,8 @@ fn main() {
     let instance = VkInstance::new(vulkan.clone());
 
     let swapchain = Swapchain::new(vulkan.clone(), &window);
-    let render_pass = mesh_pipeline::create_render_pass(&swapchain, &instance);
 
-    let pipeline = mesh_pipeline::Pipeline::create_pipeline(&swapchain, render_pass, &instance);
+    let mut pipeline = mesh_pipeline::Pipeline::create_pipeline(&swapchain, &instance);
 
     let command_buffers = instance.create_command_buffers(swapchain.image_views.len());
 
@@ -96,33 +37,55 @@ fn main() {
         .image_views
         .iter()
         .map(|image| {
-            swapchain.build_framebuffer(render_pass, vec![*image, pipeline.depth_image.view()])
+            swapchain.build_framebuffer(
+                pipeline.renderpass,
+                vec![*image, pipeline.depth_image.view()],
+            )
         })
         .collect();
 
+    let scene_batch = load_model(Path::new("assets/lights.obj"));
+    let scene_vert_buffer =
+        instance.create_gpu_buffer(vk::BufferUsageFlags::VERTEX_BUFFER, &scene_batch.vertices);
+    let scene_index_buffer =
+        instance.create_gpu_buffer(vk::BufferUsageFlags::INDEX_BUFFER, &scene_batch.indices);
+
+    let ball_batch = load_model(Path::new("assets/ball.obj"));
+
+    let ball_vert_buffer =
+        instance.create_gpu_buffer(vk::BufferUsageFlags::VERTEX_BUFFER, &ball_batch.vertices);
+    let ball_index_buffer =
+        instance.create_gpu_buffer(vk::BufferUsageFlags::INDEX_BUFFER, &ball_batch.indices);
+
     let mut tick_counter = FPSLimiter::new();
 
-    let cube_index_buffer =
-        instance.create_gpu_buffer(vk::BufferUsageFlags::INDEX_BUFFER, &cube_indices);
-    let cube_vertex_buffer =
-        instance.create_gpu_buffer(vk::BufferUsageFlags::VERTEX_BUFFER, &cube_vertices);
+    use cgmath::Zero;
 
-    let plane_index_buffer =
-        instance.create_gpu_buffer(vk::BufferUsageFlags::INDEX_BUFFER, &plane_indices);
-    let plane_vertex_buffer =
-        instance.create_gpu_buffer(vk::BufferUsageFlags::VERTEX_BUFFER, &plane_vertices);
-
-    let mut cube_data = PushConstantModel::new(
-        cgmath::Deg(0.0),
-        cgmath::Vector3::new(0.0, 0.0, 1.0),
-        [1.0, 1.0, 1.0],
+    let scene_data = PushConstantModel::new(
+        cgmath::Decomposed {
+            scale: 1.0,
+            rot: cgmath::Rotation3::from_angle_x(cgmath::Deg(80.0)),
+            disp: cgmath::Vector3::new(0.0, 0.0, -2.0),
+        },
+        [2.0, 2.5, 1.0],
     );
 
-    let plane_data = PushConstantModel::new(
-        cgmath::Deg(0.0),
-        cgmath::Vector3::new(0.0, 0.0, 0.0),
-        [1.0, 1.0, 0.0],
+    let mut ball_data = PushConstantModel::new(
+        cgmath::Decomposed {
+            scale: 0.2,
+            rot: cgmath::Rotation3::from_angle_z(cgmath::Deg(0.0)),
+            disp: cgmath::Vector3::new(0.0, 0.0, -1.5),
+        },
+        [10.5, 10.5, 10.0],
     );
+
+    pipeline.update_light(Light::new(
+        cgmath::Point3::new(0.0, 0.0, -3.0),
+        0.8,
+        [1.0, 1.5, 1.0],
+        0.5,
+        0.5,
+    ));
 
     event_loop.run(move |event, _, control_flow| match event {
         Event::WindowEvent { event, .. } => match event {
@@ -148,9 +111,15 @@ fn main() {
         }
         Event::RedrawRequested(_window_id) => {
             let delta_time = tick_counter.delta_time();
-
             // rotate cube
-            cube_data.update_rotation(cgmath::Deg(90.0) * delta_time);
+            let transform: cgmath::Decomposed<cgmath::Vector3<f32>, cgmath::Basis3<f32>> =
+                cgmath::Decomposed {
+                    scale: 1.0,
+                    rot: cgmath::Rotation3::from_angle_z(cgmath::Deg(90.0) * delta_time),
+                    disp: cgmath::Vector3::zero(),
+                };
+
+            ball_data.update_transform(transform);
 
             let extent = vk::Rect2D {
                 offset: vk::Offset2D { x: 0, y: 0 },
@@ -170,7 +139,7 @@ fn main() {
 
             let render_pass_info = vk::RenderPassBeginInfo::builder()
                 .framebuffer(framebuffers[next_frame.image_index].buffer())
-                .render_pass(render_pass)
+                .render_pass(pipeline.renderpass)
                 .render_area(extent)
                 .clear_values(&[
                     vk::ClearValue {
@@ -214,49 +183,61 @@ fn main() {
                     device.cmd_set_viewport(command_buffer, 0, &viewports);
                     device.cmd_set_scissor(command_buffer, 0, &[extent]);
 
-                    //Draw cube
                     device.cmd_push_constants(
                         command_buffer,
                         pipeline.layout,
                         vk::ShaderStageFlags::VERTEX,
                         0,
-                        as_byte_slice(&cube_data),
+                        as_byte_slice(&scene_data),
                     );
                     device.cmd_bind_vertex_buffers(
                         command_buffer,
                         0,
-                        &[cube_vertex_buffer.buffer],
+                        &[scene_vert_buffer.buffer],
                         &[0],
                     );
                     device.cmd_bind_index_buffer(
                         command_buffer,
-                        cube_index_buffer.buffer,
+                        scene_index_buffer.buffer,
                         0,
                         vk::IndexType::UINT32,
                     );
-                    device.cmd_draw_indexed(command_buffer, cube_indices.len() as u32, 1, 0, 0, 1);
+                    device.cmd_draw_indexed(
+                        command_buffer,
+                        scene_batch.indices.len() as u32,
+                        1,
+                        0,
+                        0,
+                        1,
+                    );
 
-                    //Draw plane
                     device.cmd_push_constants(
                         command_buffer,
                         pipeline.layout,
                         vk::ShaderStageFlags::VERTEX,
                         0,
-                        as_byte_slice(&plane_data),
+                        as_byte_slice(&ball_data),
                     );
                     device.cmd_bind_vertex_buffers(
                         command_buffer,
                         0,
-                        &[plane_vertex_buffer.buffer],
+                        &[ball_vert_buffer.buffer],
                         &[0],
                     );
                     device.cmd_bind_index_buffer(
                         command_buffer,
-                        plane_index_buffer.buffer,
+                        ball_index_buffer.buffer,
                         0,
                         vk::IndexType::UINT32,
                     );
-                    device.cmd_draw_indexed(command_buffer, plane_indices.len() as u32, 1, 0, 0, 1);
+                    device.cmd_draw_indexed(
+                        command_buffer,
+                        ball_batch.indices.len() as u32,
+                        1,
+                        0,
+                        0,
+                        1,
+                    );
 
                     device.cmd_end_render_pass(command_buffer);
                 },
@@ -272,4 +253,38 @@ fn main() {
         Event::LoopDestroyed => {}
         _ => {}
     });
+}
+
+fn load_model(model_path: &Path) -> Batch<Vertex> {
+    let model_obj = tobj::load_obj(model_path).expect("Failed to load model object!");
+
+    let (models, _) = model_obj;
+    let mut batch = Batch::<Vertex>::new();
+
+    for m in models.iter() {
+        let mesh = &m.mesh;
+        let mut mesh_data = Mesh::default();
+
+        for i in 0..mesh.positions.len() / 3 {
+            let vertex = Vertex {
+                pos: [
+                    mesh.positions[i * 3],
+                    mesh.positions[i * 3 + 1],
+                    mesh.positions[i * 3 + 2],
+                ],
+                normal: [
+                    mesh.normals[i * 3],
+                    mesh.normals[i * 3 + 1],
+                    mesh.normals[i * 3 + 2],
+                ],
+                tex_cord: [0.0, 0.0],
+            };
+            mesh_data.vertices.push(vertex);
+        }
+
+        mesh_data.indices = mesh.indices.clone();
+        batch.add(&mut mesh_data);
+    }
+
+    batch
 }

@@ -2,8 +2,8 @@ use vulkan::{
     modules::swapchain::Swapchain,
     offset_of,
     prelude::*,
-    utilities::{tools::load_shader, Buffer, Image},
-    Context, VkInstance,
+    utilities::{tools::load_shader, Image},
+    Buffer, Context, VkInstance,
 };
 
 use cgmath::{Deg, Matrix4, Point3, Vector3};
@@ -43,32 +43,20 @@ pub struct UniformBufferObject {
 
 impl PushConstantModel {
     pub fn new(
-        rotation: cgmath::Deg<f32>,
-        transform: cgmath::Vector3<f32>,
+        transform: cgmath::Decomposed<cgmath::Vector3<f32>, cgmath::Basis3<f32>>,
         color: [f32; 3],
     ) -> Self {
-        let model_transform: cgmath::Decomposed<cgmath::Vector3<f32>, cgmath::Basis3<f32>> =
-            cgmath::Decomposed {
-                scale: 1.0,
-                rot: cgmath::Rotation3::from_angle_z(rotation),
-                disp: transform,
-            };
-
         Self {
-            model: model_transform.into(),
+            model: transform.into(),
             color: [color[0], color[1], color[2], 1.0],
         }
     }
 
-    pub fn update_rotation(&mut self, rotation: cgmath::Deg<f32>) {
-        use cgmath::Zero;
-        let new_rotation: cgmath::Decomposed<cgmath::Vector3<f32>, cgmath::Basis3<f32>> =
-            cgmath::Decomposed {
-                scale: 1.0,
-                rot: cgmath::Rotation3::from_angle_z(rotation),
-                disp: cgmath::Vector3::zero(),
-            };
-        self.model = self.model * cgmath::Matrix4::from(new_rotation);
+    pub fn update_transform(
+        &mut self,
+        transform: cgmath::Decomposed<cgmath::Vector3<f32>, cgmath::Basis3<f32>>,
+    ) {
+        self.model = self.model * cgmath::Matrix4::from(transform);
     }
 }
 
@@ -76,9 +64,9 @@ impl UniformBufferObject {
     pub fn new(swapchain: &Swapchain) -> UniformBufferObject {
         UniformBufferObject {
             view: Matrix4::look_at(
-                Point3::new(0.0, 15.0, 10.5),
-                Point3::new(0.0, 0.0, 1.0),
-                Vector3::new(0.0, 0.0, 1.0),
+                Point3::new(0.0, -15.0, 8.0),
+                Point3::new(0.0, -5.0, 1.0),
+                Vector3::new(0.0, 3.0, 1.0),
             ),
             proj: {
                 let proj = cgmath::perspective(
@@ -127,6 +115,8 @@ pub struct Pipeline {
     pub light_buffer: Buffer,
     pub light: Light,
 
+    pub renderpass: vk::RenderPass,
+
     pub descriptor_layout: vk::DescriptorSetLayout,
     pub descriptor_set: vk::DescriptorSet,
     pub descriptor_pool: vk::DescriptorPool,
@@ -135,12 +125,11 @@ pub struct Pipeline {
 }
 
 impl Pipeline {
+    pub fn update_light(&mut self, light: Light) {
+        self.light_buffer.upload_to_buffer(&[light], 0);
+    }
     //Creates a new pipeline
-    pub fn create_pipeline(
-        swapchain: &Swapchain,
-        renderpass: vk::RenderPass,
-        vulkan: &VkInstance,
-    ) -> Pipeline {
+    pub fn create_pipeline(swapchain: &Swapchain, vulkan: &VkInstance) -> Pipeline {
         let vertex_input_state_info = vk::PipelineVertexInputStateCreateInfo::builder()
             .vertex_binding_descriptions(&[vk::VertexInputBindingDescription {
                 binding: 0,
@@ -423,7 +412,7 @@ impl Pipeline {
                 .create_pipeline_layout(&layout_create_info, None)
                 .unwrap()
         };
-
+        let renderpass = create_render_pass(&swapchain, &vulkan);
         let graphic_pipeline_info = vk::GraphicsPipelineCreateInfo::builder()
             .stages(shaders)
             .vertex_input_state(&vertex_input_state_info)
@@ -469,7 +458,7 @@ impl Pipeline {
             light_buffer,
             light: light_data,
             uniform_transform: uniform_data,
-
+            renderpass,
             descriptor_set,
             descriptor_layout,
             descriptor_pool,
@@ -493,6 +482,10 @@ impl Drop for Pipeline {
             self.context
                 .device
                 .destroy_descriptor_pool(self.descriptor_pool, None);
+
+            self.context
+                .device
+                .destroy_render_pass(self.renderpass, None);
         }
     }
 }
@@ -606,7 +599,6 @@ pub fn create_texture(image_path: &Path, vulkan: &VkInstance) -> Image {
 
     image
 }
-
 
 pub fn create_render_pass(swapchain: &Swapchain, vulkan: &VkInstance) -> vk::RenderPass {
     let color_attachment = vk::AttachmentDescription {

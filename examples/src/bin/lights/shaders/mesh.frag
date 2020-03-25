@@ -21,7 +21,7 @@ layout (location = 0) out vec4 outColor;
 
 void main() {
     //Lets find the vector ray between light source and model position
-    vec3 light_ray_vector = normalize((vec4(light.pos, 0.0) * light.projection).xyz - model_position.xyz);
+    vec3 light_ray_vector = normalize(light.pos - model_position);
 
     //Lets normalize some values
     vec3 _model_pos = normalize(model_position);

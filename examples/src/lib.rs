@@ -178,14 +178,4 @@ pub const OPENGL_TO_VULKAN_MATRIX: cgmath::Matrix4<f32> = cgmath::Matrix4::new(
     1.0, 0.0, 0.0, 0.0, 0.0, -1.0, 0.0, 0.0, 0.0, 0.0, 0.5, 0.0, 0.0, 0.0, 0.5, 1.0,
 );
 
-pub fn calculate_cross_product(
-    vector_a: cgmath::Vector3<f32>,
-    vector_b: cgmath::Vector3<f32>,
-) -> cgmath::Vector3<f32> {
-    //A (cross) B = ( Ay*Bz - Az*By, Az*Bx - Ax*Bz, Ax*By - Ay*Bx )
-    cgmath::Vector3::new(
-        vector_a.y * vector_b.z - vector_a.z * vector_b.y,
-        vector_a.z * vector_b.x - vector_a.x * vector_b.z,
-        vector_a.x * vector_b.y - vector_a.y * vector_b.x,
-    )
-}
+
