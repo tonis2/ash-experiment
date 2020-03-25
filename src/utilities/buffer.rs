@@ -78,7 +78,6 @@ impl Buffer {
     }
 
     pub fn size(&self) -> u64 {
-        println!("{}", self.allocation_info.get_size() as u64);
         self.allocation_info.get_size() as u64
     }
 
@@ -89,6 +88,7 @@ impl Buffer {
 
 impl Drop for Buffer {
     fn drop(&mut self) {
+        println!("drop memory");
         self.context
             .memory
             .destroy_buffer(self.buffer, &self.allocation)
