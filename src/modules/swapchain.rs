@@ -16,6 +16,24 @@ impl Framebuffer {
     pub fn buffer(&self) -> vk::Framebuffer {
         self.buffer
     }
+
+    pub fn new(
+        info: vk::FramebufferCreateInfo,
+        context: Arc<Context>
+    ) -> Framebuffer {
+
+        let buffer = unsafe {
+            context
+                .device
+                .create_framebuffer(&info, None)
+                .expect("Failed to create Framebuffer!")
+        };
+
+        Framebuffer {
+            buffer,
+            context: context.clone(),
+        }
+    }
 }
 
 impl Drop for Framebuffer {
@@ -144,30 +162,12 @@ impl Swapchain {
         }
     }
 
-    pub fn build_framebuffer(
-        &self,
-        render_pass: vk::RenderPass,
-        attachments: Vec<vk::ImageView>,
-    ) -> Framebuffer {
-        let framebuffer_create_info = vk::FramebufferCreateInfo::builder()
-            .layers(1)
-            .render_pass(render_pass)
-            .attachments(&attachments[..])
-            .width(self.extent.width)
-            .height(self.extent.height)
-            .build();
+    pub fn width(&self) -> u32 {
+        self.extent.width
+    }
 
-        let buffer = unsafe {
-            self.context
-                .device
-                .create_framebuffer(&framebuffer_create_info, None)
-                .expect("Failed to create Framebuffer!")
-        };
-
-        Framebuffer {
-            buffer,
-            context: self.context.clone(),
-        }
+    pub fn height(&self) -> u32 {
+        self.extent.height
     }
 
     pub fn get_image(&self, image_index: usize) -> vk::ImageView {

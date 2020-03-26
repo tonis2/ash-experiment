@@ -35,33 +35,30 @@ impl VkInstance {
     }
 
     pub fn create_command_buffers(&self, amount: usize) -> Vec<vk::CommandBuffer> {
-        let command_buffer_allocate_info = vk::CommandBufferAllocateInfo {
-            s_type: vk::StructureType::COMMAND_BUFFER_ALLOCATE_INFO,
-            p_next: ptr::null(),
-            command_buffer_count: amount as u32,
-            command_pool: self.command_pool,
-            level: vk::CommandBufferLevel::PRIMARY,
-        };
-
         unsafe {
-            let command_buffers = self
-                .context
+            self.context
                 .device
-                .allocate_command_buffers(&command_buffer_allocate_info)
-                .expect("Failed to allocate Command Buffers!");
-            command_buffers
+                .allocate_command_buffers(&vk::CommandBufferAllocateInfo {
+                    s_type: vk::StructureType::COMMAND_BUFFER_ALLOCATE_INFO,
+                    p_next: ptr::null(),
+                    command_buffer_count: amount as u32,
+                    command_pool: self.command_pool,
+                    level: vk::CommandBufferLevel::PRIMARY,
+                })
+                .expect("Failed to allocate Command Buffers!")
         }
     }
 
     pub fn create_command_pool(context: Arc<Context>) -> vk::CommandPool {
         unsafe {
-            let pool_create_info = vk::CommandPoolCreateInfo::builder()
-                .flags(vk::CommandPoolCreateFlags::RESET_COMMAND_BUFFER)
-                .queue_family_index(context.queue_family.graphics_family.unwrap());
-
             context
                 .device
-                .create_command_pool(&pool_create_info, None)
+                .create_command_pool(
+                    &vk::CommandPoolCreateInfo::builder()
+                        .flags(vk::CommandPoolCreateFlags::RESET_COMMAND_BUFFER)
+                        .queue_family_index(context.queue_family.graphics_family.unwrap()),
+                    None,
+                )
                 .unwrap()
         }
     }

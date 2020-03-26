@@ -37,9 +37,15 @@ fn main() {
         .image_views
         .iter()
         .map(|image| {
-            swapchain.build_framebuffer(
-                pipeline.renderpass,
-                vec![*image, pipeline.depth_image.view()],
+            Framebuffer::new(
+                vk::FramebufferCreateInfo::builder()
+                    .layers(1)
+                    .render_pass(pipeline.renderpass)
+                    .attachments(&[*image, pipeline.depth_image.view()])
+                    .width(swapchain.width())
+                    .height(swapchain.height())
+                    .build(),
+                vulkan.clone(),
             )
         })
         .collect();

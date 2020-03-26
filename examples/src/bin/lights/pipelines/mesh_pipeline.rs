@@ -6,6 +6,8 @@ use vulkan::{
     Buffer, Context, VkInstance,
 };
 
+use super::shadowmap_pipeline;
+
 use cgmath::{Deg, Matrix4, Point3, Vector3};
 
 use std::{default::Default, ffi::CString, mem, path::Path, ptr, sync::Arc};
@@ -117,6 +119,8 @@ pub struct Pipeline {
     pub descriptor_set: vk::DescriptorSet,
     pub descriptor_pool: vk::DescriptorPool,
 
+    pub shadow_map: shadowmap_pipeline::Pipeline,
+
     context: Arc<Context>,
 }
 
@@ -125,7 +129,7 @@ impl Pipeline {
         self.light_buffer.upload_to_buffer(&[light], 0);
     }
     //Creates a new pipeline
-    pub fn create_pipeline(swapchain: &Swapchain, vulkan: &VkInstance) -> Pipeline {
+    pub fn new(swapchain: &Swapchain, vulkan: &VkInstance) -> Pipeline {
         let vertex_input_state_info = vk::PipelineVertexInputStateCreateInfo::builder()
             .vertex_binding_descriptions(&[vk::VertexInputBindingDescription {
                 binding: 0,
@@ -281,29 +285,37 @@ impl Pipeline {
         uniform_buffer.upload_to_buffer(&[uniform_data], 0);
         light_buffer.upload_to_buffer(&[light_data], 0);
 
-        let descriptor_binding = vec![
-            vk::DescriptorSetLayoutBinding {
-                // transform uniform
-                binding: 0,
-                descriptor_type: vk::DescriptorType::UNIFORM_BUFFER,
-                descriptor_count: 1,
-                stage_flags: vk::ShaderStageFlags::VERTEX,
-                p_immutable_samplers: ptr::null(),
-            },
-            vk::DescriptorSetLayoutBinding {
-                // transform uniform
-                binding: 1,
-                descriptor_type: vk::DescriptorType::UNIFORM_BUFFER,
-                descriptor_count: 1,
-                stage_flags: vk::ShaderStageFlags::FRAGMENT,
-                p_immutable_samplers: ptr::null(),
-            },
-        ];
+        let shadow_map = shadowmap_pipeline::Pipeline::new(&swapchain, vulkan.context.clone());
 
         let (descriptor_layout, descriptor_set, descriptor_pool) =
             vulkan.context.create_descriptor(
                 swapchain.image_views.len() as u32,
-                descriptor_binding,
+                vec![
+                    vk::DescriptorSetLayoutBinding {
+                        // transform uniform
+                        binding: 0,
+                        descriptor_type: vk::DescriptorType::UNIFORM_BUFFER,
+                        descriptor_count: 1,
+                        stage_flags: vk::ShaderStageFlags::VERTEX,
+                        p_immutable_samplers: ptr::null(),
+                    },
+                    vk::DescriptorSetLayoutBinding {
+                        // transform uniform
+                        binding: 1,
+                        descriptor_type: vk::DescriptorType::UNIFORM_BUFFER,
+                        descriptor_count: 1,
+                        stage_flags: vk::ShaderStageFlags::FRAGMENT,
+                        p_immutable_samplers: ptr::null(),
+                    },
+                    vk::DescriptorSetLayoutBinding {
+                        // Shadow image
+                        binding: 2,
+                        descriptor_type: vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
+                        descriptor_count: 1,
+                        stage_flags: vk::ShaderStageFlags::FRAGMENT,
+                        p_immutable_samplers: ptr::null(),
+                    },
+                ],
                 &mut vec![
                     vk::WriteDescriptorSet {
                         // transform uniform
@@ -333,6 +345,20 @@ impl Pipeline {
                         .as_ptr(),
                         ..Default::default()
                     },
+                    vk::WriteDescriptorSet {
+                        // shadow uniform
+                        dst_binding: 2,
+                        dst_array_element: 0,
+                        descriptor_count: 1,
+                        descriptor_type: vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
+                        p_image_info: [vk::DescriptorImageInfo {
+                            sampler: shadow_map.sampler,
+                            image_view: shadow_map.image.view(),
+                            image_layout: vk::ImageLayout::DEPTH_STENCIL_READ_ONLY_OPTIMAL,
+                        }]
+                        .as_ptr(),
+                        ..Default::default()
+                    },
                 ],
             );
 
@@ -343,16 +369,17 @@ impl Pipeline {
             .size(mem::size_of::<PushConstantModel>() as u32)
             .build();
 
-        let layout_create_info = vk::PipelineLayoutCreateInfo::builder()
-            .set_layouts(layout)
-            .push_constant_ranges(&[push_constant_range])
-            .build();
-
         //Create pipeline stuff
         let pipeline_layout = unsafe {
             vulkan
                 .device()
-                .create_pipeline_layout(&layout_create_info, None)
+                .create_pipeline_layout(
+                    &vk::PipelineLayoutCreateInfo::builder()
+                        .set_layouts(layout)
+                        .push_constant_ranges(&[push_constant_range])
+                        .build(),
+                    None,
+                )
                 .unwrap()
         };
         let renderpass = create_render_pass(&swapchain, &vulkan);
@@ -400,6 +427,7 @@ impl Pipeline {
             light: light_data,
             uniform_transform: uniform_data,
             renderpass,
+            shadow_map,
             descriptor_set,
             descriptor_layout,
             descriptor_pool,

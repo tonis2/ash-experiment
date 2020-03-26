@@ -181,26 +181,27 @@ impl Pipeline {
 
         let (texture, mip_levels) = create_texture(&Path::new("assets/chalet.jpg"), &vulkan);
 
-        let sampler_create_info = vk::SamplerCreateInfo {
-            s_type: vk::StructureType::SAMPLER_CREATE_INFO,
-            mag_filter: vk::Filter::LINEAR,
-            min_filter: vk::Filter::LINEAR,
-            mipmap_mode: vk::SamplerMipmapMode::LINEAR,
-            address_mode_u: vk::SamplerAddressMode::REPEAT,
-            address_mode_v: vk::SamplerAddressMode::REPEAT,
-            address_mode_w: vk::SamplerAddressMode::REPEAT,
-            max_lod: mip_levels as f32,
-            mip_lod_bias: 0.0,
-            anisotropy_enable: vk::TRUE,
-            max_anisotropy: 16.0,
-            ..Default::default()
-        };
-
         let sampler = unsafe {
             vulkan
                 .context
                 .device
-                .create_sampler(&sampler_create_info, None)
+                .create_sampler(
+                    &vk::SamplerCreateInfo {
+                        s_type: vk::StructureType::SAMPLER_CREATE_INFO,
+                        mag_filter: vk::Filter::LINEAR,
+                        min_filter: vk::Filter::LINEAR,
+                        mipmap_mode: vk::SamplerMipmapMode::LINEAR,
+                        address_mode_u: vk::SamplerAddressMode::REPEAT,
+                        address_mode_v: vk::SamplerAddressMode::REPEAT,
+                        address_mode_w: vk::SamplerAddressMode::REPEAT,
+                        max_lod: mip_levels as f32,
+                        mip_lod_bias: 0.0,
+                        anisotropy_enable: vk::TRUE,
+                        max_anisotropy: 16.0,
+                        ..Default::default()
+                    },
+                    None,
+                )
                 .expect("Failed to create Sampler!")
         };
 
@@ -416,31 +417,30 @@ pub fn create_texture(image_path: &Path, vulkan: &VkInstance) -> (Image, u32) {
 
     buffer.upload_to_buffer::<u8>(&image_data, 0);
 
-    let image_create_info = vk::ImageCreateInfo {
-        s_type: vk::StructureType::IMAGE_CREATE_INFO,
-        image_type: vk::ImageType::TYPE_2D,
-        format: vk::Format::R8G8B8A8_UNORM,
-        extent: vk::Extent3D {
-            width: image_width,
-            height: image_height,
-            depth: 1,
-        },
-        mip_levels,
-        array_layers: 1,
-        samples: vk::SampleCountFlags::TYPE_1,
-        tiling: vk::ImageTiling::OPTIMAL,
-        usage: vk::ImageUsageFlags::TRANSFER_SRC
-            | vk::ImageUsageFlags::TRANSFER_DST
-            | vk::ImageUsageFlags::SAMPLED,
-        sharing_mode: vk::SharingMode::EXCLUSIVE,
-        ..Default::default()
-    };
-
     let mut image = Image::create_image(
-        image_create_info,
+        vk::ImageCreateInfo {
+            s_type: vk::StructureType::IMAGE_CREATE_INFO,
+            image_type: vk::ImageType::TYPE_2D,
+            format: vk::Format::R8G8B8A8_UNORM,
+            extent: vk::Extent3D {
+                width: image_width,
+                height: image_height,
+                depth: 1,
+            },
+            mip_levels,
+            array_layers: 1,
+            samples: vk::SampleCountFlags::TYPE_1,
+            tiling: vk::ImageTiling::OPTIMAL,
+            usage: vk::ImageUsageFlags::TRANSFER_SRC
+                | vk::ImageUsageFlags::TRANSFER_DST
+                | vk::ImageUsageFlags::SAMPLED,
+            sharing_mode: vk::SharingMode::EXCLUSIVE,
+            ..Default::default()
+        },
         vk_mem::MemoryUsage::GpuOnly,
         vulkan.context(),
     );
+    
     vulkan.transition_image_layout(
         image.image,
         vk::Format::R8G8B8A8_UNORM,

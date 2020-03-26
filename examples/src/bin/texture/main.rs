@@ -59,7 +59,18 @@ fn main() {
     let framebuffers: Vec<Framebuffer> = swapchain
         .image_views
         .iter()
-        .map(|image| swapchain.build_framebuffer(pipeline.renderpass, vec![*image]))
+        .map(|image| {
+            Framebuffer::new(
+                vk::FramebufferCreateInfo::builder()
+                    .layers(1)
+                    .render_pass(pipeline.renderpass)
+                    .attachments(&[*image])
+                    .width(swapchain.width())
+                    .height(swapchain.height())
+                    .build(),
+                vulkan.clone(),
+            )
+        })
         .collect();
 
     let mut tick_counter = FPSLimiter::new();

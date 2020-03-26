@@ -1,6 +1,8 @@
 mod pipeline;
 
-use vulkan::{prelude::*, Context, utilities::FPSLimiter, Framebuffer, Queue, Swapchain, VkInstance};
+use vulkan::{
+    prelude::*, utilities::FPSLimiter, Context, Framebuffer, Queue, Swapchain, VkInstance,
+};
 use winit::event::{ElementState, Event, KeyboardInput, VirtualKeyCode, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop};
 
@@ -49,7 +51,18 @@ fn main() {
     let framebuffers: Vec<Framebuffer> = swapchain
         .image_views
         .iter()
-        .map(|image| swapchain.build_framebuffer(pipeline.renderpass, vec![*image]))
+        .map(|image| {
+            Framebuffer::new(
+                vk::FramebufferCreateInfo::builder()
+                    .layers(1)
+                    .render_pass(pipeline.renderpass)
+                    .attachments(&[*image])
+                    .width(swapchain.width())
+                    .height(swapchain.height())
+                    .build(),
+                vulkan.clone(),
+            )
+        })
         .collect();
 
     event_loop.run(move |event, _, control_flow| match event {

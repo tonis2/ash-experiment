@@ -52,6 +52,7 @@ impl Image {
 impl Drop for Image {
     fn drop(&mut self) {
         unsafe {
+            self.context.wait_idle();
             self.context
                 .memory
                 .destroy_image(self.image, &self.allocation)
