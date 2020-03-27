@@ -1,8 +1,63 @@
+use crate::Context;
 use ash::util::read_spv;
+use ash::version::DeviceV1_0;
 use ash::vk;
-use std::ffi::CStr;
-use std::os::raw::c_char;
-use std::path::Path;
+use std::{
+    default::Default,
+    ffi::{CStr, CString},
+    os::raw::c_char,
+    path::Path,
+    sync::Arc,
+};
+
+pub struct Shader {
+    pub shader_info: vk::PipelineShaderStageCreateInfo,
+    shader_module: vk::ShaderModule,
+    context: Arc<Context>,
+}
+
+impl Shader {
+    pub fn new(
+        path: &Path,
+        stage: vk::ShaderStageFlags,
+        entry_name: &CString,
+        context: Arc<Context>,
+    ) -> Self {
+        let shader_module = unsafe {
+            context
+                .device
+                .create_shader_module(
+                    &vk::ShaderModuleCreateInfo::builder().code(&load_shader(path)),
+                    None,
+                )
+                .expect("Vertex shader module error")
+        };
+
+        Self {
+            shader_info: vk::PipelineShaderStageCreateInfo {
+                module: shader_module,
+                p_name: entry_name.as_ptr(),
+                stage: stage,
+                ..Default::default()
+            },
+            shader_module,
+            context: context,
+        }
+    }
+    pub fn info(&self) -> vk::PipelineShaderStageCreateInfo {
+        self.shader_info
+    }
+}
+
+impl Drop for Shader {
+    fn drop(&mut self) {
+        unsafe {
+            self.context
+                .device
+                .destroy_shader_module(self.shader_module, None);
+        }
+    }
+}
 
 /// Helper function to convert [c_char; SIZE] to string
 pub fn vk_to_string(raw_string_array: &[c_char]) -> String {

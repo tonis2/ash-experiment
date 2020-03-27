@@ -1,107 +1,12 @@
 use vulkan::{
-    modules::swapchain::Swapchain,
-    offset_of,
-    prelude::*,
-    utilities::{tools::load_shader, Image},
-    Buffer, Context, VkInstance,
+    modules::swapchain::Swapchain, offset_of, prelude::*, utilities::Shader, Buffer, Context,
+    Image, VkInstance,
 };
 
 use super::shadowmap_pipeline;
 
-use cgmath::{Deg, Matrix4, Point3, Vector3};
-
+use super::{Light, PushConstantModel, UniformBufferObject, Vertex};
 use std::{default::Default, ffi::CString, mem, path::Path, ptr, sync::Arc};
-
-#[derive(Clone, Debug, Copy)]
-pub struct Vertex {
-    pub pos: [f32; 3],
-    pub normal: [f32; 3],
-}
-
-#[repr(C)]
-#[derive(Clone, Debug, Copy)]
-pub struct Light {
-    pub projection: Matrix4<f32>,
-    pub pos: cgmath::Point3<f32>,
-    pub color: [f32; 3],
-    pub ambient: f32,
-    pub specular: f32,
-}
-
-#[repr(C)]
-#[derive(Clone, Debug, Copy)]
-pub struct PushConstantModel {
-    pub model: Matrix4<f32>,
-    pub color: [f32; 4],
-}
-
-#[repr(C)]
-#[derive(Clone, Debug, Copy)]
-pub struct UniformBufferObject {
-    pub view: Matrix4<f32>,
-    pub proj: Matrix4<f32>,
-}
-
-impl PushConstantModel {
-    pub fn new(
-        transform: cgmath::Decomposed<cgmath::Vector3<f32>, cgmath::Basis3<f32>>,
-        color: [f32; 3],
-    ) -> Self {
-        Self {
-            model: transform.into(),
-            color: [color[0], color[1], color[2], 1.0],
-        }
-    }
-
-    pub fn update_transform(
-        &mut self,
-        transform: cgmath::Decomposed<cgmath::Vector3<f32>, cgmath::Basis3<f32>>,
-    ) {
-        self.model = self.model * cgmath::Matrix4::from(transform);
-    }
-}
-
-impl UniformBufferObject {
-    pub fn new(swapchain: &Swapchain) -> UniformBufferObject {
-        UniformBufferObject {
-            view: Matrix4::look_at(
-                Point3::new(0.0, -15.0, 8.0),
-                Point3::new(0.0, -5.0, 1.0),
-                Vector3::new(0.0, 3.0, 1.0),
-            ),
-            proj: {
-                let proj = cgmath::perspective(
-                    Deg(45.0),
-                    swapchain.extent.width as f32 / swapchain.extent.height as f32,
-                    0.1,
-                    100.0,
-                );
-                examples::OPENGL_TO_VULKAN_MATRIX * proj
-            },
-        }
-    }
-}
-
-impl Light {
-    pub fn new(
-        pos: cgmath::Point3<f32>,
-        aspect: f32,
-        color: [f32; 3],
-        ambient: f32,
-        specular: f32,
-    ) -> Light {
-        let view = Matrix4::look_at(pos, Point3::new(0.0, 0.0, 1.0), Vector3::new(0.0, 0.0, 1.0));
-        let projection = cgmath::perspective(Deg(45.0), aspect, 0.1, 15.0);
-
-        Light {
-            projection: examples::OPENGL_TO_VULKAN_MATRIX * projection * view,
-            pos,
-            color,
-            ambient,
-            specular,
-        }
-    }
-}
 
 pub struct Pipeline {
     pub pipeline: vk::Pipeline,
@@ -130,134 +35,8 @@ impl Pipeline {
     }
     //Creates a new pipeline
     pub fn new(swapchain: &Swapchain, vulkan: &VkInstance) -> Pipeline {
-        let vertex_input_state_info = vk::PipelineVertexInputStateCreateInfo::builder()
-            .vertex_binding_descriptions(&[vk::VertexInputBindingDescription {
-                binding: 0,
-                stride: mem::size_of::<Vertex>() as u32,
-                input_rate: vk::VertexInputRate::VERTEX,
-            }])
-            .vertex_attribute_descriptions(&[
-                vk::VertexInputAttributeDescription {
-                    binding: 0,
-                    location: 0,
-                    format: vk::Format::R32G32B32_SFLOAT,
-                    offset: offset_of!(Vertex, pos) as u32,
-                },
-                vk::VertexInputAttributeDescription {
-                    binding: 0,
-                    location: 1,
-                    format: vk::Format::R32G32_SFLOAT,
-                    offset: offset_of!(Vertex, normal) as u32,
-                },
-            ])
-            .build();
-        let vertex_input_assembly_state_info = vk::PipelineInputAssemblyStateCreateInfo {
-            topology: vk::PrimitiveTopology::TRIANGLE_LIST,
-            ..Default::default()
-        };
-        let viewports = [vk::Viewport {
-            x: 0.0,
-            y: 0.0,
-            width: swapchain.extent.width as f32,
-            height: swapchain.extent.height as f32,
-            min_depth: 0.0,
-            max_depth: 1.0,
-        }];
-        let scissors = [vk::Rect2D {
-            offset: vk::Offset2D { x: 0, y: 0 },
-            extent: swapchain.extent,
-        }];
-        let viewport_state_info = vk::PipelineViewportStateCreateInfo::builder()
-            .scissors(&scissors)
-            .viewports(&viewports);
-
-        let rasterization_info = vk::PipelineRasterizationStateCreateInfo {
-            front_face: vk::FrontFace::COUNTER_CLOCKWISE,
-            line_width: 1.0,
-            polygon_mode: vk::PolygonMode::FILL,
-            ..Default::default()
-        };
-        let multisample_state_info = vk::PipelineMultisampleStateCreateInfo {
-            rasterization_samples: vk::SampleCountFlags::TYPE_1,
-            ..Default::default()
-        };
-        let noop_stencil_state = vk::StencilOpState {
-            fail_op: vk::StencilOp::KEEP,
-            pass_op: vk::StencilOp::KEEP,
-            depth_fail_op: vk::StencilOp::KEEP,
-            compare_op: vk::CompareOp::ALWAYS,
-            ..Default::default()
-        };
-        let depth_state_info = vk::PipelineDepthStencilStateCreateInfo {
-            depth_test_enable: 1,
-            depth_write_enable: 1,
-            depth_compare_op: vk::CompareOp::LESS_OR_EQUAL,
-            front: noop_stencil_state,
-            back: noop_stencil_state,
-            max_depth_bounds: 1.0,
-            ..Default::default()
-        };
-        let color_blend_attachment_states = [vk::PipelineColorBlendAttachmentState {
-            blend_enable: 0,
-            src_color_blend_factor: vk::BlendFactor::SRC_COLOR,
-            dst_color_blend_factor: vk::BlendFactor::ONE_MINUS_DST_COLOR,
-            color_blend_op: vk::BlendOp::ADD,
-            src_alpha_blend_factor: vk::BlendFactor::ZERO,
-            dst_alpha_blend_factor: vk::BlendFactor::ZERO,
-            alpha_blend_op: vk::BlendOp::ADD,
-            color_write_mask: vk::ColorComponentFlags::all(),
-        }];
-        let color_blend_state = vk::PipelineColorBlendStateCreateInfo::builder()
-            .logic_op(vk::LogicOp::CLEAR)
-            .attachments(&color_blend_attachment_states);
-
-        let dynamic_state_info = vk::PipelineDynamicStateCreateInfo::builder()
-            .dynamic_states(&[vk::DynamicState::VIEWPORT, vk::DynamicState::SCISSOR]);
-
-        let vertex_shader = load_shader(&Path::new("src/bin/lights/shaders/mesh.vert.spv"));
-        let frag_shader = load_shader(&Path::new("src/bin/lights/shaders/mesh.frag.spv"));
-
-        let vertex_shader_module = unsafe {
-            vulkan
-                .device()
-                .create_shader_module(
-                    &vk::ShaderModuleCreateInfo::builder().code(&vertex_shader),
-                    None,
-                )
-                .expect("Vertex shader module error")
-        };
-
-        let fragment_shader_module = unsafe {
-            vulkan
-                .device()
-                .create_shader_module(
-                    &vk::ShaderModuleCreateInfo::builder().code(&frag_shader),
-                    None,
-                )
-                .expect("Fragment shader module error")
-        };
-
-        let shader_entry_name = CString::new("main").unwrap();
-        let shaders = &[
-            vk::PipelineShaderStageCreateInfo {
-                module: vertex_shader_module,
-                p_name: shader_entry_name.as_ptr(),
-                stage: vk::ShaderStageFlags::VERTEX,
-                ..Default::default()
-            },
-            vk::PipelineShaderStageCreateInfo {
-                s_type: vk::StructureType::PIPELINE_SHADER_STAGE_CREATE_INFO,
-                module: fragment_shader_module,
-                p_name: shader_entry_name.as_ptr(),
-                stage: vk::ShaderStageFlags::FRAGMENT,
-                ..Default::default()
-            },
-        ];
-
+        //Create buffer data
         let depth_image = examples::create_depth_resources(&swapchain, &vulkan);
-
-        //Create uniform buffer
-
         let uniform_data = UniformBufferObject::new(&swapchain);
 
         let light_data = Light::new(
@@ -285,8 +64,62 @@ impl Pipeline {
         uniform_buffer.upload_to_buffer(&[uniform_data], 0);
         light_buffer.upload_to_buffer(&[light_data], 0);
 
-        let shadow_map = shadowmap_pipeline::Pipeline::new(&swapchain, vulkan.context.clone());
+        let viewports = [vk::Viewport {
+            x: 0.0,
+            y: 0.0,
+            width: swapchain.extent.width as f32,
+            height: swapchain.extent.height as f32,
+            min_depth: 0.0,
+            max_depth: 1.0,
+        }];
+        let scissors = [vk::Rect2D {
+            offset: vk::Offset2D { x: 0, y: 0 },
+            extent: swapchain.extent,
+        }];
 
+        // Create shadowpipeline layout
+        let (shadow_layout, shadow_set, descriptor_pool) = vulkan.context.create_descriptor(
+            swapchain.image_views.len() as u32,
+            vec![vk::DescriptorSetLayoutBinding {
+                // transform uniform
+                binding: 0,
+                descriptor_type: vk::DescriptorType::UNIFORM_BUFFER,
+                descriptor_count: 1,
+                stage_flags: vk::ShaderStageFlags::VERTEX,
+                p_immutable_samplers: ptr::null(),
+            }],
+            &mut vec![vk::WriteDescriptorSet {
+                // transform uniform
+                dst_binding: 0,
+                dst_array_element: 0,
+                descriptor_count: 1,
+                descriptor_type: vk::DescriptorType::UNIFORM_BUFFER,
+                p_buffer_info: [vk::DescriptorBufferInfo {
+                    buffer: uniform_buffer.buffer,
+                    offset: 0,
+                    range: std::mem::size_of_val(&uniform_data) as u64,
+                }]
+                .as_ptr(),
+                ..Default::default()
+            }],
+        );
+        let shadow_layout = unsafe {
+            vulkan
+                .context
+                .device
+                .create_pipeline_layout(
+                    &vk::PipelineLayoutCreateInfo::builder()
+                        .set_layouts(&[shadow_layout])
+                        .build(),
+                    None,
+                )
+                .unwrap()
+        };
+
+        let shadow_map =
+            shadowmap_pipeline::Pipeline::new(&swapchain, vulkan.context.clone(), shadow_layout);
+
+        //Create mesh pipeline stuff
         let (descriptor_layout, descriptor_set, descriptor_pool) =
             vulkan.context.create_descriptor(
                 swapchain.image_views.len() as u32,
@@ -362,63 +195,137 @@ impl Pipeline {
                 ],
             );
 
-        let layout = &[descriptor_layout];
-
         let push_constant_range = vk::PushConstantRange::builder()
             .stage_flags(vk::ShaderStageFlags::VERTEX)
             .size(mem::size_of::<PushConstantModel>() as u32)
             .build();
 
+        let renderpass = create_render_pass(&swapchain, &vulkan);
         //Create pipeline stuff
         let pipeline_layout = unsafe {
             vulkan
                 .device()
                 .create_pipeline_layout(
                     &vk::PipelineLayoutCreateInfo::builder()
-                        .set_layouts(layout)
+                        .set_layouts(&[descriptor_layout])
                         .push_constant_ranges(&[push_constant_range])
                         .build(),
                     None,
                 )
                 .unwrap()
         };
-        let renderpass = create_render_pass(&swapchain, &vulkan);
-        let graphic_pipeline_info = vk::GraphicsPipelineCreateInfo::builder()
-            .stages(shaders)
-            .vertex_input_state(&vertex_input_state_info)
-            .input_assembly_state(&vertex_input_assembly_state_info)
-            .viewport_state(&viewport_state_info)
-            .rasterization_state(&rasterization_info)
-            .multisample_state(&multisample_state_info)
-            .depth_stencil_state(&depth_state_info)
-            .color_blend_state(&color_blend_state)
-            .dynamic_state(&dynamic_state_info)
-            .layout(pipeline_layout)
-            .render_pass(renderpass);
 
+        let noop_stencil_state = vk::StencilOpState {
+            fail_op: vk::StencilOp::KEEP,
+            pass_op: vk::StencilOp::KEEP,
+            depth_fail_op: vk::StencilOp::KEEP,
+            compare_op: vk::CompareOp::ALWAYS,
+            ..Default::default()
+        };
+        let shader_name = CString::new("main").unwrap();
         let pipeline = unsafe {
             vulkan
                 .device()
                 .create_graphics_pipelines(
                     vk::PipelineCache::null(),
-                    &[graphic_pipeline_info.build()],
+                    &[vk::GraphicsPipelineCreateInfo::builder()
+                        .stages(&[
+                            Shader::new(
+                                &Path::new("src/bin/lights/shaders/mesh.vert.spv"),
+                                vk::ShaderStageFlags::VERTEX,
+                                &shader_name,
+                                vulkan.context(),
+                            )
+                            .info(),
+                            Shader::new(
+                                &Path::new("src/bin/lights/shaders/mesh.frag.spv"),
+                                vk::ShaderStageFlags::FRAGMENT,
+                                &shader_name,
+                                vulkan.context(),
+                            )
+                            .info(),
+                        ])
+                        .vertex_input_state(
+                            &vk::PipelineVertexInputStateCreateInfo::builder()
+                                .vertex_binding_descriptions(&[vk::VertexInputBindingDescription {
+                                    binding: 0,
+                                    stride: mem::size_of::<Vertex>() as u32,
+                                    input_rate: vk::VertexInputRate::VERTEX,
+                                }])
+                                .vertex_attribute_descriptions(&[
+                                    vk::VertexInputAttributeDescription {
+                                        binding: 0,
+                                        location: 0,
+                                        format: vk::Format::R32G32B32_SFLOAT,
+                                        offset: offset_of!(Vertex, pos) as u32,
+                                    },
+                                    vk::VertexInputAttributeDescription {
+                                        binding: 0,
+                                        location: 1,
+                                        format: vk::Format::R32G32_SFLOAT,
+                                        offset: offset_of!(Vertex, normal) as u32,
+                                    },
+                                ])
+                                .build(),
+                        )
+                        .input_assembly_state(&vk::PipelineInputAssemblyStateCreateInfo {
+                            topology: vk::PrimitiveTopology::TRIANGLE_LIST,
+                            ..Default::default()
+                        })
+                        .viewport_state(
+                            &vk::PipelineViewportStateCreateInfo::builder()
+                                .scissors(&scissors)
+                                .viewports(&viewports),
+                        )
+                        .rasterization_state(&vk::PipelineRasterizationStateCreateInfo {
+                            front_face: vk::FrontFace::COUNTER_CLOCKWISE,
+                            line_width: 1.0,
+                            polygon_mode: vk::PolygonMode::FILL,
+                            ..Default::default()
+                        })
+                        .multisample_state(&vk::PipelineMultisampleStateCreateInfo {
+                            rasterization_samples: vk::SampleCountFlags::TYPE_1,
+                            ..Default::default()
+                        })
+                        .depth_stencil_state(&vk::PipelineDepthStencilStateCreateInfo {
+                            depth_test_enable: 1,
+                            depth_write_enable: 1,
+                            depth_compare_op: vk::CompareOp::LESS_OR_EQUAL,
+                            front: noop_stencil_state,
+                            back: noop_stencil_state,
+                            max_depth_bounds: 1.0,
+                            ..Default::default()
+                        })
+                        .color_blend_state(
+                            &vk::PipelineColorBlendStateCreateInfo::builder()
+                                .logic_op(vk::LogicOp::CLEAR)
+                                .attachments(&[vk::PipelineColorBlendAttachmentState {
+                                    blend_enable: 0,
+                                    src_color_blend_factor: vk::BlendFactor::SRC_COLOR,
+                                    dst_color_blend_factor: vk::BlendFactor::ONE_MINUS_DST_COLOR,
+                                    color_blend_op: vk::BlendOp::ADD,
+                                    src_alpha_blend_factor: vk::BlendFactor::ZERO,
+                                    dst_alpha_blend_factor: vk::BlendFactor::ZERO,
+                                    alpha_blend_op: vk::BlendOp::ADD,
+                                    color_write_mask: vk::ColorComponentFlags::all(),
+                                }]),
+                        )
+                        .dynamic_state(
+                            &vk::PipelineDynamicStateCreateInfo::builder().dynamic_states(&[
+                                vk::DynamicState::VIEWPORT,
+                                vk::DynamicState::SCISSOR,
+                            ]),
+                        )
+                        .layout(pipeline_layout)
+                        .render_pass(renderpass)
+                        .build()],
                     None,
                 )
                 .expect("Unable to create graphics pipeline")
-        };
-
-        //Destoy shader modules
-        unsafe {
-            vulkan
-                .device()
-                .destroy_shader_module(vertex_shader_module, None);
-            vulkan
-                .device()
-                .destroy_shader_module(fragment_shader_module, None);
-        }
+        }[0];
 
         Pipeline {
-            pipeline: pipeline[0],
+            pipeline: pipeline,
             layout: pipeline_layout,
             depth_image,
             context: vulkan.context(),
@@ -427,6 +334,7 @@ impl Pipeline {
             light: light_data,
             uniform_transform: uniform_data,
             renderpass,
+
             shadow_map,
             descriptor_set,
             descriptor_layout,

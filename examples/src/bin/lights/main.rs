@@ -11,7 +11,7 @@ use std::path::Path;
 use winit::event::{ElementState, Event, KeyboardInput, VirtualKeyCode, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop};
 
-use pipelines::mesh_pipeline::{self, Light, PushConstantModel, Vertex};
+use pipelines::{Light, PushConstantModel, Vertex, mesh_pipeline};
 use std::sync::Arc;
 
 fn main() {

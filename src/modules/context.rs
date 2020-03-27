@@ -105,46 +105,47 @@ impl Context {
             })
             .collect();
 
-        let descriptor_pool_create_info = vk::DescriptorPoolCreateInfo {
-            s_type: vk::StructureType::DESCRIPTOR_POOL_CREATE_INFO,
-            p_next: ptr::null(),
-            flags: vk::DescriptorPoolCreateFlags::empty(),
-            max_sets: images_count,
-            pool_size_count: pool_sizes.len() as u32,
-            p_pool_sizes: pool_sizes.as_ptr(),
-        };
-
         let descriptor_pool = unsafe {
             self.device
-                .create_descriptor_pool(&descriptor_pool_create_info, None)
+                .create_descriptor_pool(
+                    &vk::DescriptorPoolCreateInfo {
+                        s_type: vk::StructureType::DESCRIPTOR_POOL_CREATE_INFO,
+                        p_next: ptr::null(),
+                        flags: vk::DescriptorPoolCreateFlags::empty(),
+                        max_sets: images_count,
+                        pool_size_count: pool_sizes.len() as u32,
+                        p_pool_sizes: pool_sizes.as_ptr(),
+                    },
+                    None,
+                )
                 .expect("Failed to create Descriptor Pool!")
         };
 
-        let layout_create_info = vk::DescriptorSetLayoutCreateInfo {
-            s_type: vk::StructureType::DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
-            flags: vk::DescriptorSetLayoutCreateFlags::empty(),
-            binding_count: bindings.len() as u32,
-            p_bindings: bindings.as_ptr(),
-            ..Default::default()
-        };
         let layouts = unsafe {
             vec![self
                 .device
-                .create_descriptor_set_layout(&layout_create_info, None)
+                .create_descriptor_set_layout(
+                    &vk::DescriptorSetLayoutCreateInfo {
+                        s_type: vk::StructureType::DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
+                        flags: vk::DescriptorSetLayoutCreateFlags::empty(),
+                        binding_count: bindings.len() as u32,
+                        p_bindings: bindings.as_ptr(),
+                        ..Default::default()
+                    },
+                    None,
+                )
                 .expect("Failed to create Descriptor Set Layout!")]
-        };
-
-        let descriptor_set_allocate_info = vk::DescriptorSetAllocateInfo {
-            s_type: vk::StructureType::DESCRIPTOR_SET_ALLOCATE_INFO,
-            descriptor_pool,
-            descriptor_set_count: 1 as u32,
-            p_set_layouts: layouts.as_ptr(),
-            ..Default::default()
         };
 
         let descriptor_sets = unsafe {
             self.device
-                .allocate_descriptor_sets(&descriptor_set_allocate_info)
+                .allocate_descriptor_sets(&vk::DescriptorSetAllocateInfo {
+                    s_type: vk::StructureType::DESCRIPTOR_SET_ALLOCATE_INFO,
+                    descriptor_pool,
+                    descriptor_set_count: 1 as u32,
+                    p_set_layouts: layouts.as_ptr(),
+                    ..Default::default()
+                })
                 .expect("Failed to allocate descriptor sets!")
         };
 

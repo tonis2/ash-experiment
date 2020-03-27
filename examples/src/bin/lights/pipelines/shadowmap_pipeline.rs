@@ -1,17 +1,137 @@
-use std::sync::Arc;
-use vulkan::{prelude::*, Context, Framebuffer, Image, Swapchain};
-const DEPTH_FORMAT: vk::Format = vk::Format::D16_UNORM;
+use super::Vertex;
+use std::{default::Default, ffi::CString, mem, path::Path, sync::Arc};
+use vulkan::{offset_of, prelude::*, utilities::Shader, Context, Framebuffer, Image, Swapchain};
 
+const DEPTH_FORMAT: vk::Format = vk::Format::D16_UNORM;
 pub struct Pipeline {
     pub framebuffer: Framebuffer,
     pub renderpass: vk::RenderPass,
     pub sampler: vk::Sampler,
     pub image: Image,
+    pub pipeline: vk::Pipeline,
     pub context: Arc<Context>,
 }
 
 impl Pipeline {
-    pub fn new(swapchain: &Swapchain, context: Arc<Context>) -> Self {
+    pub fn new(swapchain: &Swapchain, context: Arc<Context>, layout: vk::PipelineLayout) -> Self {
+        //Create shadow pipeline stuff
+
+        let noop_stencil_state = vk::StencilOpState {
+            fail_op: vk::StencilOp::KEEP,
+            pass_op: vk::StencilOp::KEEP,
+            depth_fail_op: vk::StencilOp::KEEP,
+            compare_op: vk::CompareOp::ALWAYS,
+            ..Default::default()
+        };
+
+        let viewports = [vk::Viewport {
+            x: 0.0,
+            y: 0.0,
+            width: swapchain.extent.width as f32,
+            height: swapchain.extent.height as f32,
+            min_depth: 0.0,
+            max_depth: 1.0,
+        }];
+
+        let scissors = [vk::Rect2D {
+            offset: vk::Offset2D { x: 0, y: 0 },
+            extent: swapchain.extent,
+        }];
+
+        let renderpass = Self::create_render_pass(context.clone());
+        let shader_name = CString::new("main").unwrap();
+        let pipeline = unsafe {
+            context
+                .device
+                .create_graphics_pipelines(
+                    vk::PipelineCache::null(),
+                    &[vk::GraphicsPipelineCreateInfo::builder()
+                        .stages(&[Shader::new(
+                            &Path::new("src/bin/lights/shaders/offscreen.vert.spv"),
+                            vk::ShaderStageFlags::VERTEX,
+                            &shader_name,
+                            context.clone(),
+                        )
+                        .info()])
+                        .vertex_input_state(
+                            &vk::PipelineVertexInputStateCreateInfo::builder()
+                                .vertex_binding_descriptions(&[vk::VertexInputBindingDescription {
+                                    binding: 0,
+                                    stride: mem::size_of::<Vertex>() as u32,
+                                    input_rate: vk::VertexInputRate::VERTEX,
+                                }])
+                                .vertex_attribute_descriptions(&[
+                                    vk::VertexInputAttributeDescription {
+                                        binding: 0,
+                                        location: 0,
+                                        format: vk::Format::R32G32B32_SFLOAT,
+                                        offset: offset_of!(Vertex, pos) as u32,
+                                    },
+                                    vk::VertexInputAttributeDescription {
+                                        binding: 0,
+                                        location: 1,
+                                        format: vk::Format::R32G32_SFLOAT,
+                                        offset: offset_of!(Vertex, normal) as u32,
+                                    },
+                                ])
+                                .build(),
+                        )
+                        .input_assembly_state(&vk::PipelineInputAssemblyStateCreateInfo {
+                            topology: vk::PrimitiveTopology::TRIANGLE_LIST,
+                            ..Default::default()
+                        })
+                        .viewport_state(
+                            &vk::PipelineViewportStateCreateInfo::builder()
+                                .scissors(&scissors)
+                                .viewports(&viewports),
+                        )
+                        .rasterization_state(&vk::PipelineRasterizationStateCreateInfo {
+                            front_face: vk::FrontFace::COUNTER_CLOCKWISE,
+                            line_width: 1.0,
+                            polygon_mode: vk::PolygonMode::FILL,
+                            ..Default::default()
+                        })
+                        .multisample_state(&vk::PipelineMultisampleStateCreateInfo {
+                            rasterization_samples: vk::SampleCountFlags::TYPE_1,
+                            ..Default::default()
+                        })
+                        .depth_stencil_state(&vk::PipelineDepthStencilStateCreateInfo {
+                            depth_test_enable: 1,
+                            depth_write_enable: 1,
+                            depth_compare_op: vk::CompareOp::LESS_OR_EQUAL,
+                            front: noop_stencil_state,
+                            back: noop_stencil_state,
+                            max_depth_bounds: 1.0,
+                            ..Default::default()
+                        })
+                        .color_blend_state(
+                            &vk::PipelineColorBlendStateCreateInfo::builder()
+                                .logic_op(vk::LogicOp::CLEAR)
+                                .attachments(&[vk::PipelineColorBlendAttachmentState {
+                                    blend_enable: 0,
+                                    src_color_blend_factor: vk::BlendFactor::SRC_COLOR,
+                                    dst_color_blend_factor: vk::BlendFactor::ONE_MINUS_DST_COLOR,
+                                    color_blend_op: vk::BlendOp::ADD,
+                                    src_alpha_blend_factor: vk::BlendFactor::ZERO,
+                                    dst_alpha_blend_factor: vk::BlendFactor::ZERO,
+                                    alpha_blend_op: vk::BlendOp::ADD,
+                                    color_write_mask: vk::ColorComponentFlags::all(),
+                                }]),
+                        )
+                        .dynamic_state(
+                            &vk::PipelineDynamicStateCreateInfo::builder().dynamic_states(&[
+                                vk::DynamicState::VIEWPORT,
+                                vk::DynamicState::SCISSOR,
+                            ]),
+                        )
+                        .layout(layout)
+                        .render_pass(renderpass)
+                        .build()],
+                    None,
+                )
+                .expect("Unable to create graphics pipeline")
+        }[0];
+
         let mut shadow_map_image = Image::create_image(
             vk::ImageCreateInfo {
                 s_type: vk::StructureType::IMAGE_CREATE_INFO,
@@ -93,16 +213,11 @@ impl Pipeline {
             context.clone(),
         );
 
-        let descriptor_info = vk::DescriptorImageInfo {
-            sampler: sampler,
-            image_view: shadow_map_image.view(),
-            image_layout: vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
-        };
-
         Pipeline {
             framebuffer,
             renderpass,
             sampler,
+            pipeline,
             image: shadow_map_image,
             context,
         }
