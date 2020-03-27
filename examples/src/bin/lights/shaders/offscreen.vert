@@ -1,19 +1,18 @@
 #version 450
 
-layout (location = 0) in vec3 inPos;
+layout (location = 0) in vec3 pos;
 
-layout (binding = 0) uniform UBO 
-{
-	mat4 depthMVP;
+layout (binding = 0) uniform UniformBufferObject {
+    mat4 view;
+    mat4 proj;
 } ubo;
 
-out gl_PerVertex 
-{
-    vec4 gl_Position;   
-};
-
+layout(push_constant) uniform Constants {
+    mat4 model_transform;
+    vec4 color;
+} constants;
  
 void main()
 {
-	gl_Position =  ubo.depthMVP * vec4(inPos, 1.0);
+	   gl_Position = ubo.proj * ubo.view * constants.model_transform * vec4(pos, 1.0);
 }

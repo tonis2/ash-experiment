@@ -47,13 +47,22 @@ impl Pipeline {
                 .create_graphics_pipelines(
                     vk::PipelineCache::null(),
                     &[vk::GraphicsPipelineCreateInfo::builder()
-                        .stages(&[Shader::new(
-                            &Path::new("src/bin/lights/shaders/offscreen.vert.spv"),
-                            vk::ShaderStageFlags::VERTEX,
-                            &shader_name,
-                            context.clone(),
-                        )
-                        .info()])
+                        .stages(&[
+                            Shader::new(
+                                &Path::new("src/bin/lights/shaders/offscreen.vert.spv"),
+                                vk::ShaderStageFlags::VERTEX,
+                                &shader_name,
+                                context.clone(),
+                            )
+                            .info(),
+                            Shader::new(
+                                &Path::new("src/bin/lights/shaders/offscreen.frag.spv"),
+                                vk::ShaderStageFlags::FRAGMENT,
+                                &shader_name,
+                                context.clone(),
+                            )
+                            .info(),
+                        ])
                         .vertex_input_state(
                             &vk::PipelineVertexInputStateCreateInfo::builder()
                                 .vertex_binding_descriptions(&[vk::VertexInputBindingDescription {
@@ -142,7 +151,6 @@ impl Pipeline {
                 samples: vk::SampleCountFlags::TYPE_1,
                 tiling: vk::ImageTiling::OPTIMAL,
                 usage: vk::ImageUsageFlags::DEPTH_STENCIL_ATTACHMENT
-                    | vk::ImageUsageFlags::TRANSFER_DST
                     | vk::ImageUsageFlags::SAMPLED,
                 sharing_mode: vk::SharingMode::EXCLUSIVE,
                 ..Default::default()
@@ -238,8 +246,8 @@ impl Pipeline {
             samples: vk::SampleCountFlags::TYPE_1,
             load_op: vk::AttachmentLoadOp::CLEAR,
             store_op: vk::AttachmentStoreOp::STORE,
-            stencil_load_op: vk::AttachmentLoadOp::DONT_CARE,
-            stencil_store_op: vk::AttachmentStoreOp::DONT_CARE,
+            stencil_load_op: vk::AttachmentLoadOp::CLEAR,
+            stencil_store_op: vk::AttachmentStoreOp::STORE,
             initial_layout: vk::ImageLayout::UNDEFINED,
             final_layout: vk::ImageLayout::DEPTH_READ_ONLY_STENCIL_ATTACHMENT_OPTIMAL,
         };

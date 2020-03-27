@@ -11,7 +11,7 @@ use std::path::Path;
 use winit::event::{ElementState, Event, KeyboardInput, VirtualKeyCode, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop};
 
-use pipelines::{Light, PushConstantModel, Vertex, mesh_pipeline};
+use pipelines::{mesh_pipeline, Light, PushConstantModel, Vertex};
 use std::sync::Arc;
 
 fn main() {
@@ -169,6 +169,13 @@ fn main() {
                 |command_buffer, device| unsafe {
                     device.cmd_set_viewport(command_buffer, 0, &viewports);
                     device.cmd_set_scissor(command_buffer, 0, &[extent]);
+                    device.cmd_push_constants(
+                        command_buffer,
+                        pipeline.shadow_layout,
+                        vk::ShaderStageFlags::VERTEX,
+                        0,
+                        as_byte_slice(&scene_data),
+                    );
 
                     //Shadow
                     device.cmd_begin_render_pass(
@@ -189,9 +196,38 @@ fn main() {
                         &[pipeline.shadow_descriptor.set],
                         &[],
                     );
+                    device.cmd_bind_vertex_buffers(
+                        command_buffer,
+                        0,
+                        &[scene_vert_buffer.buffer],
+                        &[0],
+                    );
+                    device.cmd_bind_index_buffer(
+                        command_buffer,
+                        scene_index_buffer.buffer,
+                        0,
+                        vk::IndexType::UINT32,
+                    );
+                    device.cmd_draw_indexed(
+                        command_buffer,
+                        scene_batch.indices.len() as u32,
+                        1,
+                        0,
+                        0,
+                        1,
+                    );
+
                     device.cmd_end_render_pass(command_buffer);
 
                     //Scene
+
+                    device.cmd_push_constants(
+                        command_buffer,
+                        pipeline.layout,
+                        vk::ShaderStageFlags::VERTEX,
+                        0,
+                        as_byte_slice(&scene_data),
+                    );
                     device.cmd_begin_render_pass(
                         command_buffer,
                         &render_pass_info,
@@ -212,13 +248,7 @@ fn main() {
                     );
 
                     //Ball
-                    device.cmd_push_constants(
-                        command_buffer,
-                        pipeline.layout,
-                        vk::ShaderStageFlags::VERTEX,
-                        0,
-                        as_byte_slice(&scene_data),
-                    );
+
                     device.cmd_bind_vertex_buffers(
                         command_buffer,
                         0,

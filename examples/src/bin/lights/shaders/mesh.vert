@@ -18,7 +18,6 @@ layout(push_constant) uniform Constants {
     vec4 color;
 } constants;
 
-
 void main() {
     vec4 mesh_world_position = constants.model_transform * vec4(pos, 1.0);
 
