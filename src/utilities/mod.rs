@@ -3,7 +3,7 @@ pub mod tools;
 pub mod buffer;
 pub mod images;
 pub mod fps_meter;
-
+pub mod descriptor;
 
 pub use images::Image;
 pub use buffer::Buffer;

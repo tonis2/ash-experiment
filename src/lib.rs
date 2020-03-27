@@ -9,3 +9,4 @@ pub use modules::queue::Queue;
 pub use utilities::images::Image;
 
 pub use utilities::buffer::Buffer;
+pub use utilities::descriptor::Descriptor;

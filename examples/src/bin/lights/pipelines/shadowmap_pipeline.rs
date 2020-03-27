@@ -6,6 +6,7 @@ const DEPTH_FORMAT: vk::Format = vk::Format::D16_UNORM;
 pub struct Pipeline {
     pub framebuffer: Framebuffer,
     pub renderpass: vk::RenderPass,
+    pub render_pass_info: vk::RenderPassBeginInfo,
     pub sampler: vk::Sampler,
     pub image: Image,
     pub pipeline: vk::Pipeline,
@@ -24,19 +25,19 @@ impl Pipeline {
             ..Default::default()
         };
 
-        let viewports = [vk::Viewport {
+        let viewports = vk::Viewport {
             x: 0.0,
             y: 0.0,
             width: swapchain.extent.width as f32,
             height: swapchain.extent.height as f32,
             min_depth: 0.0,
             max_depth: 1.0,
-        }];
+        };
 
-        let scissors = [vk::Rect2D {
+        let scissors = vk::Rect2D {
             offset: vk::Offset2D { x: 0, y: 0 },
             extent: swapchain.extent,
-        }];
+        };
 
         let renderpass = Self::create_render_pass(context.clone());
         let shader_name = CString::new("main").unwrap();
@@ -67,12 +68,6 @@ impl Pipeline {
                                         format: vk::Format::R32G32B32_SFLOAT,
                                         offset: offset_of!(Vertex, pos) as u32,
                                     },
-                                    vk::VertexInputAttributeDescription {
-                                        binding: 0,
-                                        location: 1,
-                                        format: vk::Format::R32G32_SFLOAT,
-                                        offset: offset_of!(Vertex, normal) as u32,
-                                    },
                                 ])
                                 .build(),
                         )
@@ -82,8 +77,8 @@ impl Pipeline {
                         })
                         .viewport_state(
                             &vk::PipelineViewportStateCreateInfo::builder()
-                                .scissors(&scissors)
-                                .viewports(&viewports),
+                                .scissors(&[scissors])
+                                .viewports(&[viewports]),
                         )
                         .rasterization_state(&vk::PipelineRasterizationStateCreateInfo {
                             front_face: vk::FrontFace::COUNTER_CLOCKWISE,
@@ -201,7 +196,6 @@ impl Pipeline {
                 .expect("Failed to create Sampler!")
         };
 
-        let renderpass = Self::create_render_pass(context.clone());
         let framebuffer = Framebuffer::new(
             vk::FramebufferCreateInfo::builder()
                 .layers(1)
@@ -213,11 +207,25 @@ impl Pipeline {
             context.clone(),
         );
 
+        let render_pass_info = vk::RenderPassBeginInfo::builder()
+            .framebuffer(framebuffer.buffer())
+            .render_pass(renderpass)
+            .render_area(scissors)
+            .clear_values(&[vk::ClearValue {
+                // clear value for depth buffer
+                depth_stencil: vk::ClearDepthStencilValue {
+                    depth: 1.0,
+                    stencil: 0,
+                },
+            }])
+            .build();
+
         Pipeline {
             framebuffer,
             renderpass,
             sampler,
             pipeline,
+            render_pass_info,
             image: shadow_map_image,
             context,
         }
@@ -273,6 +281,19 @@ impl Pipeline {
                 .device
                 .create_render_pass(&renderpass_create_info, None)
                 .expect("Failed to create render pass!")
+        }
+    }
+}
+
+impl Drop for Pipeline {
+    fn drop(&mut self) {
+        unsafe {
+            self.context.wait_idle();
+            self.context.device.destroy_pipeline(self.pipeline, None);
+            self.context.device.destroy_sampler(self.sampler, None);
+            self.context
+                .device
+                .destroy_render_pass(self.renderpass, None);
         }
     }
 }

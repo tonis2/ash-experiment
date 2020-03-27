@@ -167,6 +167,31 @@ fn main() {
             instance.build_command(
                 command_buffers[next_frame.image_index],
                 |command_buffer, device| unsafe {
+                    device.cmd_set_viewport(command_buffer, 0, &viewports);
+                    device.cmd_set_scissor(command_buffer, 0, &[extent]);
+
+                    //Shadow
+                    device.cmd_begin_render_pass(
+                        command_buffer,
+                        &pipeline.shadow_pipeline.render_pass_info,
+                        vk::SubpassContents::INLINE,
+                    );
+                    device.cmd_bind_pipeline(
+                        command_buffer,
+                        vk::PipelineBindPoint::GRAPHICS,
+                        pipeline.shadow_pipeline.pipeline,
+                    );
+                    device.cmd_bind_descriptor_sets(
+                        command_buffer,
+                        vk::PipelineBindPoint::GRAPHICS,
+                        pipeline.shadow_layout,
+                        0,
+                        &[pipeline.shadow_descriptor.set],
+                        &[],
+                    );
+                    device.cmd_end_render_pass(command_buffer);
+
+                    //Scene
                     device.cmd_begin_render_pass(
                         command_buffer,
                         &render_pass_info,
@@ -182,13 +207,11 @@ fn main() {
                         vk::PipelineBindPoint::GRAPHICS,
                         pipeline.layout,
                         0,
-                        &[pipeline.descriptor_set],
+                        &[pipeline.pipeline_descriptor.set],
                         &[],
                     );
 
-                    device.cmd_set_viewport(command_buffer, 0, &viewports);
-                    device.cmd_set_scissor(command_buffer, 0, &[extent]);
-
+                    //Ball
                     device.cmd_push_constants(
                         command_buffer,
                         pipeline.layout,
