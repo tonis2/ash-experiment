@@ -291,7 +291,7 @@ impl Pipeline {
                         .depth_stencil_state(&vk::PipelineDepthStencilStateCreateInfo {
                             depth_test_enable: 1,
                             depth_write_enable: 1,
-                            depth_compare_op: vk::CompareOp::LESS_OR_EQUAL,
+                            depth_compare_op: vk::CompareOp::LESS,
                             front: noop_stencil_state,
                             back: noop_stencil_state,
                             max_depth_bounds: 1.0,
@@ -367,7 +367,7 @@ impl Drop for Pipeline {
 }
 
 pub fn create_render_pass(swapchain: &Swapchain, vulkan: &VkInstance) -> vk::RenderPass {
-    let depth_format = vulkan.find_depth_format(
+    let depth_format = vulkan.context.find_depth_format(
         &[
             vk::Format::D32_SFLOAT,
             vk::Format::D32_SFLOAT_S8_UINT,
@@ -377,24 +377,16 @@ pub fn create_render_pass(swapchain: &Swapchain, vulkan: &VkInstance) -> vk::Ren
         vk::FormatFeatureFlags::DEPTH_STENCIL_ATTACHMENT,
     );
 
-    let subpasses = [vk::SubpassDescription {
-        color_attachment_count: 1,
-        p_color_attachments: &vk::AttachmentReference {
+    let subpasses = vk::SubpassDescription::builder()
+        .color_attachments(&[vk::AttachmentReference {
             attachment: 0,
             layout: vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL,
-        },
-        p_depth_stencil_attachment: &vk::AttachmentReference {
+        }])
+        .depth_stencil_attachment(&vk::AttachmentReference {
             attachment: 1,
             layout: vk::ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
-        },
-        flags: vk::SubpassDescriptionFlags::empty(),
-        pipeline_bind_point: vk::PipelineBindPoint::GRAPHICS,
-        input_attachment_count: 0,
-        p_input_attachments: ptr::null(),
-        p_resolve_attachments: ptr::null(),
-        preserve_attachment_count: 0,
-        p_preserve_attachments: ptr::null(),
-    }];
+        })
+        .build();
 
     let subpass_dependencies = [vk::SubpassDependency {
         src_subpass: vk::SUBPASS_EXTERNAL,
@@ -408,7 +400,7 @@ pub fn create_render_pass(swapchain: &Swapchain, vulkan: &VkInstance) -> vk::Ren
     }];
 
     let renderpass_create_info = vk::RenderPassCreateInfo::builder()
-        .subpasses(&subpasses)
+        .subpasses(&[subpasses])
         .dependencies(&subpass_dependencies)
         .attachments(&[
             vk::AttachmentDescription {

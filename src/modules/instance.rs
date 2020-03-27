@@ -1,5 +1,5 @@
 use ash::{
-    version::{DeviceV1_0, InstanceV1_0},
+    version::DeviceV1_0,
     vk,
 };
 
@@ -327,31 +327,6 @@ impl VkInstance {
         self.end_single_time_command(command_buffer);
     }
 
-    pub fn find_depth_format(
-        &self,
-        candidate_formats: &[vk::Format],
-        tiling: vk::ImageTiling,
-        features: vk::FormatFeatureFlags,
-    ) -> vk::Format {
-        for &format in candidate_formats.iter() {
-            let format_properties = unsafe {
-                self.context
-                    .instance
-                    .get_physical_device_format_properties(self.context.physical_device, format)
-            };
-            if tiling == vk::ImageTiling::LINEAR
-                && format_properties.linear_tiling_features.contains(features)
-            {
-                return format.clone();
-            } else if tiling == vk::ImageTiling::OPTIMAL
-                && format_properties.optimal_tiling_features.contains(features)
-            {
-                return format.clone();
-            }
-        }
-
-        panic!("Failed to find supported format!")
-    }
 
     pub fn generate_mipmaps(
         &self,

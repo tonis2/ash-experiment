@@ -115,7 +115,7 @@ pub fn create_texture(image_path: &Path, vulkan: &VkInstance) -> Image {
 
 //Creates depth image
 pub fn create_depth_resources(swapchain: &Swapchain, vulkan: &VkInstance) -> Image {
-    let depth_format = vulkan.find_depth_format(
+    let depth_format = vulkan.context.find_depth_format(
         &[
             vk::Format::D32_SFLOAT,
             vk::Format::D32_SFLOAT_S8_UINT,

@@ -2,7 +2,7 @@ use super::Vertex;
 use std::{default::Default, ffi::CString, mem, path::Path, sync::Arc};
 use vulkan::{offset_of, prelude::*, utilities::Shader, Context, Framebuffer, Image, Swapchain};
 
-const DEPTH_FORMAT: vk::Format = vk::Format::D16_UNORM;
+
 pub struct Pipeline {
     pub framebuffer: Framebuffer,
     pub renderpass: vk::RenderPass,
@@ -38,8 +38,17 @@ impl Pipeline {
             offset: vk::Offset2D { x: 0, y: 0 },
             extent: swapchain.extent,
         };
+        let depth_format = context.find_depth_format(
+            &[
+                vk::Format::D32_SFLOAT,
+                vk::Format::D32_SFLOAT_S8_UINT,
+                vk::Format::D24_UNORM_S8_UINT,
+            ],
+            vk::ImageTiling::OPTIMAL,
+            vk::FormatFeatureFlags::DEPTH_STENCIL_ATTACHMENT,
+        );
 
-        let renderpass = Self::create_render_pass(context.clone());
+        let renderpass = Self::create_render_pass(context.clone(), depth_format);
         let shader_name = CString::new("main").unwrap();
         let pipeline = unsafe {
             context
@@ -55,13 +64,7 @@ impl Pipeline {
                                 context.clone(),
                             )
                             .info(),
-                            Shader::new(
-                                &Path::new("src/bin/lights/shaders/offscreen.frag.spv"),
-                                vk::ShaderStageFlags::FRAGMENT,
-                                &shader_name,
-                                context.clone(),
-                            )
-                            .info(),
+
                         ])
                         .vertex_input_state(
                             &vk::PipelineVertexInputStateCreateInfo::builder()
@@ -140,7 +143,7 @@ impl Pipeline {
             vk::ImageCreateInfo {
                 s_type: vk::StructureType::IMAGE_CREATE_INFO,
                 image_type: vk::ImageType::TYPE_2D,
-                format: DEPTH_FORMAT,
+                format: depth_format,
                 extent: vk::Extent3D {
                     width: swapchain.extent.width,
                     height: swapchain.extent.height,
@@ -162,7 +165,7 @@ impl Pipeline {
         shadow_map_image.attach_view(vk::ImageViewCreateInfo {
             s_type: vk::StructureType::IMAGE_VIEW_CREATE_INFO,
             view_type: vk::ImageViewType::TYPE_2D,
-            format: DEPTH_FORMAT,
+            format: depth_format,
             components: vk::ComponentMapping {
                 r: vk::ComponentSwizzle::IDENTITY,
                 g: vk::ComponentSwizzle::IDENTITY,
@@ -239,10 +242,10 @@ impl Pipeline {
         }
     }
 
-    fn create_render_pass(context: Arc<Context>) -> vk::RenderPass {
+    fn create_render_pass(context: Arc<Context>, depth_format: vk::Format) -> vk::RenderPass {
         let depth_attachment = vk::AttachmentDescription {
             flags: vk::AttachmentDescriptionFlags::empty(),
-            format: DEPTH_FORMAT,
+            format: depth_format,
             samples: vk::SampleCountFlags::TYPE_1,
             load_op: vk::AttachmentLoadOp::CLEAR,
             store_op: vk::AttachmentStoreOp::STORE,

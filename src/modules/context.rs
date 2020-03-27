@@ -11,7 +11,7 @@ use super::{
 };
 use crate::constants::*;
 use crate::utilities::platform::extension_names;
-use std::ptr;
+
 
 use std::ffi::CString;
 use winit::window::Window;
@@ -76,89 +76,39 @@ impl Context {
         }
     }
 
+
+    pub fn find_depth_format(
+        &self,
+        candidate_formats: &[vk::Format],
+        tiling: vk::ImageTiling,
+        features: vk::FormatFeatureFlags,
+    ) -> vk::Format {
+        for &format in candidate_formats.iter() {
+            let format_properties = unsafe {
+                self
+                    .instance
+                    .get_physical_device_format_properties(self.physical_device, format)
+            };
+            if tiling == vk::ImageTiling::LINEAR
+                && format_properties.linear_tiling_features.contains(features)
+            {
+                return format.clone();
+            } else if tiling == vk::ImageTiling::OPTIMAL
+                && format_properties.optimal_tiling_features.contains(features)
+            {
+                return format.clone();
+            }
+        }
+
+        panic!("Failed to find supported format!")
+    }
+
     pub fn wait_idle(&self) {
         unsafe {
             self.device
                 .device_wait_idle()
                 .expect("failed to wait device idle")
         }
-    }
-
-    pub fn create_descriptor(
-        &self,
-        images_count: u32,
-        bindings: Vec<vk::DescriptorSetLayoutBinding>,
-        descriptor_write_sets: &mut Vec<vk::WriteDescriptorSet>,
-    ) -> (
-        vk::DescriptorSetLayout,
-        vk::DescriptorSet,
-        vk::DescriptorPool,
-    ) {
-        let pool_sizes: Vec<vk::DescriptorPoolSize> = bindings
-            .iter()
-            .map(|binding| {
-                vk::DescriptorPoolSize {
-                    // transform descriptor pool
-                    ty: binding.descriptor_type,
-                    descriptor_count: images_count,
-                }
-            })
-            .collect();
-
-        let descriptor_pool = unsafe {
-            self.device
-                .create_descriptor_pool(
-                    &vk::DescriptorPoolCreateInfo {
-                        s_type: vk::StructureType::DESCRIPTOR_POOL_CREATE_INFO,
-                        p_next: ptr::null(),
-                        flags: vk::DescriptorPoolCreateFlags::empty(),
-                        max_sets: images_count,
-                        pool_size_count: pool_sizes.len() as u32,
-                        p_pool_sizes: pool_sizes.as_ptr(),
-                    },
-                    None,
-                )
-                .expect("Failed to create Descriptor Pool!")
-        };
-
-        let layouts = unsafe {
-            vec![self
-                .device
-                .create_descriptor_set_layout(
-                    &vk::DescriptorSetLayoutCreateInfo {
-                        s_type: vk::StructureType::DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
-                        flags: vk::DescriptorSetLayoutCreateFlags::empty(),
-                        binding_count: bindings.len() as u32,
-                        p_bindings: bindings.as_ptr(),
-                        ..Default::default()
-                    },
-                    None,
-                )
-                .expect("Failed to create Descriptor Set Layout!")]
-        };
-
-        let descriptor_sets = unsafe {
-            self.device
-                .allocate_descriptor_sets(&vk::DescriptorSetAllocateInfo {
-                    s_type: vk::StructureType::DESCRIPTOR_SET_ALLOCATE_INFO,
-                    descriptor_pool,
-                    descriptor_set_count: 1 as u32,
-                    p_set_layouts: layouts.as_ptr(),
-                    ..Default::default()
-                })
-                .expect("Failed to allocate descriptor sets!")
-        };
-
-        for descriptor in descriptor_write_sets.iter_mut() {
-            descriptor.dst_set = descriptor_sets[0]
-        }
-
-        unsafe {
-            self.device
-                .update_descriptor_sets(&descriptor_write_sets, &[]);
-        }
-
-        (layouts[0], descriptor_sets[0], descriptor_pool)
     }
 }
 

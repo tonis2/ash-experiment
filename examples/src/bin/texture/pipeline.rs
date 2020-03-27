@@ -4,7 +4,7 @@ use vulkan::{
     offset_of,
     prelude::*,
     utilities::{tools::load_shader, Buffer, Image},
-    Context, VkInstance,
+    Context, Descriptor, VkInstance,
 };
 
 use std::default::Default;
@@ -39,9 +39,7 @@ pub struct Pipeline {
     pub renderpass: vk::RenderPass,
     context: Arc<Context>,
 
-    pub descriptor_layout: vk::DescriptorSetLayout,
-    pub descriptor_set: vk::DescriptorSet,
-    pub descriptor_pool: vk::DescriptorPool,
+    pub pipeline_descriptor: Descriptor,
 }
 
 impl Pipeline {
@@ -212,65 +210,64 @@ impl Pipeline {
             &[uniform_data],
         );
 
-        let descriptor_binding = vec![
-            vk::DescriptorSetLayoutBinding {
-                // transform uniform
-                binding: 0,
-                descriptor_type: vk::DescriptorType::UNIFORM_BUFFER,
-                descriptor_count: 1,
-                stage_flags: vk::ShaderStageFlags::VERTEX,
-                p_immutable_samplers: ptr::null(),
-            },
-            vk::DescriptorSetLayoutBinding {
-                // sampler uniform
-                binding: 1,
-                descriptor_type: vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
-                descriptor_count: 1,
-                stage_flags: vk::ShaderStageFlags::FRAGMENT,
-                p_immutable_samplers: ptr::null(),
-            },
-        ];
+        let pipeline_descriptor = Descriptor::new(
+            vec![
+                vk::DescriptorSetLayoutBinding {
+                    // transform uniform
+                    binding: 0,
+                    descriptor_type: vk::DescriptorType::UNIFORM_BUFFER,
+                    descriptor_count: 1,
+                    stage_flags: vk::ShaderStageFlags::VERTEX,
+                    p_immutable_samplers: ptr::null(),
+                },
+                vk::DescriptorSetLayoutBinding {
+                    // sampler uniform
+                    binding: 1,
+                    descriptor_type: vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
+                    descriptor_count: 1,
+                    stage_flags: vk::ShaderStageFlags::FRAGMENT,
+                    p_immutable_samplers: ptr::null(),
+                },
+            ],
+            vec![
+                vk::WriteDescriptorSet {
+                    // transform uniform
+                    s_type: vk::StructureType::WRITE_DESCRIPTOR_SET,
+                    dst_binding: 0,
+                    dst_array_element: 0,
+                    descriptor_count: 1,
+                    descriptor_type: vk::DescriptorType::UNIFORM_BUFFER,
+                    p_buffer_info: [vk::DescriptorBufferInfo {
+                        buffer: uniform_buffer.buffer,
+                        offset: 0,
+                        range: std::mem::size_of_val(&uniform_data) as u64,
+                    }]
+                    .as_ptr(),
+                    ..Default::default()
+                },
+                vk::WriteDescriptorSet {
+                    // sampler uniform
+                    s_type: vk::StructureType::WRITE_DESCRIPTOR_SET,
+                    dst_binding: 1,
+                    dst_array_element: 0,
+                    descriptor_count: 1,
+                    descriptor_type: vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
+                    p_image_info: [vk::DescriptorImageInfo {
+                        sampler: sampler,
+                        image_view: texture.view(),
+                        image_layout: vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
+                    }]
+                    .as_ptr(),
+                    ..Default::default()
+                },
+            ],
+            swapchain.images.len() as u32,
+            vulkan.context(),
+        );
 
-        let (descriptor_layout, descriptor_set, descriptor_pool) =
-            vulkan.context.create_descriptor(
-                swapchain.image_views.len() as u32,
-                descriptor_binding,
-                &mut vec![
-                    vk::WriteDescriptorSet {
-                        // transform uniform
-                        s_type: vk::StructureType::WRITE_DESCRIPTOR_SET,
-                        dst_binding: 0,
-                        dst_array_element: 0,
-                        descriptor_count: 1,
-                        descriptor_type: vk::DescriptorType::UNIFORM_BUFFER,
-                        p_buffer_info: [vk::DescriptorBufferInfo {
-                            buffer: uniform_buffer.buffer,
-                            offset: 0,
-                            range: std::mem::size_of_val(&uniform_data) as u64,
-                        }]
-                        .as_ptr(),
-                        ..Default::default()
-                    },
-                    vk::WriteDescriptorSet {
-                        // sampler uniform
-                        s_type: vk::StructureType::WRITE_DESCRIPTOR_SET,
-                        dst_binding: 1,
-                        dst_array_element: 0,
-                        descriptor_count: 1,
-                        descriptor_type: vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
-                        p_image_info: [vk::DescriptorImageInfo {
-                            sampler: sampler,
-                            image_view: texture.view(),
-                            image_layout: vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
-                        }]
-                        .as_ptr(),
-                        ..Default::default()
-                    },
-                ],
-            );
-
-        let layout = &[descriptor_layout];
-        let layout_create_info = vk::PipelineLayoutCreateInfo::builder().set_layouts(layout);
+        let layout_create_info = vk::PipelineLayoutCreateInfo::builder()
+            .set_layouts(&[pipeline_descriptor.layout])
+            .build();
 
         //Create pipeline stuff
         let pipeline_layout = unsafe {
@@ -320,9 +317,7 @@ impl Pipeline {
             texture,
             sampler,
             renderpass,
-            descriptor_set,
-            descriptor_pool,
-            descriptor_layout,
+            pipeline_descriptor,
             uniform_buffer,
             uniform_transform: uniform_data,
             context: vulkan.context(),
@@ -340,14 +335,8 @@ impl Drop for Pipeline {
                 .destroy_pipeline_layout(self.layout, None);
             self.context
                 .device
-                .destroy_descriptor_set_layout(self.descriptor_layout, None);
-            self.context.device.destroy_sampler(self.sampler, None);
-            self.context
-                .device
-                .destroy_descriptor_pool(self.descriptor_pool, None);
-            self.context
-                .device
                 .destroy_render_pass(self.renderpass, None);
+            self.context.device.destroy_sampler(self.sampler, None);
         }
     }
 }

@@ -8,11 +8,10 @@ use vulkan::{
 
 use std::path::Path;
 
-use winit::event::{ElementState, Event, KeyboardInput, VirtualKeyCode, WindowEvent};
-use winit::event_loop::{ControlFlow, EventLoop};
-
 use pipelines::{mesh_pipeline, Light, PushConstantModel, Vertex};
 use std::sync::Arc;
+use winit::event::{ElementState, Event, KeyboardInput, VirtualKeyCode, WindowEvent};
+use winit::event_loop::{ControlFlow, EventLoop};
 
 fn main() {
     let event_loop = EventLoop::new();
@@ -65,8 +64,6 @@ fn main() {
 
     let mut tick_counter = FPSLimiter::new();
 
-    use cgmath::Zero;
-
     let mut scene_data = PushConstantModel::new(
         cgmath::Decomposed {
             scale: 1.0,
@@ -93,6 +90,20 @@ fn main() {
         0.5,
     ));
 
+    let extent = vk::Rect2D {
+        offset: vk::Offset2D { x: 0, y: 0 },
+        extent: swapchain.extent,
+    };
+
+    let viewports = [vk::Viewport {
+        x: 0.0,
+        y: 0.0,
+        width: swapchain.extent.width as f32,
+        height: swapchain.extent.height as f32,
+        min_depth: 0.0,
+        max_depth: 1.0,
+    }];
+
     event_loop.run(move |event, _, control_flow| match event {
         Event::WindowEvent { event, .. } => match event {
             WindowEvent::CloseRequested => *control_flow = ControlFlow::Exit,
@@ -118,6 +129,8 @@ fn main() {
         Event::RedrawRequested(_window_id) => {
             let delta_time = tick_counter.delta_time();
             // rotate cube
+
+            use cgmath::Zero;
             let transform: cgmath::Decomposed<cgmath::Vector3<f32>, cgmath::Basis3<f32>> =
                 cgmath::Decomposed {
                     scale: 1.0,
@@ -127,23 +140,9 @@ fn main() {
 
             scene_data.update_transform(transform);
 
-            let extent = vk::Rect2D {
-                offset: vk::Offset2D { x: 0, y: 0 },
-                extent: swapchain.extent,
-            };
-
-            let viewports = [vk::Viewport {
-                x: 0.0,
-                y: 0.0,
-                width: swapchain.extent.width as f32,
-                height: swapchain.extent.height as f32,
-                min_depth: 0.0,
-                max_depth: 1.0,
-            }];
-
             let next_frame = queue.next_frame(&swapchain);
 
-            let render_pass_info = vk::RenderPassBeginInfo::builder()
+            let scene_pass = vk::RenderPassBeginInfo::builder()
                 .framebuffer(framebuffers[next_frame.image_index].buffer())
                 .render_pass(pipeline.renderpass)
                 .render_area(extent)
@@ -169,55 +168,6 @@ fn main() {
                 |command_buffer, device| unsafe {
                     device.cmd_set_viewport(command_buffer, 0, &viewports);
                     device.cmd_set_scissor(command_buffer, 0, &[extent]);
-                    device.cmd_push_constants(
-                        command_buffer,
-                        pipeline.shadow_layout,
-                        vk::ShaderStageFlags::VERTEX,
-                        0,
-                        as_byte_slice(&scene_data),
-                    );
-
-                    //Shadow
-                    device.cmd_begin_render_pass(
-                        command_buffer,
-                        &pipeline.shadow_pipeline.render_pass_info,
-                        vk::SubpassContents::INLINE,
-                    );
-                    device.cmd_bind_pipeline(
-                        command_buffer,
-                        vk::PipelineBindPoint::GRAPHICS,
-                        pipeline.shadow_pipeline.pipeline,
-                    );
-                    device.cmd_bind_descriptor_sets(
-                        command_buffer,
-                        vk::PipelineBindPoint::GRAPHICS,
-                        pipeline.shadow_layout,
-                        0,
-                        &[pipeline.shadow_descriptor.set],
-                        &[],
-                    );
-                    device.cmd_bind_vertex_buffers(
-                        command_buffer,
-                        0,
-                        &[scene_vert_buffer.buffer],
-                        &[0],
-                    );
-                    device.cmd_bind_index_buffer(
-                        command_buffer,
-                        scene_index_buffer.buffer,
-                        0,
-                        vk::IndexType::UINT32,
-                    );
-                    device.cmd_draw_indexed(
-                        command_buffer,
-                        scene_batch.indices.len() as u32,
-                        1,
-                        0,
-                        0,
-                        1,
-                    );
-
-                    device.cmd_end_render_pass(command_buffer);
 
                     //Scene
 
@@ -230,7 +180,7 @@ fn main() {
                     );
                     device.cmd_begin_render_pass(
                         command_buffer,
-                        &render_pass_info,
+                        &scene_pass,
                         vk::SubpassContents::INLINE,
                     );
                     device.cmd_bind_pipeline(
