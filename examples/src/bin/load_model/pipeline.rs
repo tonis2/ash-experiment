@@ -305,7 +305,7 @@ impl Pipeline {
                 .expect("Unable to create graphics pipeline")
         };
 
-        let depth_image = examples::create_depth_resources(&swapchain, &vulkan);
+        let depth_image = examples::create_depth_resources(&swapchain, vulkan.context());
 
         //Destoy shader modules
         unsafe {

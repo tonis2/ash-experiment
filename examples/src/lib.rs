@@ -1,7 +1,7 @@
 use image::GenericImageView;
-use vulkan::{prelude::*, Buffer, Image, Swapchain, VkInstance};
+use vulkan::{prelude::*, Buffer, Context, Image, Swapchain, VkInstance};
 
-use std::{default::Default, path::Path};
+use std::{default::Default, path::Path, sync::Arc};
 
 pub fn create_texture(image_path: &Path, vulkan: &VkInstance) -> Image {
     let mut image_object = image::open(image_path).unwrap(); // this function is slow in debug mode.
@@ -114,8 +114,8 @@ pub fn create_texture(image_path: &Path, vulkan: &VkInstance) -> Image {
 }
 
 //Creates depth image
-pub fn create_depth_resources(swapchain: &Swapchain, vulkan: &VkInstance) -> Image {
-    let depth_format = vulkan.context.find_depth_format(
+pub fn create_depth_resources(swapchain: &Swapchain, context: Arc<Context>) -> Image {
+    let depth_format = context.find_depth_format(
         &[
             vk::Format::D32_SFLOAT,
             vk::Format::D32_SFLOAT_S8_UINT,
@@ -142,11 +142,7 @@ pub fn create_depth_resources(swapchain: &Swapchain, vulkan: &VkInstance) -> Ima
         ..Default::default()
     };
 
-    let mut image = Image::create_image(
-        depth_image_info,
-        vk_mem::MemoryUsage::GpuOnly,
-        vulkan.context(),
-    );
+    let mut image = Image::create_image(depth_image_info, vk_mem::MemoryUsage::GpuOnly, context);
 
     image.attach_view(vk::ImageViewCreateInfo {
         s_type: vk::StructureType::IMAGE_VIEW_CREATE_INFO,
@@ -163,19 +159,9 @@ pub fn create_depth_resources(swapchain: &Swapchain, vulkan: &VkInstance) -> Ima
         ..Default::default()
     });
 
-    // vulkan.transition_image_layout(
-    //     image.image,
-    //     depth_format,
-    //     vk::ImageLayout::UNDEFINED,
-    //     vk::ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
-    //     1,
-    // );
-
     image
 }
 
 pub const OPENGL_TO_VULKAN_MATRIX: cgmath::Matrix4<f32> = cgmath::Matrix4::new(
     1.0, 0.0, 0.0, 0.0, 0.0, -1.0, 0.0, 0.0, 0.0, 0.0, 0.5, 0.0, 0.0, 0.0, 0.5, 1.0,
 );
-
-

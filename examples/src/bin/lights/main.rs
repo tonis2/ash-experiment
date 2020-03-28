@@ -168,9 +168,6 @@ fn main() {
                 |command_buffer, device| unsafe {
                     device.cmd_set_viewport(command_buffer, 0, &viewports);
                     device.cmd_set_scissor(command_buffer, 0, &[extent]);
-
-                    //Scene
-
                     device.cmd_push_constants(
                         command_buffer,
                         pipeline.layout,
@@ -178,6 +175,51 @@ fn main() {
                         0,
                         as_byte_slice(&scene_data),
                     );
+
+                    device.cmd_begin_render_pass(
+                        command_buffer,
+                        &pipeline.shadow_pipeline.render_pass_info,
+                        vk::SubpassContents::INLINE,
+                    );
+
+                    device.cmd_bind_pipeline(
+                        command_buffer,
+                        vk::PipelineBindPoint::GRAPHICS,
+                        pipeline.shadow_pipeline.pipeline,
+                    );
+                    device.cmd_bind_descriptor_sets(
+                        command_buffer,
+                        vk::PipelineBindPoint::GRAPHICS,
+                        pipeline.shadow_layout,
+                        0,
+                        &[pipeline.shadow_descriptor.set],
+                        &[],
+                    );
+
+                    device.cmd_bind_vertex_buffers(
+                        command_buffer,
+                        0,
+                        &[scene_vert_buffer.buffer],
+                        &[0],
+                    );
+                    device.cmd_bind_index_buffer(
+                        command_buffer,
+                        scene_index_buffer.buffer,
+                        0,
+                        vk::IndexType::UINT32,
+                    );
+                    device.cmd_draw_indexed(
+                        command_buffer,
+                        scene_batch.indices.len() as u32,
+                        1,
+                        0,
+                        0,
+                        1,
+                    );
+
+                    device.cmd_end_render_pass(command_buffer);
+
+                    //Scene
                     device.cmd_begin_render_pass(
                         command_buffer,
                         &scene_pass,
@@ -195,6 +237,27 @@ fn main() {
                         0,
                         &[pipeline.pipeline_descriptor.set],
                         &[],
+                    );
+
+                    device.cmd_bind_vertex_buffers(
+                        command_buffer,
+                        0,
+                        &[scene_vert_buffer.buffer],
+                        &[0],
+                    );
+                    device.cmd_bind_index_buffer(
+                        command_buffer,
+                        scene_index_buffer.buffer,
+                        0,
+                        vk::IndexType::UINT32,
+                    );
+                    device.cmd_draw_indexed(
+                        command_buffer,
+                        scene_batch.indices.len() as u32,
+                        1,
+                        0,
+                        0,
+                        1,
                     );
 
                     //Ball

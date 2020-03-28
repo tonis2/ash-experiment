@@ -35,7 +35,7 @@ impl Pipeline {
     //Creates a new pipeline
     pub fn new(swapchain: &Swapchain, vulkan: &VkInstance) -> Pipeline {
         //Create buffer data
-        let depth_image = examples::create_depth_resources(&swapchain, &vulkan);
+        let depth_image = examples::create_depth_resources(&swapchain, vulkan.context());
         let uniform_data = UniformBufferObject::new(&swapchain);
 
         let light_data = Light::new(
@@ -123,8 +123,7 @@ impl Pipeline {
                 .unwrap()
         };
 
-        let shadow_pipeline =
-            shadowmap_pipeline::Pipeline::new(&swapchain, vulkan.context.clone(), shadow_layout);
+        let shadow_pipeline = shadowmap_pipeline::Pipeline::new(&swapchain, &vulkan, shadow_layout);
         let pipeline_descriptor = Descriptor::new(
             vec![
                 vk::DescriptorSetLayoutBinding {
@@ -388,20 +387,18 @@ pub fn create_render_pass(swapchain: &Swapchain, vulkan: &VkInstance) -> vk::Ren
         })
         .build();
 
-    let subpass_dependencies = [vk::SubpassDependency {
-        src_subpass: vk::SUBPASS_EXTERNAL,
-        dst_subpass: 0,
-        src_stage_mask: vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT,
-        dst_stage_mask: vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT,
-        src_access_mask: vk::AccessFlags::empty(),
-        dst_access_mask: vk::AccessFlags::COLOR_ATTACHMENT_READ
-            | vk::AccessFlags::COLOR_ATTACHMENT_WRITE,
-        dependency_flags: vk::DependencyFlags::empty(),
-    }];
-
     let renderpass_create_info = vk::RenderPassCreateInfo::builder()
         .subpasses(&[subpasses])
-        .dependencies(&subpass_dependencies)
+        .dependencies(&[vk::SubpassDependency {
+            src_subpass: vk::SUBPASS_EXTERNAL,
+            dst_subpass: 0,
+            src_stage_mask: vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT,
+            dst_stage_mask: vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT,
+            src_access_mask: vk::AccessFlags::empty(),
+            dst_access_mask: vk::AccessFlags::COLOR_ATTACHMENT_READ
+                | vk::AccessFlags::COLOR_ATTACHMENT_WRITE,
+            dependency_flags: vk::DependencyFlags::empty(),
+        }])
         .attachments(&[
             vk::AttachmentDescription {
                 flags: vk::AttachmentDescriptionFlags::empty(),

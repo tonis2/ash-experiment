@@ -1,7 +1,8 @@
 use super::Vertex;
 use std::{default::Default, ffi::CString, mem, path::Path, sync::Arc};
-use vulkan::{offset_of, prelude::*, utilities::Shader, Context, Framebuffer, Image, Swapchain};
-
+use vulkan::{
+    offset_of, prelude::*, utilities::Shader, Context, Framebuffer, Image, Swapchain, VkInstance,
+};
 
 pub struct Pipeline {
     pub framebuffer: Framebuffer,
@@ -14,9 +15,9 @@ pub struct Pipeline {
 }
 
 impl Pipeline {
-    pub fn new(swapchain: &Swapchain, context: Arc<Context>, layout: vk::PipelineLayout) -> Self {
+    pub fn new(swapchain: &Swapchain, vulkan: &VkInstance, layout: vk::PipelineLayout) -> Self {
         //Create shadow pipeline stuff
-
+        let context = vulkan.context();
         let noop_stencil_state = vk::StencilOpState {
             fail_op: vk::StencilOp::KEEP,
             pass_op: vk::StencilOp::KEEP,
@@ -56,16 +57,13 @@ impl Pipeline {
                 .create_graphics_pipelines(
                     vk::PipelineCache::null(),
                     &[vk::GraphicsPipelineCreateInfo::builder()
-                        .stages(&[
-                            Shader::new(
-                                &Path::new("src/bin/lights/shaders/offscreen.vert.spv"),
-                                vk::ShaderStageFlags::VERTEX,
-                                &shader_name,
-                                context.clone(),
-                            )
-                            .info(),
-
-                        ])
+                        .stages(&[Shader::new(
+                            &Path::new("src/bin/lights/shaders/offscreen.vert.spv"),
+                            vk::ShaderStageFlags::VERTEX,
+                            &shader_name,
+                            context.clone(),
+                        )
+                        .info()])
                         .vertex_input_state(
                             &vk::PipelineVertexInputStateCreateInfo::builder()
                                 .vertex_binding_descriptions(&[vk::VertexInputBindingDescription {
@@ -105,7 +103,7 @@ impl Pipeline {
                         .depth_stencil_state(&vk::PipelineDepthStencilStateCreateInfo {
                             depth_test_enable: 1,
                             depth_write_enable: 1,
-                            depth_compare_op: vk::CompareOp::LESS_OR_EQUAL,
+                            depth_compare_op: vk::CompareOp::LESS,
                             front: noop_stencil_state,
                             back: noop_stencil_state,
                             max_depth_bounds: 1.0,
@@ -153,8 +151,7 @@ impl Pipeline {
                 array_layers: 1,
                 samples: vk::SampleCountFlags::TYPE_1,
                 tiling: vk::ImageTiling::OPTIMAL,
-                usage: vk::ImageUsageFlags::DEPTH_STENCIL_ATTACHMENT
-                    | vk::ImageUsageFlags::SAMPLED,
+                usage: vk::ImageUsageFlags::DEPTH_STENCIL_ATTACHMENT | vk::ImageUsageFlags::SAMPLED,
                 sharing_mode: vk::SharingMode::EXCLUSIVE,
                 ..Default::default()
             },
@@ -182,7 +179,7 @@ impl Pipeline {
             image: shadow_map_image.image,
             ..Default::default()
         });
-
+        
         let sampler = unsafe {
             context
                 .device
@@ -243,18 +240,6 @@ impl Pipeline {
     }
 
     fn create_render_pass(context: Arc<Context>, depth_format: vk::Format) -> vk::RenderPass {
-        let depth_attachment = vk::AttachmentDescription {
-            flags: vk::AttachmentDescriptionFlags::empty(),
-            format: depth_format,
-            samples: vk::SampleCountFlags::TYPE_1,
-            load_op: vk::AttachmentLoadOp::CLEAR,
-            store_op: vk::AttachmentStoreOp::STORE,
-            stencil_load_op: vk::AttachmentLoadOp::CLEAR,
-            stencil_store_op: vk::AttachmentStoreOp::STORE,
-            initial_layout: vk::ImageLayout::UNDEFINED,
-            final_layout: vk::ImageLayout::DEPTH_READ_ONLY_STENCIL_ATTACHMENT_OPTIMAL,
-        };
-
         let subpasses = vk::SubpassDescription::builder()
             .depth_stencil_attachment(&vk::AttachmentReference {
                 attachment: 0,
@@ -263,7 +248,17 @@ impl Pipeline {
             .build();
 
         let renderpass_create_info = vk::RenderPassCreateInfo::builder()
-            .attachments(&[depth_attachment])
+            .attachments(&[vk::AttachmentDescription {
+                flags: vk::AttachmentDescriptionFlags::empty(),
+                format: depth_format,
+                samples: vk::SampleCountFlags::TYPE_1,
+                load_op: vk::AttachmentLoadOp::CLEAR,
+                store_op: vk::AttachmentStoreOp::STORE,
+                stencil_load_op: vk::AttachmentLoadOp::DONT_CARE,
+                stencil_store_op: vk::AttachmentStoreOp::DONT_CARE,
+                initial_layout: vk::ImageLayout::UNDEFINED,
+                final_layout: vk::ImageLayout::DEPTH_READ_ONLY_STENCIL_ATTACHMENT_OPTIMAL,
+            }])
             .subpasses(&[subpasses])
             .dependencies(&[
                 vk::SubpassDependency {
