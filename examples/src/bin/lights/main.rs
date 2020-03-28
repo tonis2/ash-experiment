@@ -23,9 +23,7 @@ fn main() {
 
     let vulkan = Arc::new(Context::new(&window, "lights", true));
     let mut queue = Queue::new(vulkan.clone());
-
     let instance = VkInstance::new(vulkan.clone());
-
     let swapchain = Swapchain::new(vulkan.clone(), &window);
 
     let mut pipeline = mesh_pipeline::Pipeline::new(&swapchain, &instance);
@@ -48,6 +46,17 @@ fn main() {
             )
         })
         .collect();
+
+    let shadow_framebuffer: Framebuffer = Framebuffer::new(
+        vk::FramebufferCreateInfo::builder()
+            .layers(1)
+            .render_pass(pipeline.shadow_pipeline.renderpass)
+            .attachments(&[pipeline.shadow_pipeline.image.view()])
+            .width(swapchain.width())
+            .height(swapchain.height())
+            .build(),
+        vulkan.clone(),
+    );
 
     let scene_batch = load_model(Path::new("assets/lights.obj"));
     let scene_vert_buffer =
@@ -163,6 +172,19 @@ fn main() {
                 ])
                 .build();
 
+            let shadow_pass_info = vk::RenderPassBeginInfo::builder()
+                .framebuffer(shadow_framebuffer.buffer())
+                .render_pass(pipeline.shadow_pipeline.renderpass)
+                .render_area(extent)
+                .clear_values(&[vk::ClearValue {
+                    // clear value for depth buffer
+                    depth_stencil: vk::ClearDepthStencilValue {
+                        depth: 1.0,
+                        stencil: 0,
+                    },
+                }])
+                .build();
+
             instance.build_command(
                 command_buffers[next_frame.image_index],
                 |command_buffer, device| unsafe {
@@ -178,7 +200,7 @@ fn main() {
 
                     device.cmd_begin_render_pass(
                         command_buffer,
-                        &pipeline.shadow_pipeline.render_pass_info,
+                        &shadow_pass_info,
                         vk::SubpassContents::INLINE,
                     );
 

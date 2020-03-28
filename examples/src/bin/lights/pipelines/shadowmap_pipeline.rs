@@ -1,17 +1,15 @@
 use super::Vertex;
 use std::{default::Default, ffi::CString, mem, path::Path, sync::Arc};
 use vulkan::{
-    offset_of, prelude::*, utilities::Shader, Context, Framebuffer, Image, Swapchain, VkInstance,
+    offset_of, prelude::*, utilities::Shader, Context, Image, Swapchain, VkInstance,
 };
 
 pub struct Pipeline {
-    pub framebuffer: Framebuffer,
-    pub renderpass: vk::RenderPass,
-    pub render_pass_info: vk::RenderPassBeginInfo,
     pub sampler: vk::Sampler,
     pub image: Image,
     pub pipeline: vk::Pipeline,
-    pub context: Arc<Context>,
+    pub renderpass: vk::RenderPass,
+    context: Arc<Context>,
 }
 
 impl Pipeline {
@@ -179,7 +177,7 @@ impl Pipeline {
             image: shadow_map_image.image,
             ..Default::default()
         });
-        
+
         let sampler = unsafe {
             context
                 .device
@@ -204,36 +202,10 @@ impl Pipeline {
                 .expect("Failed to create Sampler!")
         };
 
-        let framebuffer = Framebuffer::new(
-            vk::FramebufferCreateInfo::builder()
-                .layers(1)
-                .render_pass(renderpass)
-                .attachments(&[shadow_map_image.view()])
-                .width(swapchain.width())
-                .height(swapchain.height())
-                .build(),
-            context.clone(),
-        );
-
-        let render_pass_info = vk::RenderPassBeginInfo::builder()
-            .framebuffer(framebuffer.buffer())
-            .render_pass(renderpass)
-            .render_area(scissors)
-            .clear_values(&[vk::ClearValue {
-                // clear value for depth buffer
-                depth_stencil: vk::ClearDepthStencilValue {
-                    depth: 1.0,
-                    stencil: 0,
-                },
-            }])
-            .build();
-
         Pipeline {
-            framebuffer,
-            renderpass,
             sampler,
+            renderpass,
             pipeline,
-            render_pass_info,
             image: shadow_map_image,
             context,
         }
