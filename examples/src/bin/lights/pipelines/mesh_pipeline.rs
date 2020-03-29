@@ -3,13 +3,14 @@ use vulkan::{
     Descriptor, Image, VkInstance,
 };
 
-use super::{debug_pipeline, shadowmap_pipeline};
+use super::shadowmap_pipeline;
 use super::{Light, PushConstantModel, UniformBufferObject, Vertex};
 use std::{default::Default, ffi::CString, mem, path::Path, ptr, sync::Arc};
 
 pub struct Pipeline {
     pub pipeline: vk::Pipeline,
     pub shadow_pipeline: shadowmap_pipeline::Pipeline,
+
     pub layout: vk::PipelineLayout,
 
     pub depth_image: Image,
@@ -71,26 +72,13 @@ impl Pipeline {
             .size(mem::size_of::<PushConstantModel>() as u32)
             .build();
 
-        let viewports = [vk::Viewport {
-            x: 0.0,
-            y: 0.0,
-            width: swapchain.extent.width as f32,
-            height: swapchain.extent.height as f32,
-            min_depth: 0.0,
-            max_depth: 1.0,
-        }];
-
-        let scissors = [vk::Rect2D {
-            offset: vk::Offset2D { x: 0, y: 0 },
-            extent: swapchain.extent,
-        }];
-
         let shadow_pipeline = shadowmap_pipeline::Pipeline::new(
             &swapchain,
             &vulkan,
             uniform_descriptor,
             push_constant_range,
         );
+
         let pipeline_descriptor = Descriptor::new(
             vec![
                 vk::DescriptorSetLayoutBinding {
@@ -236,8 +224,18 @@ impl Pipeline {
                         })
                         .viewport_state(
                             &vk::PipelineViewportStateCreateInfo::builder()
-                                .scissors(&scissors)
-                                .viewports(&viewports),
+                                .scissors(&[vk::Rect2D {
+                                    offset: vk::Offset2D { x: 0, y: 0 },
+                                    extent: swapchain.extent,
+                                }])
+                                .viewports(&[vk::Viewport {
+                                    x: 0.0,
+                                    y: 0.0,
+                                    width: swapchain.extent.width as f32,
+                                    height: swapchain.extent.height as f32,
+                                    min_depth: 0.0,
+                                    max_depth: 1.0,
+                                }]),
                         )
                         .rasterization_state(&vk::PipelineRasterizationStateCreateInfo {
                             front_face: vk::FrontFace::COUNTER_CLOCKWISE,

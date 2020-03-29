@@ -1,6 +1,5 @@
 pub mod mesh_pipeline;
 pub mod shadowmap_pipeline;
-pub mod debug_pipeline;
 
 use cgmath::{Deg, Matrix4, Point3, Vector3};
 use vulkan::Swapchain;
