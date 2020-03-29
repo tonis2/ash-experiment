@@ -3,7 +3,6 @@ pub mod shadowmap_pipeline;
 
 use cgmath::{Deg, Matrix4, Point3, Vector3, Vector4};
 
-
 #[derive(Clone, Debug, Copy)]
 pub struct Vertex {
     pub pos: [f32; 3],
@@ -60,16 +59,11 @@ impl Camera {
             position: position.to_homogeneous(),
             view: Matrix4::look_at(
                 position,
-                Point3::new(0.0, 0.0, 1.0),
-                Vector3::new(0.0, 3.0, 1.0),
+                Point3::new(0.0, 0.0, 0.0),
+                Vector3::new(0.0, 1.0, 0.0),
             ),
             proj: {
-                let proj = cgmath::perspective(
-                    Deg(45.0),
-                    aspect,
-                    0.1,
-                    100.0,
-                );
+                let proj = cgmath::perspective(Deg(45.0), aspect, 0.1, 100.0);
                 examples::OPENGL_TO_VULKAN_MATRIX * proj
             },
         }
