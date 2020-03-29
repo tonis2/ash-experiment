@@ -3,16 +3,14 @@ use vulkan::{
     Descriptor, Image, VkInstance,
 };
 
-use super::shadowmap_pipeline;
+use super::{debug_pipeline, shadowmap_pipeline};
 use super::{Light, PushConstantModel, UniformBufferObject, Vertex};
 use std::{default::Default, ffi::CString, mem, path::Path, ptr, sync::Arc};
 
 pub struct Pipeline {
     pub pipeline: vk::Pipeline,
     pub shadow_pipeline: shadowmap_pipeline::Pipeline,
-
     pub layout: vk::PipelineLayout,
-    pub shadow_layout: vk::PipelineLayout,
 
     pub depth_image: Image,
     pub uniform_buffer: Buffer,
@@ -23,7 +21,6 @@ pub struct Pipeline {
     pub renderpass: vk::RenderPass,
 
     pub pipeline_descriptor: Descriptor,
-    pub shadow_descriptor: Descriptor,
 
     context: Arc<Context>,
 }
@@ -63,6 +60,12 @@ impl Pipeline {
         uniform_buffer.upload_to_buffer(&[uniform_data], 0);
         light_buffer.upload_to_buffer(&[light_data], 0);
 
+        let uniform_descriptor = vk::DescriptorBufferInfo {
+            buffer: uniform_buffer.buffer,
+            offset: 0,
+            range: std::mem::size_of_val(&uniform_data) as u64,
+        };
+
         let push_constant_range = vk::PushConstantRange::builder()
             .stage_flags(vk::ShaderStageFlags::VERTEX)
             .size(mem::size_of::<PushConstantModel>() as u32)
@@ -82,48 +85,12 @@ impl Pipeline {
             extent: swapchain.extent,
         }];
 
-        let shadow_descriptor = Descriptor::new(
-            vec![vk::DescriptorSetLayoutBinding {
-                // transform uniform
-                binding: 0,
-                descriptor_type: vk::DescriptorType::UNIFORM_BUFFER,
-                descriptor_count: 1,
-                stage_flags: vk::ShaderStageFlags::VERTEX,
-                p_immutable_samplers: ptr::null(),
-            }],
-            vec![vk::WriteDescriptorSet {
-                // transform uniform
-                dst_binding: 0,
-                dst_array_element: 0,
-                descriptor_count: 1,
-                descriptor_type: vk::DescriptorType::UNIFORM_BUFFER,
-                p_buffer_info: [vk::DescriptorBufferInfo {
-                    buffer: uniform_buffer.buffer,
-                    offset: 0,
-                    range: std::mem::size_of_val(&uniform_data) as u64,
-                }]
-                .as_ptr(),
-                ..Default::default()
-            }],
-            swapchain.images.len() as u32,
-            vulkan.context(),
+        let shadow_pipeline = shadowmap_pipeline::Pipeline::new(
+            &swapchain,
+            &vulkan,
+            uniform_descriptor,
+            push_constant_range,
         );
-
-        let shadow_layout = unsafe {
-            vulkan
-                .context
-                .device
-                .create_pipeline_layout(
-                    &vk::PipelineLayoutCreateInfo::builder()
-                        .set_layouts(&[shadow_descriptor.layout])
-                        .push_constant_ranges(&[push_constant_range])
-                        .build(),
-                    None,
-                )
-                .unwrap()
-        };
-
-        let shadow_pipeline = shadowmap_pipeline::Pipeline::new(&swapchain, &vulkan, shadow_layout);
         let pipeline_descriptor = Descriptor::new(
             vec![
                 vk::DescriptorSetLayoutBinding {
@@ -158,12 +125,7 @@ impl Pipeline {
                     dst_array_element: 0,
                     descriptor_count: 1,
                     descriptor_type: vk::DescriptorType::UNIFORM_BUFFER,
-                    p_buffer_info: [vk::DescriptorBufferInfo {
-                        buffer: uniform_buffer.buffer,
-                        offset: 0,
-                        range: std::mem::size_of_val(&uniform_data) as u64,
-                    }]
-                    .as_ptr(),
+                    p_buffer_info: [uniform_descriptor].as_ptr(),
                     ..Default::default()
                 },
                 vk::WriteDescriptorSet {
@@ -329,7 +291,6 @@ impl Pipeline {
             shadow_pipeline,
 
             layout: pipeline_layout,
-            shadow_layout,
             depth_image,
 
             uniform_buffer,
@@ -339,7 +300,6 @@ impl Pipeline {
             renderpass,
 
             pipeline_descriptor,
-            shadow_descriptor,
 
             context: vulkan.context(),
         }
@@ -354,9 +314,6 @@ impl Drop for Pipeline {
             self.context
                 .device
                 .destroy_pipeline_layout(self.layout, None);
-            self.context
-                .device
-                .destroy_pipeline_layout(self.shadow_layout, None);
 
             self.context
                 .device

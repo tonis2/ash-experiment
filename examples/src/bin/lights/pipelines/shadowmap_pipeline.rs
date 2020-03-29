@@ -1,16 +1,25 @@
 use super::Vertex;
-use std::{default::Default, ffi::CString, mem, path::Path, sync::Arc};
-use vulkan::{offset_of, prelude::*, utilities::Shader, Context, Image, Swapchain, VkInstance};
+use std::{default::Default, ffi::CString, mem, path::Path, ptr, sync::Arc};
+use vulkan::{
+    offset_of, prelude::*, utilities::Shader, Context, Descriptor, Image, Swapchain, VkInstance,
+};
 
 pub struct Pipeline {
     pub image: Image,
     pub pipeline: vk::Pipeline,
     pub renderpass: vk::RenderPass,
+    pub layout: vk::PipelineLayout,
+    pub descriptor: Descriptor,
     context: Arc<Context>,
 }
 
 impl Pipeline {
-    pub fn new(swapchain: &Swapchain, vulkan: &VkInstance, layout: vk::PipelineLayout) -> Self {
+    pub fn new(
+        swapchain: &Swapchain,
+        vulkan: &VkInstance,
+        uniform_data: vk::DescriptorBufferInfo,
+        pushconstant: vk::PushConstantRange,
+    ) -> Self {
         //Create shadow pipeline stuff
         let context = vulkan.context();
         let noop_stencil_state = vk::StencilOpState {
@@ -43,6 +52,42 @@ impl Pipeline {
             vk::ImageTiling::OPTIMAL,
             vk::FormatFeatureFlags::DEPTH_STENCIL_ATTACHMENT,
         );
+
+        let shadow_descriptor = Descriptor::new(
+            vec![vk::DescriptorSetLayoutBinding {
+                // transform uniform
+                binding: 0,
+                descriptor_type: vk::DescriptorType::UNIFORM_BUFFER,
+                descriptor_count: 1,
+                stage_flags: vk::ShaderStageFlags::VERTEX,
+                p_immutable_samplers: ptr::null(),
+            }],
+            vec![vk::WriteDescriptorSet {
+                // transform uniform
+                dst_binding: 0,
+                dst_array_element: 0,
+                descriptor_count: 1,
+                descriptor_type: vk::DescriptorType::UNIFORM_BUFFER,
+                p_buffer_info: [uniform_data].as_ptr(),
+                ..Default::default()
+            }],
+            swapchain.images.len() as u32,
+            vulkan.context(),
+        );
+
+        let shadow_layout = unsafe {
+            vulkan
+                .context
+                .device
+                .create_pipeline_layout(
+                    &vk::PipelineLayoutCreateInfo::builder()
+                        .set_layouts(&[shadow_descriptor.layout])
+                        .push_constant_ranges(&[pushconstant])
+                        .build(),
+                    None,
+                )
+                .unwrap()
+        };
 
         let renderpass = Self::create_render_pass(context.clone(), depth_format);
         let shader_name = CString::new("main").unwrap();
@@ -124,7 +169,7 @@ impl Pipeline {
                                 vk::DynamicState::SCISSOR,
                             ]),
                         )
-                        .layout(layout)
+                        .layout(shadow_layout)
                         .render_pass(renderpass)
                         .build()],
                     None,
@@ -195,6 +240,8 @@ impl Pipeline {
             renderpass,
             pipeline,
             image: shadow_map_image,
+            layout: shadow_layout,
+            descriptor: shadow_descriptor,
             context,
         }
     }
@@ -259,6 +306,9 @@ impl Drop for Pipeline {
             self.context
                 .device
                 .destroy_render_pass(self.renderpass, None);
+            self.context
+                .device
+                .destroy_pipeline_layout(self.layout, None);
         }
     }
 }

@@ -1,13 +1,10 @@
-use cgmath::{Deg, Matrix4, Point3, Vector3};
 use vulkan::{
     modules::swapchain::Swapchain,
     offset_of,
     prelude::*,
-    utilities::{tools::Shader, Buffer, Image},
+    utilities::{tools::Shader, Image},
     Context, Descriptor, VkInstance,
 };
-
-use super::UniformBufferObject;
 
 use std::default::Default;
 use std::ffi::CString;
@@ -27,18 +24,18 @@ pub struct Pipeline {
     pub pipeline: vk::Pipeline,
     pub layout: vk::PipelineLayout,
     pub texture: Image,
-    pub sampler: vk::Sampler,
-    pub uniform_buffer: Buffer,
-    pub uniform_transform: UniformBufferObject,
     pub renderpass: vk::RenderPass,
-    context: Arc<Context>,
-
     pub pipeline_descriptor: Descriptor,
+    context: Arc<Context>,
 }
 
 impl Pipeline {
     //Creates a new pipeline
-    pub fn create_pipeline(swapchain: &Swapchain, uniform_data: UniformBufferObject, vulkan: &VkInstance) -> Pipeline {
+    pub fn create_pipeline(
+        swapchain: &Swapchain,
+        uniform_data: vk::DescriptorBufferInfo,
+        vulkan: &VkInstance,
+    ) -> Pipeline {
         let viewports = [vk::Viewport {
             x: 0.0,
             y: 0.0,
@@ -47,12 +44,11 @@ impl Pipeline {
             min_depth: 0.0,
             max_depth: 1.0,
         }];
-        
+
         let scissors = [vk::Rect2D {
             offset: vk::Offset2D { x: 0, y: 0 },
             extent: swapchain.extent,
         }];
-     
 
         let noop_stencil_state = vk::StencilOpState {
             fail_op: vk::StencilOp::KEEP,
@@ -65,28 +61,6 @@ impl Pipeline {
         //Create texture image
 
         let texture = examples::create_texture(&Path::new("assets/texture.jpg"), &vulkan);
-
-        let sampler_create_info = vk::SamplerCreateInfo {
-            s_type: vk::StructureType::SAMPLER_CREATE_INFO,
-            mag_filter: vk::Filter::LINEAR,
-            min_filter: vk::Filter::LINEAR,
-            mipmap_mode: vk::SamplerMipmapMode::LINEAR,
-            address_mode_u: vk::SamplerAddressMode::REPEAT,
-            address_mode_v: vk::SamplerAddressMode::REPEAT,
-            address_mode_w: vk::SamplerAddressMode::REPEAT,
-            mip_lod_bias: 0.0,
-            anisotropy_enable: vk::TRUE,
-            max_anisotropy: 16.0,
-            ..Default::default()
-        };
-
-        let sampler = unsafe {
-            vulkan
-                .context
-                .device
-                .create_sampler(&sampler_create_info, None)
-                .expect("Failed to create Sampler!")
-        };
 
         //Create uniform buffer
 
@@ -117,12 +91,7 @@ impl Pipeline {
                     dst_array_element: 0,
                     descriptor_count: 1,
                     descriptor_type: vk::DescriptorType::UNIFORM_BUFFER,
-                    p_buffer_info: [vk::DescriptorBufferInfo {
-                        buffer: uniform_buffer.buffer,
-                        offset: 0,
-                        range: std::mem::size_of_val(&uniform_data) as u64,
-                    }]
-                    .as_ptr(),
+                    p_buffer_info: [uniform_data].as_ptr(),
                     ..Default::default()
                 },
                 vk::WriteDescriptorSet {
@@ -133,7 +102,7 @@ impl Pipeline {
                     descriptor_count: 1,
                     descriptor_type: vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
                     p_image_info: [vk::DescriptorImageInfo {
-                        sampler: sampler,
+                        sampler: texture.sampler(),
                         image_view: texture.view(),
                         image_layout: vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
                     }]
@@ -164,22 +133,22 @@ impl Pipeline {
                 .create_graphics_pipelines(
                     vk::PipelineCache::null(),
                     &[vk::GraphicsPipelineCreateInfo::builder()
-                    .stages(&[
-                        Shader::new(
-                            &Path::new("src/bin/lights/shaders/mesh.vert.spv"),
-                            vk::ShaderStageFlags::VERTEX,
-                            &shader_name,
-                            vulkan.context(),
-                        )
-                        .info(),
-                        Shader::new(
-                            &Path::new("src/bin/lights/shaders/mesh.frag.spv"),
-                            vk::ShaderStageFlags::FRAGMENT,
-                            &shader_name,
-                            vulkan.context(),
-                        )
-                        .info(),
-                    ])
+                        .stages(&[
+                            Shader::new(
+                                &Path::new("src/bin/lights/shaders/mesh.vert.spv"),
+                                vk::ShaderStageFlags::VERTEX,
+                                &shader_name,
+                                vulkan.context(),
+                            )
+                            .info(),
+                            Shader::new(
+                                &Path::new("src/bin/lights/shaders/mesh.frag.spv"),
+                                vk::ShaderStageFlags::FRAGMENT,
+                                &shader_name,
+                                vulkan.context(),
+                            )
+                            .info(),
+                        ])
                         .vertex_input_state(
                             &vk::PipelineVertexInputStateCreateInfo::builder()
                                 .vertex_binding_descriptions(&[vk::VertexInputBindingDescription {
@@ -213,9 +182,11 @@ impl Pipeline {
                             topology: vk::PrimitiveTopology::TRIANGLE_LIST,
                             ..Default::default()
                         })
-                        .viewport_state(&vk::PipelineViewportStateCreateInfo::builder()
-                        .scissors(&scissors)
-                        .viewports(&viewports))
+                        .viewport_state(
+                            &vk::PipelineViewportStateCreateInfo::builder()
+                                .scissors(&scissors)
+                                .viewports(&viewports),
+                        )
                         .rasterization_state(&vk::PipelineRasterizationStateCreateInfo {
                             front_face: vk::FrontFace::COUNTER_CLOCKWISE,
                             line_width: 1.0,
@@ -235,19 +206,26 @@ impl Pipeline {
                             max_depth_bounds: 1.0,
                             ..Default::default()
                         })
-                        .color_blend_state(& vk::PipelineColorBlendStateCreateInfo::builder()
-                        .logic_op(vk::LogicOp::CLEAR)
-                        .attachments(&[vk::PipelineColorBlendAttachmentState {
-                            blend_enable: 0,
-                            src_color_blend_factor: vk::BlendFactor::SRC_COLOR,
-                            dst_color_blend_factor: vk::BlendFactor::ONE_MINUS_DST_COLOR,
-                            color_blend_op: vk::BlendOp::ADD,
-                            src_alpha_blend_factor: vk::BlendFactor::ZERO,
-                            dst_alpha_blend_factor: vk::BlendFactor::ZERO,
-                            alpha_blend_op: vk::BlendOp::ADD,
-                            color_write_mask: vk::ColorComponentFlags::all(),
-                        }]))
-                        .dynamic_state(&vk::PipelineDynamicStateCreateInfo::builder().dynamic_states(&[vk::DynamicState::VIEWPORT, vk::DynamicState::SCISSOR]))
+                        .color_blend_state(
+                            &vk::PipelineColorBlendStateCreateInfo::builder()
+                                .logic_op(vk::LogicOp::CLEAR)
+                                .attachments(&[vk::PipelineColorBlendAttachmentState {
+                                    blend_enable: 0,
+                                    src_color_blend_factor: vk::BlendFactor::SRC_COLOR,
+                                    dst_color_blend_factor: vk::BlendFactor::ONE_MINUS_DST_COLOR,
+                                    color_blend_op: vk::BlendOp::ADD,
+                                    src_alpha_blend_factor: vk::BlendFactor::ZERO,
+                                    dst_alpha_blend_factor: vk::BlendFactor::ZERO,
+                                    alpha_blend_op: vk::BlendOp::ADD,
+                                    color_write_mask: vk::ColorComponentFlags::all(),
+                                }]),
+                        )
+                        .dynamic_state(
+                            &vk::PipelineDynamicStateCreateInfo::builder().dynamic_states(&[
+                                vk::DynamicState::VIEWPORT,
+                                vk::DynamicState::SCISSOR,
+                            ]),
+                        )
                         .layout(pipeline_layout)
                         .render_pass(renderpass)
                         .build()],
@@ -260,11 +238,8 @@ impl Pipeline {
             pipeline: pipeline[0],
             layout: pipeline_layout,
             texture,
-            sampler,
             renderpass,
             pipeline_descriptor,
-            uniform_buffer,
-            uniform_transform: uniform_data,
             context: vulkan.context(),
         }
     }
@@ -281,11 +256,9 @@ impl Drop for Pipeline {
             self.context
                 .device
                 .destroy_render_pass(self.renderpass, None);
-            self.context.device.destroy_sampler(self.sampler, None);
         }
     }
 }
-
 
 pub fn create_render_pass(swapchain: &Swapchain, vulkan: &VkInstance) -> vk::RenderPass {
     let color_attachment = vk::AttachmentDescription {

@@ -190,6 +190,7 @@ fn main() {
                 |command_buffer, device| unsafe {
                     device.cmd_set_viewport(command_buffer, 0, &viewports);
                     device.cmd_set_scissor(command_buffer, 0, &[extent]);
+                    //Depth buffer
                     device.cmd_push_constants(
                         command_buffer,
                         pipeline.layout,
@@ -212,9 +213,9 @@ fn main() {
                     device.cmd_bind_descriptor_sets(
                         command_buffer,
                         vk::PipelineBindPoint::GRAPHICS,
-                        pipeline.shadow_layout,
+                        pipeline.shadow_pipeline.layout,
                         0,
-                        &[pipeline.shadow_descriptor.set],
+                        &[pipeline.shadow_pipeline.descriptor.set],
                         &[],
                     );
 

@@ -110,6 +110,21 @@ pub fn create_texture(image_path: &Path, vulkan: &VkInstance) -> Image {
         ..Default::default()
     });
 
+    image.attach_sampler(vk::SamplerCreateInfo {
+        s_type: vk::StructureType::SAMPLER_CREATE_INFO,
+        mag_filter: vk::Filter::LINEAR,
+        min_filter: vk::Filter::LINEAR,
+        mipmap_mode: vk::SamplerMipmapMode::LINEAR,
+        address_mode_u: vk::SamplerAddressMode::REPEAT,
+        address_mode_v: vk::SamplerAddressMode::REPEAT,
+        address_mode_w: vk::SamplerAddressMode::REPEAT,
+        max_lod: 1.0,
+        mip_lod_bias: 0.0,
+        anisotropy_enable: vk::TRUE,
+        max_anisotropy: 16.0,
+        ..Default::default()
+    });
+
     image
 }
 
