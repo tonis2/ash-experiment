@@ -8,7 +8,7 @@ use vulkan::{
 
 use std::path::Path;
 
-use pipelines::{mesh_pipeline, Light, PushConstantModel, Vertex};
+use pipelines::{mesh_pipeline, Camera, Light, PushConstantModel, Vertex};
 use std::sync::Arc;
 use winit::event::{ElementState, Event, KeyboardInput, VirtualKeyCode, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop};
@@ -20,15 +20,17 @@ fn main() {
         .with_inner_size(winit::dpi::LogicalSize::new(800.0, 600.0))
         .build(&event_loop)
         .expect("Failed to create window.");
+    let camera = Camera::new(800.0 / 600.0, cgmath::Vector3::new(0.0, -15.0, 8.0));
 
     let vulkan = Arc::new(Context::new(&window, "lights", true));
-    let mut queue = Queue::new(vulkan.clone());
     let instance = VkInstance::new(vulkan.clone());
+
+    let mut queue = Queue::new(vulkan.clone());
+
     let swapchain = Swapchain::new(vulkan.clone(), &window);
-
-    let mut pipeline = mesh_pipeline::Pipeline::new(&swapchain, &instance);
-
     let command_buffers = instance.create_command_buffers(swapchain.image_views.len());
+
+    let mut pipeline = mesh_pipeline::Pipeline::new(&swapchain, &instance, camera);
 
     let framebuffers: Vec<Framebuffer> = swapchain
         .image_views
@@ -77,7 +79,7 @@ fn main() {
         cgmath::Decomposed {
             scale: 1.0,
             rot: cgmath::Rotation3::from_angle_x(cgmath::Deg(80.0)),
-            disp: cgmath::Vector3::new(0.0, 0.0, -2.0),
+            disp: cgmath::Vector3::new(0.0, 0.0, 0.0),
         },
         [0.3, 0.2, 0.1],
     );
@@ -86,7 +88,7 @@ fn main() {
         cgmath::Decomposed {
             scale: 0.2,
             rot: cgmath::Rotation3::from_angle_z(cgmath::Deg(0.0)),
-            disp: cgmath::Vector3::new(0.0, 0.0, -1.5),
+            disp: cgmath::Vector3::new(0.0, 0.0, 1.0),
         },
         [1.5, 1.5, 1.0],
     );

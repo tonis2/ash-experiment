@@ -1,7 +1,7 @@
 pub mod mesh_pipeline;
 pub mod shadowmap_pipeline;
 
-use cgmath::{Deg, Matrix4, Point3, Vector3};
+use cgmath::{Deg, Matrix4, Point3, Vector3, Vector4};
 use vulkan::Swapchain;
 
 #[derive(Clone, Debug, Copy)]
@@ -29,7 +29,8 @@ pub struct PushConstantModel {
 
 #[repr(C)]
 #[derive(Clone, Debug, Copy)]
-pub struct UniformBufferObject {
+pub struct Camera {
+    pub position: Vector4<f32>,
     pub view: Matrix4<f32>,
     pub proj: Matrix4<f32>,
 }
@@ -53,9 +54,11 @@ impl PushConstantModel {
     }
 }
 
-impl UniformBufferObject {
-    pub fn new(swapchain: &Swapchain) -> UniformBufferObject {
-        UniformBufferObject {
+impl Camera {
+    pub fn new(aspect: f32, position: cgmath::Vector3<f32>) -> Camera {
+        // let camera_pos = Vector3::new(0.0, -15.0, 8.0);
+        Camera {
+            position: position.extend(1.0),
             view: Matrix4::look_at(
                 Point3::new(0.0, -15.0, 8.0),
                 Point3::new(0.0, -5.0, 1.0),
@@ -64,7 +67,7 @@ impl UniformBufferObject {
             proj: {
                 let proj = cgmath::perspective(
                     Deg(45.0),
-                    swapchain.extent.width as f32 / swapchain.extent.height as f32,
+                    aspect,
                     0.1,
                     100.0,
                 );

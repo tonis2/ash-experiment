@@ -1,43 +1,62 @@
 #version 450
+#extension GL_ARB_separate_shader_objects : enable
 
-layout (binding = 1) uniform UniformBufferObject {
-    mat4 projection;
-    vec3 pos;
+struct Light {
+    vec4 position;
     vec3 color;
     float ambient;
     float specular;
-} light;
+};
+
+layout (binding = 1) uniform LightBuffer {
+    Light light_data;
+};
 
 layout (binding = 2) uniform sampler2D shadowMap;
 
-
-layout (location = 0) in vec3 normal;
+layout (location = 0) in vec3 model_normal;
 layout (location = 1) in vec3 model_position;
 layout (location = 2) in vec4 color;
-
 layout (location = 0) out vec4 outColor;
 
+vec3 CalculateLightColor(Light light, vec3 object_color, vec3 normal, vec3 object_pos) {
+    vec3 light_direction;
+    float light_strength = 1.0;
 
-void main() {
-    vec4 shadow_cordinate = light.projection * vec4(model_position, 1.0);
-    float shadow = 1.0;
+    if (light.position.w == 0.0) {
+        //directional light
+        light_direction = normalize(light.position.xyz);
+        light_strength = 1.0; //no attenuation for directional lights
+    } else {
+        //point light
+        light_direction = normalize(light.position.xyz - object_pos);
+        float distanceToLight = length(light.position.xyz - object_pos);
 
-    if (texture( shadowMap, shadow_cordinate.xy ).z  <  shadow_cordinate.z) 
-    {
-        shadow = light.ambient;
+        //Todo add light_strength parameter to buffer
+        light_strength = 1.0 / (1.0 + 1.0 * pow(distanceToLight, 2));
     }
 
+     //ambient
+    vec3 ambient = light.ambient * object_color.rgb * light.color;
 
-    //Lets find the vector ray between light source and model position
-    vec3 light_ray_vector = normalize(light.pos - model_position);
+    //diffuse
+    float diffuseCoefficient = max(0.0, dot(normal, light_direction));
+    vec3 diffuse = diffuseCoefficient * object_color.rgb * light.color;
 
-    //Calculate the degree between model and light ray, with dot function
-    float light_dot_function = dot(normalize(normal), light_ray_vector);
+    //linear color (color before gamma correction)
+    return ambient + light_strength * diffuse;
+}
 
-    // Lets make sure light dot is > -1 and calculate with light color
-    vec3 light_color = max(light_dot_function, 0.0) * light.color ;
+void main() {
+    // vec4 shadow_cordinate = light.projection * vec4(model_position, 1.0);
+    // float shadow = 1.0;
 
-    vec4 result_color = vec4(light.ambient + light_color, 1.0) ;
+    // if (texture( shadowMap, shadow_cordinate.xy ).z  <  shadow_cordinate.z) 
+    // {
+    //     shadow = light.ambient;
+    // }
+  
+    vec3 light_color = CalculateLightColor(light_data, color.rgb, model_normal, model_position);
 
-    outColor = result_color * shadow * color;
+    outColor = color;
 }

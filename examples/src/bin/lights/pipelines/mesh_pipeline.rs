@@ -4,7 +4,7 @@ use vulkan::{
 };
 
 use super::shadowmap_pipeline;
-use super::{Light, PushConstantModel, UniformBufferObject, Vertex};
+use super::{Light, PushConstantModel, Camera, Vertex};
 use std::{default::Default, ffi::CString, mem, path::Path, ptr, sync::Arc};
 
 pub struct Pipeline {
@@ -15,7 +15,7 @@ pub struct Pipeline {
 
     pub depth_image: Image,
     pub uniform_buffer: Buffer,
-    pub uniform_transform: UniformBufferObject,
+    pub uniform_transform: Camera,
 
     pub light_buffer: Buffer,
     pub light: Light,
@@ -31,10 +31,10 @@ impl Pipeline {
         self.light_buffer.upload_to_buffer(&[light], 0);
     }
     //Creates a new pipeline
-    pub fn new(swapchain: &Swapchain, vulkan: &VkInstance) -> Pipeline {
+    pub fn new(swapchain: &Swapchain, vulkan: &VkInstance, camera: Camera) -> Pipeline {
         //Create buffer data
         let depth_image = examples::create_depth_resources(&swapchain, vulkan.context());
-        let uniform_data = UniformBufferObject::new(&swapchain);
+      
 
         let light_data = Light::new(
             cgmath::Point3::new(0.0, 3.0, 3.0),
@@ -45,7 +45,7 @@ impl Pipeline {
         );
 
         let uniform_buffer = Buffer::new_mapped_basic(
-            std::mem::size_of_val(&uniform_data) as u64,
+            mem::size_of::<Camera>() as vk::DeviceSize,
             vk::BufferUsageFlags::UNIFORM_BUFFER,
             vk_mem::MemoryUsage::CpuOnly,
             vulkan.context(),
@@ -58,13 +58,13 @@ impl Pipeline {
             vulkan.context(),
         );
 
-        uniform_buffer.upload_to_buffer(&[uniform_data], 0);
+        uniform_buffer.upload_to_buffer(&[camera], 0);
         light_buffer.upload_to_buffer(&[light_data], 0);
-
+   
         let uniform_descriptor = vk::DescriptorBufferInfo {
             buffer: uniform_buffer.buffer,
             offset: 0,
-            range: std::mem::size_of_val(&uniform_data) as u64,
+            range: mem::size_of::<Camera>() as vk::DeviceSize,
         };
 
         let push_constant_range = vk::PushConstantRange::builder()
@@ -294,7 +294,7 @@ impl Pipeline {
             uniform_buffer,
             light_buffer,
             light: light_data,
-            uniform_transform: uniform_data,
+            uniform_transform: camera,
             renderpass,
 
             pipeline_descriptor,

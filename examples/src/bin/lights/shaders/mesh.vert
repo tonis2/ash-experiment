@@ -8,10 +8,11 @@ layout (location = 0) out vec3 out_normal;
 layout (location = 1) out vec3 out_position;
 layout (location = 2) out vec4 out_color;
 
-layout (binding = 0) uniform UniformBufferObject {
+layout (binding = 0) uniform Camera {
+    vec4 pos;
     mat4 view;
     mat4 proj;
-} ubo;
+} camera;
 
 layout(push_constant) uniform Constants {
     mat4 model_transform;
@@ -26,5 +27,5 @@ void main() {
     out_position = mesh_world_position.xyz;
     out_normal = (constants.model_transform * vec4(normal, 0.0)).xyz;
 
-    gl_Position = ubo.proj * ubo.view * mesh_world_position;
+    gl_Position = camera.proj * camera.view * mesh_world_position;
 }
