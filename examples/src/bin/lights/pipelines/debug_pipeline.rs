@@ -38,7 +38,7 @@ pub struct Pipeline {
 
 impl Pipeline {
     //Creates a new pipeline
-    pub fn create_pipeline(swapchain: &Swapchain, vulkan: &VkInstance) -> Pipeline {
+    pub fn create_pipeline(swapchain: &Swapchain, uniform_data: UniformBufferObject, vulkan: &VkInstance) -> Pipeline {
         let viewports = [vk::Viewport {
             x: 0.0,
             y: 0.0,
@@ -47,6 +47,7 @@ impl Pipeline {
             min_depth: 0.0,
             max_depth: 1.0,
         }];
+        
         let scissors = [vk::Rect2D {
             offset: vk::Offset2D { x: 0, y: 0 },
             extent: swapchain.extent,
@@ -88,12 +89,6 @@ impl Pipeline {
         };
 
         //Create uniform buffer
-
-        let uniform_data = create_uniform_data(&swapchain);
-        let uniform_buffer = vulkan.create_gpu_buffer::<UniformBufferObject>(
-            vk::BufferUsageFlags::UNIFORM_BUFFER,
-            &[uniform_data],
-        );
 
         let pipeline_descriptor = Descriptor::new(
             vec![
@@ -290,24 +285,7 @@ impl Drop for Pipeline {
         }
     }
 }
-pub fn create_uniform_data(swapchain: &Swapchain) -> UniformBufferObject {
-    UniformBufferObject {
-        view: Matrix4::look_at(
-            Point3::new(2.0, 2.0, 2.0),
-            Point3::new(0.0, 0.0, 0.0),
-            Vector3::new(0.0, 0.0, 1.0),
-        ),
-        proj: {
-            let proj = cgmath::perspective(
-                Deg(45.0),
-                swapchain.extent.width as f32 / swapchain.extent.height as f32,
-                0.1,
-                10.0,
-            );
-            examples::OPENGL_TO_VULKAN_MATRIX * proj
-        },
-    }
-}
+
 
 pub fn create_render_pass(swapchain: &Swapchain, vulkan: &VkInstance) -> vk::RenderPass {
     let color_attachment = vk::AttachmentDescription {
