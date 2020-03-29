@@ -31,7 +31,6 @@ pub struct Pipeline {
     pub layout: vk::PipelineLayout,
     pub texture: (Image, u32),
     pub depth_image: Image,
-    pub sampler: vk::Sampler,
     pub uniform_buffer: Buffer,
     pub uniform_transform: UniformBufferObject,
 
@@ -179,30 +178,6 @@ impl Pipeline {
 
         let (texture, mip_levels) = create_texture(&Path::new("assets/chalet.jpg"), &vulkan);
 
-        let sampler = unsafe {
-            vulkan
-                .context
-                .device
-                .create_sampler(
-                    &vk::SamplerCreateInfo {
-                        s_type: vk::StructureType::SAMPLER_CREATE_INFO,
-                        mag_filter: vk::Filter::LINEAR,
-                        min_filter: vk::Filter::LINEAR,
-                        mipmap_mode: vk::SamplerMipmapMode::LINEAR,
-                        address_mode_u: vk::SamplerAddressMode::REPEAT,
-                        address_mode_v: vk::SamplerAddressMode::REPEAT,
-                        address_mode_w: vk::SamplerAddressMode::REPEAT,
-                        max_lod: mip_levels as f32,
-                        mip_lod_bias: 0.0,
-                        anisotropy_enable: vk::TRUE,
-                        max_anisotropy: 16.0,
-                        ..Default::default()
-                    },
-                    None,
-                )
-                .expect("Failed to create Sampler!")
-        };
-
         //Create uniform buffer
 
         let uniform_data = create_uniform_data(&swapchain);
@@ -257,7 +232,7 @@ impl Pipeline {
                     descriptor_count: 1,
                     descriptor_type: vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
                     p_image_info: [vk::DescriptorImageInfo {
-                        sampler,
+                        sampler: texture.sampler(),
                         image_view: texture.view(),
                         image_layout: vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
                     }]
@@ -322,7 +297,6 @@ impl Pipeline {
             layout: pipeline_layout,
             texture: (texture, mip_levels),
             depth_image,
-            sampler,
             context: vulkan.context(),
             uniform_buffer,
             uniform_transform: uniform_data,
@@ -340,7 +314,6 @@ impl Drop for Pipeline {
             self.context
                 .device
                 .destroy_pipeline_layout(self.layout, None);
-            self.context.device.destroy_sampler(self.sampler, None);
 
             self.context
                 .device
@@ -474,6 +447,21 @@ pub fn create_texture(image_path: &Path, vulkan: &VkInstance) -> (Image, u32) {
             base_array_layer: 0,
             layer_count: 1,
         },
+        ..Default::default()
+    });
+
+    image.attach_sampler(vk::SamplerCreateInfo {
+        s_type: vk::StructureType::SAMPLER_CREATE_INFO,
+        mag_filter: vk::Filter::LINEAR,
+        min_filter: vk::Filter::LINEAR,
+        mipmap_mode: vk::SamplerMipmapMode::LINEAR,
+        address_mode_u: vk::SamplerAddressMode::REPEAT,
+        address_mode_v: vk::SamplerAddressMode::REPEAT,
+        address_mode_w: vk::SamplerAddressMode::REPEAT,
+        max_lod: mip_levels as f32,
+        mip_lod_bias: 0.0,
+        anisotropy_enable: vk::TRUE,
+        max_anisotropy: 16.0,
         ..Default::default()
     });
 

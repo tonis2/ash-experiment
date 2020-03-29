@@ -187,7 +187,7 @@ impl Pipeline {
                     descriptor_count: 1,
                     descriptor_type: vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
                     p_image_info: [vk::DescriptorImageInfo {
-                        sampler: shadow_pipeline.sampler,
+                        sampler: shadow_pipeline.image.sampler(),
                         image_view: shadow_pipeline.image.view(),
                         image_layout: vk::ImageLayout::DEPTH_STENCIL_READ_ONLY_OPTIMAL,
                     }]

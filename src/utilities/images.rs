@@ -8,6 +8,7 @@ pub struct Image {
     pub allocation: vk_mem::Allocation,
     pub allication_info: vk_mem::AllocationInfo,
     image_view: Option<vk::ImageView>,
+    sampler: Option<vk::Sampler>,
     context: Arc<Context>,
 }
 
@@ -31,6 +32,7 @@ impl Image {
             allocation,
             allication_info: info,
             image_view: None,
+            sampler: None,
             context: context.clone(),
         }
     }
@@ -44,8 +46,21 @@ impl Image {
         });
     }
 
+    pub fn attach_sampler(&mut self, sampler_info: vk::SamplerCreateInfo) {
+        self.sampler = Some(unsafe {
+            self.context
+                .device
+                .create_sampler(&sampler_info, None)
+                .expect("Failed to create Sampler!")
+        });
+    }
+
     pub fn view(&self) -> vk::ImageView {
         self.image_view.expect("No image attached")
+    }
+
+    pub fn sampler(&self) -> vk::Sampler {
+        self.sampler.expect("No sampler attached")
     }
 }
 
@@ -61,6 +76,11 @@ impl Drop for Image {
                 self.context
                     .device
                     .destroy_image_view(self.image_view.unwrap(), None);
+            }
+            if self.sampler.is_some() {
+                self.context
+                    .device
+                    .destroy_sampler(self.sampler.unwrap(), None);
             }
         }
     }
