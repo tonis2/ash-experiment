@@ -2,7 +2,7 @@ pub mod mesh_pipeline;
 pub mod shadowmap_pipeline;
 
 use cgmath::{Deg, Matrix4, Point3, Vector3, Vector4};
-use vulkan::Swapchain;
+
 
 #[derive(Clone, Debug, Copy)]
 pub struct Vertex {
@@ -55,13 +55,12 @@ impl PushConstantModel {
 }
 
 impl Camera {
-    pub fn new(aspect: f32, position: cgmath::Vector3<f32>) -> Camera {
-        // let camera_pos = Vector3::new(0.0, -15.0, 8.0);
+    pub fn new(aspect: f32, position: cgmath::Point3<f32>) -> Camera {
         Camera {
-            position: position.extend(1.0),
+            position: position.to_homogeneous(),
             view: Matrix4::look_at(
-                Point3::new(0.0, -15.0, 8.0),
-                Point3::new(0.0, -5.0, 1.0),
+                position,
+                Point3::new(0.0, 0.0, 1.0),
                 Vector3::new(0.0, 3.0, 1.0),
             ),
             proj: {

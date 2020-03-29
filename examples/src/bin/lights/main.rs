@@ -20,7 +20,7 @@ fn main() {
         .with_inner_size(winit::dpi::LogicalSize::new(800.0, 600.0))
         .build(&event_loop)
         .expect("Failed to create window.");
-    let camera = Camera::new(800.0 / 600.0, cgmath::Vector3::new(0.0, -15.0, 8.0));
+    let camera = Camera::new(800.0 / 600.0, cgmath::Point3::new(0.0, -15.0, 8.0));
 
     let vulkan = Arc::new(Context::new(&window, "lights", true));
     let instance = VkInstance::new(vulkan.clone());
