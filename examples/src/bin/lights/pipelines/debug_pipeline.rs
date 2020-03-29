@@ -7,6 +7,8 @@ use vulkan::{
     Context, Descriptor, VkInstance,
 };
 
+use super::UniformBufferObject;
+
 use std::default::Default;
 use std::ffi::CString;
 use std::mem;
@@ -14,17 +16,11 @@ use std::path::Path;
 use std::ptr;
 use std::sync::Arc;
 
-#[repr(C)]
-#[derive(Clone, Debug, Copy)]
-pub struct UniformBufferObject {
-    pub view: Matrix4<f32>,
-    pub proj: Matrix4<f32>,
-}
-
 #[derive(Clone, Debug, Copy)]
 pub struct Vertex {
     pub pos: [f32; 2],
     pub color: [f32; 3],
+    pub tex_coord: [f32; 2],
 }
 
 pub struct Pipeline {
@@ -42,7 +38,7 @@ pub struct Pipeline {
 
 impl Pipeline {
     //Creates a new pipeline
-    pub fn new(swapchain: &Swapchain, vulkan: &VkInstance) -> Pipeline {
+    pub fn create_pipeline(swapchain: &Swapchain, vulkan: &VkInstance) -> Pipeline {
         let viewports = [vk::Viewport {
             x: 0.0,
             y: 0.0,
@@ -55,6 +51,7 @@ impl Pipeline {
             offset: vk::Offset2D { x: 0, y: 0 },
             extent: swapchain.extent,
         }];
+     
 
         let noop_stencil_state = vk::StencilOpState {
             fail_op: vk::StencilOp::KEEP,
@@ -172,22 +169,22 @@ impl Pipeline {
                 .create_graphics_pipelines(
                     vk::PipelineCache::null(),
                     &[vk::GraphicsPipelineCreateInfo::builder()
-                        .stages(&[
-                            Shader::new(
-                                &Path::new("src/bin/triangle/shaders/triangle.vert.spv"),
-                                vk::ShaderStageFlags::VERTEX,
-                                &shader_name,
-                                vulkan.context(),
-                            )
-                            .info(),
-                            Shader::new(
-                                &Path::new("src/bin/triangle/shaders/triangle.frag.spv"),
-                                vk::ShaderStageFlags::FRAGMENT,
-                                &shader_name,
-                                vulkan.context(),
-                            )
-                            .info(),
-                        ])
+                    .stages(&[
+                        Shader::new(
+                            &Path::new("src/bin/lights/shaders/mesh.vert.spv"),
+                            vk::ShaderStageFlags::VERTEX,
+                            &shader_name,
+                            vulkan.context(),
+                        )
+                        .info(),
+                        Shader::new(
+                            &Path::new("src/bin/lights/shaders/mesh.frag.spv"),
+                            vk::ShaderStageFlags::FRAGMENT,
+                            &shader_name,
+                            vulkan.context(),
+                        )
+                        .info(),
+                    ])
                         .vertex_input_state(
                             &vk::PipelineVertexInputStateCreateInfo::builder()
                                 .vertex_binding_descriptions(&[vk::VertexInputBindingDescription {
@@ -208,6 +205,12 @@ impl Pipeline {
                                         format: vk::Format::R32G32B32_SFLOAT,
                                         offset: offset_of!(Vertex, color) as u32,
                                     },
+                                    vk::VertexInputAttributeDescription {
+                                        binding: 0,
+                                        location: 2,
+                                        format: vk::Format::R32G32_SFLOAT,
+                                        offset: offset_of!(Vertex, tex_coord) as u32,
+                                    },
                                 ])
                                 .build(),
                         )
@@ -215,11 +218,9 @@ impl Pipeline {
                             topology: vk::PrimitiveTopology::TRIANGLE_LIST,
                             ..Default::default()
                         })
-                        .viewport_state(
-                            &vk::PipelineViewportStateCreateInfo::builder()
-                                .scissors(&scissors)
-                                .viewports(&viewports),
-                        )
+                        .viewport_state(&vk::PipelineViewportStateCreateInfo::builder()
+                        .scissors(&scissors)
+                        .viewports(&viewports))
                         .rasterization_state(&vk::PipelineRasterizationStateCreateInfo {
                             front_face: vk::FrontFace::COUNTER_CLOCKWISE,
                             line_width: 1.0,
@@ -239,26 +240,19 @@ impl Pipeline {
                             max_depth_bounds: 1.0,
                             ..Default::default()
                         })
-                        .color_blend_state(
-                            &vk::PipelineColorBlendStateCreateInfo::builder()
-                                .logic_op(vk::LogicOp::CLEAR)
-                                .attachments(&[vk::PipelineColorBlendAttachmentState {
-                                    blend_enable: 0,
-                                    src_color_blend_factor: vk::BlendFactor::SRC_COLOR,
-                                    dst_color_blend_factor: vk::BlendFactor::ONE_MINUS_DST_COLOR,
-                                    color_blend_op: vk::BlendOp::ADD,
-                                    src_alpha_blend_factor: vk::BlendFactor::ZERO,
-                                    dst_alpha_blend_factor: vk::BlendFactor::ZERO,
-                                    alpha_blend_op: vk::BlendOp::ADD,
-                                    color_write_mask: vk::ColorComponentFlags::all(),
-                                }]),
-                        )
-                        .dynamic_state(
-                            &vk::PipelineDynamicStateCreateInfo::builder().dynamic_states(&[
-                                vk::DynamicState::VIEWPORT,
-                                vk::DynamicState::SCISSOR,
-                            ]),
-                        )
+                        .color_blend_state(& vk::PipelineColorBlendStateCreateInfo::builder()
+                        .logic_op(vk::LogicOp::CLEAR)
+                        .attachments(&[vk::PipelineColorBlendAttachmentState {
+                            blend_enable: 0,
+                            src_color_blend_factor: vk::BlendFactor::SRC_COLOR,
+                            dst_color_blend_factor: vk::BlendFactor::ONE_MINUS_DST_COLOR,
+                            color_blend_op: vk::BlendOp::ADD,
+                            src_alpha_blend_factor: vk::BlendFactor::ZERO,
+                            dst_alpha_blend_factor: vk::BlendFactor::ZERO,
+                            alpha_blend_op: vk::BlendOp::ADD,
+                            color_write_mask: vk::ColorComponentFlags::all(),
+                        }]))
+                        .dynamic_state(&vk::PipelineDynamicStateCreateInfo::builder().dynamic_states(&[vk::DynamicState::VIEWPORT, vk::DynamicState::SCISSOR]))
                         .layout(pipeline_layout)
                         .render_pass(renderpass)
                         .build()],

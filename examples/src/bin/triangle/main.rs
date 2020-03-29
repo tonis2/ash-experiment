@@ -12,15 +12,15 @@ fn main() {
     let vertices = vec![
         Vertex {
             pos: [-1.0, 1.0],
-            color: [0.0, 1.0, 0.0, 1.0],
+            color: [0.0, 1.0, 0.0],
         },
         Vertex {
             pos: [1.0, 1.0],
-            color: [0.0, 0.0, 1.0, 1.0],
+            color: [0.0, 0.0, 1.0],
         },
         Vertex {
             pos: [0.0, -1.0],
-            color: [1.0, 0.0, 0.0, 1.0],
+            color: [1.0, 0.0, 0.0],
         },
     ];
 
@@ -40,7 +40,7 @@ fn main() {
 
     let swapchain = Swapchain::new(vulkan.clone(), &window);
 
-    let pipeline = pipeline::Pipeline::new(&swapchain, vulkan.clone());
+    let pipeline = pipeline::Pipeline::new(&swapchain, &instance);
 
     let index_buffer = instance.create_gpu_buffer(vk::BufferUsageFlags::INDEX_BUFFER, &indices);
     let vertex_buffer = instance.create_gpu_buffer(vk::BufferUsageFlags::VERTEX_BUFFER, &vertices);
