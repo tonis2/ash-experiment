@@ -25,7 +25,7 @@ void main() {
     out_color = constants.color;
 
     out_position = mesh_world_position.xyz;
-    out_normal = (constants.model_transform * vec4(normal, 0.0)).xyz;
+    out_normal = mat3(transpose(inverse(constants.model_transform))) * normal;
 
     gl_Position = camera.proj * camera.view * mesh_world_position;
 }
