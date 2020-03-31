@@ -3,9 +3,9 @@
 
 struct Light {
     vec4 position;
-    vec3 color;
-    float ambient;
-    float specular;
+    vec4 color;
+    vec4 ambient;
+    vec4 specular;
 };
 
 layout (binding = 1) uniform LightBuffer {
@@ -19,17 +19,17 @@ layout (location = 1) in vec3 model_position;
 layout (location = 2) in vec4 color;
 layout (location = 0) out vec4 outColor;
 
-vec3 CalculateLightColor(Light light, vec3 object_color, vec3 normal, vec3 object_pos) {
+vec3 CalculateLightColor(Light light, vec4 object_color, vec3 normal, vec3 object_pos) {
     vec3 light_direction;
     float light_strength = 1.0;
 
     if (light.position.w == 0.0) {
         //directional light
-        light_direction = normalize(light.position.xyz);
+        light_direction = -light.position.xyz;
         light_strength = 1.0; //no attenuation for directional lights
     } else {
         //point light
-        light_direction = normalize(light.position.xyz - object_pos);
+        light_direction = light.position.xyz - object_pos;
         float distanceToLight = length(light.position.xyz - object_pos);
 
         //Todo add light_strength parameter to buffer
@@ -37,14 +37,14 @@ vec3 CalculateLightColor(Light light, vec3 object_color, vec3 normal, vec3 objec
     }
 
      //ambient
-    vec3 ambient = light.ambient * object_color.rgb * light.color;
+    vec3 ambient = object_color.rgb * light.color.rgb;
 
     //diffuse
-    float diffuseCoefficient = max(0.0, dot(normal, light_direction));
-    vec3 diffuse = diffuseCoefficient * object_color.rgb * light.color;
+    float diffuseCoefficient = max(dot(normalize(normal), normalize(light_direction)), 0.0);
+    vec3 diffuse = light.color.rgb * diffuseCoefficient * object_color.rgb;
 
     //linear color (color before gamma correction)
-    return ambient + light_strength * diffuse;
+    return ambient.rgb + diffuse;
 }
 
 void main() {
@@ -56,7 +56,7 @@ void main() {
     //     shadow = light.ambient;
     // }
   
-    vec3 light_color = CalculateLightColor(light_data, color.rgb, model_normal, model_position);
+    vec3 light_color = CalculateLightColor(light_data, color, model_normal, model_position);
 
-    outColor = color;
+    outColor = vec4(light_color, 1.0);
 }

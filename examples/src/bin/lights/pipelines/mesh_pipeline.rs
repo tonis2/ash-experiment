@@ -27,23 +27,14 @@ pub struct Pipeline {
 }
 
 impl Pipeline {
-    pub fn update_light(&mut self, light: Light) {
-        self.light_buffer.upload_to_buffer(&[light], 0);
-    }
+    // pub fn update_light(&mut self, light: Light) {
+    //     self.light_buffer.upload_to_buffer(&[light], 0);
+    // }
     //Creates a new pipeline
-    pub fn new(swapchain: &Swapchain, vulkan: &VkInstance, camera: Camera) -> Pipeline {
+    pub fn new(swapchain: &Swapchain, vulkan: &VkInstance, camera: Camera, light_data: Light) -> Pipeline {
         //Create buffer data
         let depth_image = examples::create_depth_resources(&swapchain, vulkan.context());
       
-
-        let light_data = Light::new(
-            cgmath::Point3::new(0.0, 3.0, 3.0),
-            0.5,
-            [1.0, 1.5, 1.0],
-            0.5,
-            0.5,
-        );
-
         let uniform_buffer = Buffer::new_mapped_basic(
             mem::size_of::<Camera>() as vk::DeviceSize,
             vk::BufferUsageFlags::UNIFORM_BUFFER,
