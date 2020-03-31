@@ -21,7 +21,7 @@ fn main() {
         .build(&event_loop)
         .expect("Failed to create window.");
 
-    let camera = Camera::new(800.0 / 600.0, cgmath::Point3::new(0.0, 8.0, 10.0));
+    let camera = Camera::new(800.0 / 600.0, cgmath::Point3::new(0.0, 8.0, 15.0));
 
     let light = Light {
         position: cgmath::Vector4::new(0.0, 5.0, 1.0, 1.0),
