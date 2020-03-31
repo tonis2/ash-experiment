@@ -25,9 +25,9 @@ fn main() {
 
     let light = Light {
         position: cgmath::Vector4::new(0.0, 5.0, 1.0, 1.0),
-        color : cgmath::Vector4::new(0.8, 0.8, 0.8, 1.0),
-        specular: cgmath::Vector4::new(0.8, 0.8, 0.8, 1.0),
-        ambient: cgmath::Vector4::new(0.3, 0.3, 0.3, 1.0),
+        color : [0.8, 0.8, 0.8, 1.0],
+        specular: [0.8, 0.8, 0.8, 1.0],
+        ambient: [0.3, 0.3, 0.3, 1.0],
     };
 
     let vulkan = Arc::new(Context::new(&window, "lights", true));

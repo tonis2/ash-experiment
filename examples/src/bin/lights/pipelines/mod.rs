@@ -13,9 +13,9 @@ pub struct Vertex {
 #[derive(Clone, Debug, Copy)]
 pub struct Light {
     pub position: cgmath::Vector4<f32>,
-    pub color: cgmath::Vector4<f32>,
-    pub specular: cgmath::Vector4<f32>,
-    pub ambient: cgmath::Vector4<f32>,
+    pub color: [f32; 4],
+    pub specular:  [f32; 4],
+    pub ambient:  [f32; 4],
 }
 
 #[repr(C)]
