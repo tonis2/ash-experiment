@@ -48,15 +48,14 @@ vec3 CalculateLightColor(Light light, vec4 object_color, vec3 normal, vec3 objec
 }
 
 void main() {
-    // vec4 shadow_cordinate = light.projection * vec4(model_position, 1.0);
-    // float shadow = 1.0;
+    float shadow = 1.0;
 
-    // if (texture( shadowMap, shadow_cordinate.xy ).z  <  shadow_cordinate.z) 
-    // {
-    //     shadow = light.ambient;
-    // }
+    if (texture(shadowMap, model_position.xy ).z  <  model_position.z) 
+    {
+        shadow = 0.5;
+    }
   
     vec3 light_color = CalculateLightColor(light_data, color, model_normal, model_position);
 
-    outColor = vec4(light_color, 1.0);
+    outColor =  vec4(light_color, 1.0);
 }
