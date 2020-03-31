@@ -25,7 +25,7 @@ vec3 CalculateLightColor(Light light, vec4 object_color, vec3 normal, vec3 objec
 
     if (light.position.w == 0.0) {
         //directional light
-        light_direction = -light.position.xyz;
+        light_direction = light.position.xyz;
         light_strength = 1.0; //no attenuation for directional lights
     } else {
         //point light

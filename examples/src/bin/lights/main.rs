@@ -21,10 +21,10 @@ fn main() {
         .build(&event_loop)
         .expect("Failed to create window.");
 
-    let camera = Camera::new(800.0 / 600.0, cgmath::Point3::new(5.0, 20.0, 15.0));
+    let camera = Camera::new(800.0 / 600.0, cgmath::Point3::new(0.0, 8.0, 10.0));
 
     let light = Light {
-        position: cgmath::Vector4::new(0.0, 10.0, 0.0, 0.0),
+        position: cgmath::Vector4::new(0.0, 5.0, 1.0, 1.0),
         color : cgmath::Vector4::new(0.8, 0.8, 0.8, 1.0),
         specular: cgmath::Vector4::new(0.8, 0.8, 0.8, 1.0),
         ambient: cgmath::Vector4::new(0.3, 0.3, 0.3, 1.0),
@@ -95,7 +95,7 @@ fn main() {
     let ball_data = PushConstantModel::new(
         cgmath::Decomposed {
             scale: 0.2,
-            rot: cgmath::Rotation3::from_angle_z(cgmath::Deg(0.0)),
+            rot: cgmath::Rotation3::from_angle_x(cgmath::Deg(0.0)),
             disp: cgmath::Vector3::new(light.position.x, light.position.y, light.position.z),
         },
         [1.0, 1.0, 1.0],
