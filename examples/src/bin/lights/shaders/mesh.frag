@@ -15,8 +15,11 @@ layout (binding = 1) uniform LightBuffer {
 layout (binding = 2) uniform sampler2D shadowMap;
 
 layout (location = 0) in vec3 model_normal;
-layout (location = 1) in vec4 shadow_cordinate;
-layout (location = 2) in vec4 color;
+layout (location = 1) in vec4 object_position;
+layout (location = 2) in vec4 shadow_cordinate;
+layout (location = 3) in vec4 color;
+
+
 layout (location = 0) out vec4 outColor;
 
 vec3 CalculateLightColor(Light light, vec4 object_color, vec3 normal, vec4 object_pos) {
@@ -25,7 +28,7 @@ vec3 CalculateLightColor(Light light, vec4 object_color, vec3 normal, vec4 objec
 
     if (light.position.w == 0.0) {
         //directional light
-        light_direction = light.position.xyz;
+        light_direction = (light.position.xyz);
         light_strength = 1.0; //no attenuation for directional lights
     } else {
         //point light
@@ -47,16 +50,27 @@ vec3 CalculateLightColor(Light light, vec4 object_color, vec3 normal, vec4 objec
     return ambient.rgb + diffuse;
 }
 
+float CalculateShadow(vec4 shadowPos){
+    shadowPos = shadowPos/shadowPos.w;
+
+
+     float bias =  0.0012;
+     float visibility = 1.0f;
+     if ((shadowPos.x < 0 || shadowPos.x > 1 || shadowPos.y < 0 || shadowPos.y > 1 || shadowPos.z < 0 || shadowPos.z > 1)){
+       visibility = 1.0f;
+     }else{
+        float shadowDepth = texture(shadowMap, shadowPos.xy).r;
+        if(shadowDepth<shadowPos.z-bias)
+            visibility = 0.0f;
+     }
+     return visibility;
+
+}
 void main() {
-    float shadow = 1.0;
+   
+    vec3 light_color = CalculateLightColor(light_data, color, model_normal, object_position);
+    float shadow_color = CalculateShadow(shadow_cordinate);
 
-
-    if (texture(shadowMap, shadow_cordinate.xy).z  <  shadow_cordinate.z) 
-    {
-        shadow = 0.5;
-    }
-  
-    vec3 light_color = CalculateLightColor(light_data, color, model_normal, shadow_cordinate);
-
-    outColor =  vec4(light_color, 1.0);
+    vec4 lighting = vec4(shadow_color * light_color, 1.0); 
+    outColor = lighting;
 }

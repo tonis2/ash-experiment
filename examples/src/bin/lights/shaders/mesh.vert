@@ -4,8 +4,10 @@ layout (location = 0) in vec3 pos;
 layout (location = 1) in vec3 normal;
 
 layout (location = 0) out vec3 out_normal;
-layout (location = 1) out vec4 shadow_cordinate;
-layout (location = 2) out vec4 out_color;
+layout (location = 1) out vec4 object_position;
+layout (location = 2) out vec4 shadow_cordinate;
+layout (location = 3) out vec4 out_color;
+
 
 layout (binding = 0) uniform Camera {
     vec4 pos;
@@ -25,7 +27,6 @@ layout(push_constant) uniform Constants {
     vec4 color;
 } constants;
 
-
 const mat4 biasMat = mat4( 
 	0.5, 0.0, 0.0, 0.0,
 	0.0, 0.5, 0.0, 0.0,
@@ -33,10 +34,11 @@ const mat4 biasMat = mat4(
 	0.5, 0.5, 0.0, 1.0 );
 
 void main() {
+
     out_color = constants.color;
 
-    shadow_cordinate =  light.projection * constants.model_transform * vec4(pos, 1.0);
-    out_normal = vec3(constants.model_transform * vec4(pos, 1.0)).xyz;
-
+    object_position = constants.model_transform * vec4(pos, 1.0);
+    out_normal = transpose(inverse(mat3(constants.model_transform))) * normal;
+    shadow_cordinate = biasMat * light.projection * constants.model_transform * vec4(pos, 1.0);
     gl_Position = camera.proj * camera.view * constants.model_transform * vec4(pos, 1.0);
 }
