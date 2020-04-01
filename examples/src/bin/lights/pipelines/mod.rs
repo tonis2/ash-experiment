@@ -78,7 +78,7 @@ impl Light {
         );
         
         let projection = examples::OPENGL_TO_VULKAN_MATRIX
-            * cgmath::perspective(Deg(45.0), 1.0, 3.0, 25.0)
+            * cgmath::perspective(Deg(45.0), 1.0, 3.0, 30.0)
             * view;
 
         Self {

@@ -15,11 +15,11 @@ layout (binding = 1) uniform LightBuffer {
 layout (binding = 2) uniform sampler2D shadowMap;
 
 layout (location = 0) in vec3 model_normal;
-layout (location = 1) in vec3 model_position;
+layout (location = 1) in vec4 shadow_cordinate;
 layout (location = 2) in vec4 color;
 layout (location = 0) out vec4 outColor;
 
-vec3 CalculateLightColor(Light light, vec4 object_color, vec3 normal, vec3 object_pos) {
+vec3 CalculateLightColor(Light light, vec4 object_color, vec3 normal, vec4 object_pos) {
     vec3 light_direction;
     float light_strength = 1.0;
 
@@ -29,8 +29,8 @@ vec3 CalculateLightColor(Light light, vec4 object_color, vec3 normal, vec3 objec
         light_strength = 1.0; //no attenuation for directional lights
     } else {
         //point light
-        light_direction = light.position.xyz - object_pos;
-        float distanceToLight = length(light.position.xyz - object_pos);
+        light_direction = light.position.xyz - object_pos.xyz;
+        float distanceToLight = length(light.position.xyz - object_pos.xyz);
 
         //Todo add light_strength parameter to buffer
         light_strength = 1.0 / (1.0 + 1.0 * pow(distanceToLight, 2));
@@ -50,14 +50,13 @@ vec3 CalculateLightColor(Light light, vec4 object_color, vec3 normal, vec3 objec
 void main() {
     float shadow = 1.0;
 
-    vec4 shadw_position = light_data.projection * vec4(model_position, 1.0);
 
-    if (texture(shadowMap, shadw_position.xy).z  <  shadw_position.z) 
+    if (texture(shadowMap, shadow_cordinate.xy).z  <  shadow_cordinate.z) 
     {
         shadow = 0.5;
     }
   
-    vec3 light_color = CalculateLightColor(light_data, color, model_normal, model_position);
+    vec3 light_color = CalculateLightColor(light_data, color, model_normal, shadow_cordinate);
 
-    outColor =  shadow * vec4(light_color, 1.0);
+    outColor =  vec4(light_color, 1.0);
 }
