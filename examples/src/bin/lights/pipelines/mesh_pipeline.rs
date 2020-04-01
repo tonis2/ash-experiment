@@ -4,7 +4,7 @@ use vulkan::{
 };
 
 use super::shadowmap_pipeline;
-use super::{Light, PushConstantModel, Camera, Vertex};
+use super::{Camera, Light, PushConstantModel, Vertex};
 use std::{default::Default, ffi::CString, mem, path::Path, ptr, sync::Arc};
 
 pub struct Pipeline {
@@ -31,10 +31,15 @@ impl Pipeline {
     //     self.light_buffer.upload_to_buffer(&[light], 0);
     // }
     //Creates a new pipeline
-    pub fn new(swapchain: &Swapchain, vulkan: &VkInstance, camera: Camera, light_data: Light) -> Pipeline {
+    pub fn new(
+        swapchain: &Swapchain,
+        vulkan: &VkInstance,
+        camera: Camera,
+        light_data: Light,
+    ) -> Pipeline {
         //Create buffer data
         let depth_image = examples::create_depth_resources(&swapchain, vulkan.context());
-      
+
         let uniform_buffer = Buffer::new_mapped_basic(
             mem::size_of::<Camera>() as vk::DeviceSize,
             vk::BufferUsageFlags::UNIFORM_BUFFER,
@@ -51,12 +56,6 @@ impl Pipeline {
 
         uniform_buffer.upload_to_buffer(&[camera], 0);
         light_buffer.upload_to_buffer(&[light_data], 0);
-   
-        let uniform_descriptor = vk::DescriptorBufferInfo {
-            buffer: uniform_buffer.buffer,
-            offset: 0,
-            range: mem::size_of::<Camera>() as vk::DeviceSize,
-        };
 
         let push_constant_range = vk::PushConstantRange::builder()
             .stage_flags(vk::ShaderStageFlags::VERTEX)
@@ -66,7 +65,7 @@ impl Pipeline {
         let shadow_pipeline = shadowmap_pipeline::Pipeline::new(
             &swapchain,
             &vulkan,
-            uniform_descriptor,
+            light_buffer.descriptor_info(0),
             push_constant_range,
         );
 
@@ -104,7 +103,7 @@ impl Pipeline {
                     dst_array_element: 0,
                     descriptor_count: 1,
                     descriptor_type: vk::DescriptorType::UNIFORM_BUFFER,
-                    p_buffer_info: [uniform_descriptor].as_ptr(),
+                    p_buffer_info: [uniform_buffer.descriptor_info(0)].as_ptr(),
                     ..Default::default()
                 },
                 vk::WriteDescriptorSet {
@@ -113,12 +112,7 @@ impl Pipeline {
                     dst_array_element: 0,
                     descriptor_count: 1,
                     descriptor_type: vk::DescriptorType::UNIFORM_BUFFER,
-                    p_buffer_info: [vk::DescriptorBufferInfo {
-                        buffer: light_buffer.buffer,
-                        offset: 0,
-                        range: std::mem::size_of_val(&light_data) as u64,
-                    }]
-                    .as_ptr(),
+                    p_buffer_info: [light_buffer.descriptor_info(0)].as_ptr(),
                     ..Default::default()
                 },
                 vk::WriteDescriptorSet {

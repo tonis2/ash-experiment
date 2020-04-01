@@ -7,6 +7,7 @@ pub struct Buffer {
     pub buffer: vk::Buffer,
     pub allocation: vk_mem::Allocation,
     pub allocation_info: vk_mem::AllocationInfo,
+    pub size: vk::DeviceSize,
     pub context: Arc<Context>,
 }
 
@@ -25,6 +26,7 @@ impl Buffer {
             buffer,
             allocation,
             allocation_info,
+            size: buffer_create_info.size,
             context,
         }
     }
@@ -77,12 +79,20 @@ impl Buffer {
             .flush_allocation(&self.allocation, offset, size)
     }
 
-    pub fn size(&self) -> u64 {
+    pub fn allocation_size(&self) -> u64 {
         self.allocation_info.get_size() as u64
     }
 
     pub fn offset(&self) -> u64 {
         self.allocation_info.get_offset() as u64
+    }
+
+    pub fn descriptor_info(&self, offset: u64) -> vk::DescriptorBufferInfo {
+        vk::DescriptorBufferInfo {
+            buffer: self.buffer,
+            offset: offset,
+            range: self.size,
+        }
     }
 }
 

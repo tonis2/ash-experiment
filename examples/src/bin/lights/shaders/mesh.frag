@@ -3,9 +3,9 @@
 
 struct Light {
     vec4 position;
+    mat4 projection;
     vec4 color;
     vec4 ambient;
-    vec4 specular;
 };
 
 layout (binding = 1) uniform LightBuffer {
@@ -50,12 +50,14 @@ vec3 CalculateLightColor(Light light, vec4 object_color, vec3 normal, vec3 objec
 void main() {
     float shadow = 1.0;
 
-    if (texture(shadowMap, model_position.xy ).z  <  model_position.z) 
+    vec4 shadw_position = light_data.projection * vec4(model_position, 1.0);
+
+    if (texture(shadowMap, shadw_position.xy).z  <  shadw_position.z) 
     {
         shadow = 0.5;
     }
   
     vec3 light_color = CalculateLightColor(light_data, color, model_normal, model_position);
 
-    outColor =  vec4(light_color, 1.0);
+    outColor =  shadow * vec4(light_color, 1.0);
 }

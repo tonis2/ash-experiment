@@ -17,7 +17,7 @@ impl Pipeline {
     pub fn new(
         swapchain: &Swapchain,
         vulkan: &VkInstance,
-        uniform_data: vk::DescriptorBufferInfo,
+        lights: vk::DescriptorBufferInfo,
         pushconstant: vk::PushConstantRange,
     ) -> Self {
         //Create shadow pipeline stuff
@@ -68,7 +68,7 @@ impl Pipeline {
                 dst_array_element: 0,
                 descriptor_count: 1,
                 descriptor_type: vk::DescriptorType::UNIFORM_BUFFER,
-                p_buffer_info: [uniform_data].as_ptr(),
+                p_buffer_info: [lights].as_ptr(),
                 ..Default::default()
             }],
             swapchain.images.len() as u32,
@@ -143,7 +143,7 @@ impl Pipeline {
                         .depth_stencil_state(&vk::PipelineDepthStencilStateCreateInfo {
                             depth_test_enable: 1,
                             depth_write_enable: 1,
-                            depth_compare_op: vk::CompareOp::LESS_OR_EQUAL,
+                            depth_compare_op: vk::CompareOp::LESS,
                             front: noop_stencil_state,
                             back: noop_stencil_state,
                             max_depth_bounds: 1.0,

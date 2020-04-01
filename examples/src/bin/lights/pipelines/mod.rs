@@ -13,9 +13,9 @@ pub struct Vertex {
 #[derive(Clone, Debug, Copy)]
 pub struct Light {
     pub position: cgmath::Vector4<f32>,
+    pub projection: cgmath::Matrix4<f32>,
     pub color: [f32; 4],
-    pub specular:  [f32; 4],
-    pub ambient:  [f32; 4],
+    pub ambient: [f32; 4],
 }
 
 #[repr(C)]
@@ -62,26 +62,30 @@ impl Camera {
                 Vector3::new(0.0, 1.0, 0.0),
             ),
             proj: {
-                let proj = cgmath::perspective(Deg(45.0), aspect, 0.1, 100.0);
+                let proj = cgmath::perspective(Deg(45.0), aspect, 5.0, 30.0);
                 examples::OPENGL_TO_VULKAN_MATRIX * proj
             },
         }
     }
 }
 
-// impl Light {
-//     pub fn new(
-//         pos: cgmath::Vector4<f32>,
-//         color: [f32; 3],
-//         ambient: f32,
-//         specular: f32,
-//     ) -> Light {
+impl Light {
+    pub fn new(position: cgmath::Vector4<f32>, color: [f32; 4], ambient: [f32; 4]) -> Self {
+        let view = Matrix4::look_at(
+            cgmath::Point3::new(position.x, position.y, position.z),
+            Point3::new(0.0, 0.0, 0.0),
+            Vector3::new(0.0, 1.0, 0.0),
+        );
+        
+        let projection = examples::OPENGL_TO_VULKAN_MATRIX
+            * cgmath::perspective(Deg(45.0), 1.0, 3.0, 25.0)
+            * view;
 
-//         Light {
-//             pos,
-//             color: cgmath::Vector4::new(color[0], color[1], color[2], 0.0),
-//             ambient,
-//             specular,
-//         }
-//     }
-// }
+        Self {
+            position,
+            projection,
+            color,
+            ambient,
+        }
+    }
+}

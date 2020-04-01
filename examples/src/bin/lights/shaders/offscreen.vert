@@ -2,10 +2,12 @@
 
 layout (location = 0) in vec3 pos;
 
-layout (binding = 0) uniform UniformBufferObject {
-    mat4 view;
-    mat4 proj;
-} ubo;
+layout (binding = 0) uniform Light {
+    vec4 position;
+    mat4 projection;
+    vec4 color;
+    vec4 ambient;
+} light;
 
 layout(push_constant) uniform Constants {
     mat4 model_transform;
@@ -14,5 +16,5 @@ layout(push_constant) uniform Constants {
  
 void main()
 {
-	   gl_Position = ubo.proj * ubo.view * constants.model_transform * vec4(pos, 1.0);
+	   gl_Position = light.projection * constants.model_transform * vec4(pos, 1.0);
 }

@@ -23,12 +23,11 @@ fn main() {
 
     let camera = Camera::new(800.0 / 600.0, cgmath::Point3::new(0.0, 8.0, 20.0));
 
-    let light = Light {
-        position: cgmath::Vector4::new(0.0, 7.0, 10.0, 0.0),
-        color : [0.8, 0.8, 0.8, 1.0],
-        specular: [0.8, 0.8, 0.8, 1.0],
-        ambient: [0.3, 0.3, 0.3, 1.0],
-    };
+    let light = Light::new(
+        cgmath::Vector4::new(6.0, 7.0, -2.0, 0.0),
+        [0.8, 0.8, 0.8, 1.0],
+        [0.3, 0.3, 0.3, 1.0],
+    );
 
     let vulkan = Arc::new(Context::new(&window, "lights", true));
     let instance = VkInstance::new(vulkan.clone());
