@@ -18,11 +18,15 @@ layout (location = 0) in vec3 model_normal;
 layout (location = 1) in vec4 object_position;
 layout (location = 2) in vec4 shadow_cordinate;
 layout (location = 3) in vec4 color;
+layout (location = 4) in vec4 view_direction;
 
 
 layout (location = 0) out vec4 outColor;
 
+float specularStrength = 0.5;
+
 vec3 CalculateLightColor(Light light, vec4 object_color, vec3 normal, vec4 object_pos) {
+   
     vec3 light_direction;
     float light_strength = 1.0;
 
@@ -39,14 +43,19 @@ vec3 CalculateLightColor(Light light, vec4 object_color, vec3 normal, vec4 objec
         light_strength = 1.0 / (1.0 + 1.0 * pow(distanceToLight, 2));
     }
 
-     //ambient
+    //Ambient
     vec3 ambient = object_color.rgb * light.color.rgb;
 
-    //diffuse
+    //Specular
+    vec3 reflectDirection = reflect(-light_direction, normal);  
+
+    vec3 specular = specularStrength * light.color.rgb * pow(max(dot(view_direction.xyz, reflectDirection), 0.0), 32); 
+
+    //Diffuse
     float diffuseCoefficient = max(dot(normalize(normal), normalize(light_direction)), 0.0);
     vec3 diffuse = diffuseCoefficient * light.color.rgb * object_color.rgb;
 
-    return ambient.rgb + diffuse;
+    return ambient + diffuse + specular;
 }
 
 float CalculateShadow(vec4 shadowPos) {
