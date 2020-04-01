@@ -28,7 +28,7 @@ vec3 CalculateLightColor(Light light, vec4 object_color, vec3 normal, vec4 objec
 
     if (light.position.w == 0.0) {
         //directional light
-        light_direction = (light.position.xyz);
+        light_direction = -light.position.xyz;
         light_strength = 1.0; //no attenuation for directional lights
     } else {
         //point light
@@ -44,33 +44,25 @@ vec3 CalculateLightColor(Light light, vec4 object_color, vec3 normal, vec4 objec
 
     //diffuse
     float diffuseCoefficient = max(dot(normalize(normal), normalize(light_direction)), 0.0);
-    vec3 diffuse = light.color.rgb * diffuseCoefficient * object_color.rgb;
+    vec3 diffuse = diffuseCoefficient * light.color.rgb * object_color.rgb;
 
-    //linear color (color before gamma correction)
     return ambient.rgb + diffuse;
 }
 
-float CalculateShadow(vec4 shadowPos){
+float CalculateShadow(vec4 shadowPos) {
     shadowPos = shadowPos/shadowPos.w;
+    float bias = 0.05;
+    float visibility = 1.0f;
 
+    if (texture(shadowMap, shadowPos.xy).r < shadowPos.z - bias)
+        visibility = 0.3f;
 
-     float bias =  0.0012;
-     float visibility = 1.0f;
-     if ((shadowPos.x < 0 || shadowPos.x > 1 || shadowPos.y < 0 || shadowPos.y > 1 || shadowPos.z < 0 || shadowPos.z > 1)){
-       visibility = 1.0f;
-     }else{
-        float shadowDepth = texture(shadowMap, shadowPos.xy).r;
-        if(shadowDepth<shadowPos.z-bias)
-            visibility = 0.0f;
-     }
      return visibility;
-
 }
+
 void main() {
-   
     vec3 light_color = CalculateLightColor(light_data, color, model_normal, object_position);
     float shadow_color = CalculateShadow(shadow_cordinate);
 
-    vec4 lighting = vec4(shadow_color * light_color, 1.0); 
-    outColor = lighting;
+    outColor = vec4(shadow_color * light_color, 1.0);
 }

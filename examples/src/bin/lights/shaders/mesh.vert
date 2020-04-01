@@ -4,7 +4,7 @@ layout (location = 0) in vec3 pos;
 layout (location = 1) in vec3 normal;
 
 layout (location = 0) out vec3 out_normal;
-layout (location = 1) out vec4 object_position;
+layout (location = 1) out vec4 out_position;
 layout (location = 2) out vec4 shadow_cordinate;
 layout (location = 3) out vec4 out_color;
 
@@ -36,9 +36,8 @@ const mat4 biasMat = mat4(
 void main() {
 
     out_color = constants.color;
-
-    object_position = constants.model_transform * vec4(pos, 1.0);
-    out_normal = transpose(inverse(mat3(constants.model_transform))) * normal;
+    out_position = constants.model_transform * vec4(pos, 1.0);
+    out_normal = mat3(constants.model_transform) * normal;
     shadow_cordinate = biasMat * light.projection * constants.model_transform * vec4(pos, 1.0);
     gl_Position = camera.proj * camera.view * constants.model_transform * vec4(pos, 1.0);
 }

@@ -24,7 +24,7 @@ fn main() {
     let camera = Camera::new(800.0 / 600.0, cgmath::Point3::new(0.0, 8.0, 20.0));
 
     let light = Light::new(
-        cgmath::Vector4::new(6.0, 7.0, 5.0, 0.0),
+        cgmath::Vector4::new(6.0, 7.0, 5.0, 1.0),
         [0.8, 0.8, 0.8, 1.0],
         [0.5, 0.5, 0.5, 1.0],
     );
