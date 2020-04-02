@@ -1,11 +1,10 @@
 use super::context::Context;
 use std::sync::Arc;
 
-use ash::{version::DeviceV1_0, vk};
+use ash::{extensions::khr::Surface, version::DeviceV1_0, vk};
 use std::ptr;
 
 use super::device::query_swapchain_support;
-use winit::window::Window;
 
 pub struct Framebuffer {
     buffer: vk::Framebuffer,
@@ -17,11 +16,7 @@ impl Framebuffer {
         self.buffer
     }
 
-    pub fn new(
-        info: vk::FramebufferCreateInfo,
-        context: Arc<Context>
-    ) -> Framebuffer {
-
+    pub fn new(info: vk::FramebufferCreateInfo, context: Arc<Context>) -> Framebuffer {
         let buffer = unsafe {
             context
                 .device
@@ -55,14 +50,17 @@ pub struct Swapchain {
 }
 
 impl Swapchain {
-    pub fn new(context: Arc<Context>, window: &Window) -> Swapchain {
+    pub fn new(context: Arc<Context>) -> Swapchain {
         unsafe {
-            let swapchain_support =
-                query_swapchain_support(context.physical_device, &context.surface);
+            let swapchain_support = query_swapchain_support(
+                context.physical_device,
+                &context.surface_loader,
+                context.surface,
+            );
 
             let surface_format = choose_swapchain_format(&swapchain_support.formats);
             let present_mode = choose_swapchain_present_mode(&swapchain_support.present_modes);
-            let extent = choose_swapchain_extent(&swapchain_support.capabilities, window);
+            let extent = swapchain_support.capabilities.current_extent;
 
             let image_count = swapchain_support.capabilities.min_image_count + 1;
             let image_count = if swapchain_support.capabilities.max_image_count > 0 {
@@ -87,11 +85,13 @@ impl Swapchain {
                     (vk::SharingMode::EXCLUSIVE, 0, vec![])
                 };
 
+          
+
             let swapchain_create_info = vk::SwapchainCreateInfoKHR {
                 s_type: vk::StructureType::SWAPCHAIN_CREATE_INFO_KHR,
                 p_next: ptr::null(),
                 flags: vk::SwapchainCreateFlagsKHR::empty(),
-                surface: context.surface.surface,
+                surface: context.surface,
                 min_image_count: image_count,
                 image_color_space: surface_format.color_space,
                 image_format: surface_format.format,
@@ -146,7 +146,7 @@ impl Swapchain {
                     context
                         .device
                         .create_image_view(&imageview_create_info, None)
-                        .expect("Failed to create Image View!")
+                        .expect("Failed to create Swapchain image view!")
                 })
                 .collect();
 
@@ -173,6 +173,23 @@ impl Swapchain {
     pub fn get_image(&self, image_index: usize) -> vk::ImageView {
         self.image_views[image_index]
     }
+
+    pub fn recreate(&mut self) {
+        let new_swapchain = Self::new(self.context.clone());
+        let swapchain_support = query_swapchain_support(
+            self.context.physical_device,
+            &self.context.surface_loader,
+            self.context.surface,
+        );
+        let surface_format = choose_swapchain_format(&swapchain_support.formats);
+
+        self.swapchain = new_swapchain.swapchain;
+        self.images = new_swapchain.images.clone();
+        self.swapchain_loader = new_swapchain.swapchain_loader.clone();
+        self.format = surface_format.format;
+        self.extent = swapchain_support.capabilities.current_extent;
+        self.image_views = new_swapchain.image_views.clone();
+    }
 }
 
 impl Drop for Swapchain {
@@ -197,20 +214,18 @@ pub struct SwapchainSupport {
 impl SwapchainSupport {
     pub fn query_swapchain_support(
         physical_device: vk::PhysicalDevice,
-        surface_stuff: &super::surface::VkSurface,
+        surface_loader: &Surface,
+        surface: vk::SurfaceKHR,
     ) -> SwapchainSupport {
         unsafe {
-            let capabilities = surface_stuff
-                .surface_loader
-                .get_physical_device_surface_capabilities(physical_device, surface_stuff.surface)
+            let capabilities = surface_loader
+                .get_physical_device_surface_capabilities(physical_device, surface)
                 .expect("Failed to query for surface capabilities.");
-            let formats = surface_stuff
-                .surface_loader
-                .get_physical_device_surface_formats(physical_device, surface_stuff.surface)
+            let formats = surface_loader
+                .get_physical_device_surface_formats(physical_device, surface)
                 .expect("Failed to query for surface formats.");
-            let present_modes = surface_stuff
-                .surface_loader
-                .get_physical_device_surface_present_modes(physical_device, surface_stuff.surface)
+            let present_modes = surface_loader
+                .get_physical_device_surface_present_modes(physical_device, surface)
                 .expect("Failed to query for surface present mode.");
 
             SwapchainSupport {
@@ -232,36 +247,6 @@ pub fn choose_swapchain_present_mode(
     }
 
     vk::PresentModeKHR::FIFO
-}
-
-pub fn choose_swapchain_extent(
-    capabilities: &vk::SurfaceCapabilitiesKHR,
-    window: &winit::window::Window,
-) -> vk::Extent2D {
-    if capabilities.current_extent.width != u32::max_value() {
-        capabilities.current_extent
-    } else {
-        use num::clamp;
-
-        let window_size = window.inner_size();
-        println!(
-            "\t\tInner Window Size: ({}, {})",
-            window_size.width, window_size.height
-        );
-
-        vk::Extent2D {
-            width: clamp(
-                window_size.width as u32,
-                capabilities.min_image_extent.width,
-                capabilities.max_image_extent.width,
-            ),
-            height: clamp(
-                window_size.height as u32,
-                capabilities.min_image_extent.height,
-                capabilities.max_image_extent.height,
-            ),
-        }
-    }
 }
 
 pub fn choose_swapchain_format(

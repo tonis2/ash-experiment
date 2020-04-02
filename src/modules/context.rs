@@ -1,4 +1,5 @@
 use ash::{
+    extensions::khr::Surface,
     version::{DeviceV1_0, EntryV1_0, InstanceV1_0},
     vk, Device, Entry, Instance,
 };
@@ -7,11 +8,9 @@ use super::{
     debug::{Debugger, ValidationInfo},
     device,
     queue::QueueFamilyIndices,
-    surface::VkSurface,
 };
 use crate::constants::*;
-use crate::utilities::platform::extension_names;
-
+use crate::utilities::platform::{create_surface, extension_names};
 
 use std::ffi::CString;
 use winit::window::Window;
@@ -20,7 +19,8 @@ pub struct Context {
     _entry: Entry,
     _debugger: Option<Debugger>,
     pub instance: Instance,
-    pub surface: VkSurface,
+    pub surface: vk::SurfaceKHR,
+    pub surface_loader: Surface,
     pub physical_device: vk::PhysicalDevice,
     pub device: Device,
     pub queue_family: QueueFamilyIndices,
@@ -33,8 +33,13 @@ impl Context {
     pub fn new(window: &Window, app_name: &str, validation_enabled: bool) -> Self {
         let (entry, instance) = create_entry(app_name);
 
-        let surface = VkSurface::new(&window, &instance, &entry);
-        let physical_device = device::pick_physical_device(&instance, &surface, &DEVICE_EXTENSIONS);
+        let surface_loader = Surface::new(&entry, &instance);
+        let surface =
+            unsafe { create_surface(&entry, &instance, window).expect("Failed to create surface") };
+
+        let physical_device =
+            device::pick_physical_device(&instance, &surface_loader, surface, &DEVICE_EXTENSIONS);
+
         let validation: ValidationInfo = ValidationInfo {
             is_enable: validation_enabled,
             required_validation_layers: ["VK_LAYER_KHRONOS_validation"],
@@ -45,6 +50,7 @@ impl Context {
             physical_device,
             &validation,
             &DEVICE_EXTENSIONS,
+            &surface_loader,
             &surface,
         );
 
@@ -66,6 +72,7 @@ impl Context {
                 _debugger: debugger,
                 instance,
                 surface,
+                surface_loader,
                 physical_device,
                 graphics_queue: device.get_device_queue(queue.graphics_family.unwrap(), 0),
                 present_queue: device.get_device_queue(queue.present_family.unwrap(), 0),
@@ -76,7 +83,6 @@ impl Context {
         }
     }
 
-
     pub fn find_depth_format(
         &self,
         candidate_formats: &[vk::Format],
@@ -85,8 +91,7 @@ impl Context {
     ) -> vk::Format {
         for &format in candidate_formats.iter() {
             let format_properties = unsafe {
-                self
-                    .instance
+                self.instance
                     .get_physical_device_format_properties(self.physical_device, format)
             };
             if tiling == vk::ImageTiling::LINEAR
@@ -116,9 +121,7 @@ impl Drop for Context {
     fn drop(&mut self) {
         unsafe {
             self.wait_idle();
-            self.surface
-                .surface_loader
-                .destroy_surface(self.surface.surface, None);
+            self.surface_loader.destroy_surface(self.surface, None);
 
             if self._debugger.is_some() {
                 let debugger = self._debugger.as_ref().unwrap();

@@ -34,7 +34,7 @@ fn main() {
 
     let mut queue = Queue::new(vulkan.clone());
 
-    let swapchain = Swapchain::new(vulkan.clone(), &window);
+    let swapchain = Swapchain::new(vulkan.clone());
     let command_buffers = instance.create_command_buffers(swapchain.image_views.len());
 
     let pipeline = mesh_pipeline::Pipeline::new(&swapchain, &instance, camera, light);
@@ -343,7 +343,6 @@ fn main() {
                 &next_frame,
                 &swapchain,
                 command_buffers[next_frame.image_index],
-                vulkan.clone(),
             );
         }
         Event::LoopDestroyed => {}

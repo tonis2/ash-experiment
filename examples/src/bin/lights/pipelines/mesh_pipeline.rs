@@ -27,9 +27,6 @@ pub struct Pipeline {
 }
 
 impl Pipeline {
-    // pub fn update_light(&mut self, light: Light) {
-    //     self.light_buffer.upload_to_buffer(&[light], 0);
-    // }
     //Creates a new pipeline
     pub fn new(
         swapchain: &Swapchain,

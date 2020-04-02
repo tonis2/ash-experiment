@@ -97,7 +97,6 @@ impl Queue {
         frame: &Frame,
         swapchain: &Swapchain,
         command_buffer: vk::CommandBuffer,
-        context: Arc<Context>,
     ) {
         let submit_infos = vec![vk::SubmitInfo {
             s_type: vk::StructureType::SUBMIT_INFO,
@@ -112,38 +111,42 @@ impl Queue {
         }];
 
         unsafe {
-            context
+            self.context
                 .device
                 .reset_fences(&frame.wait_fences)
                 .expect("Failed to reset Fence!");
-            context
+            self.context
                 .device
                 .queue_submit(
-                    context.graphics_queue,
+                    self.context.graphics_queue,
                     &submit_infos,
                     self.inflight_fences[self.current_frame],
                 )
                 .expect("Failed to execute queue submit.");
         }
 
-        let swapchains = [swapchain.swapchain];
         let image_index = frame.image_index as u32;
-        let present_info = vk::PresentInfoKHR {
-            s_type: vk::StructureType::PRESENT_INFO_KHR,
-            p_next: ptr::null(),
-            wait_semaphore_count: 1,
-            p_wait_semaphores: frame.signal_semaphores.as_ptr(),
-            swapchain_count: 1,
-            p_swapchains: swapchains.as_ptr(),
-            p_image_indices: &image_index,
-            p_results: ptr::null_mut(),
-        };
+        let present_info = vk::PresentInfoKHR::builder()
+            .wait_semaphores(&frame.signal_semaphores)
+            .swapchains(&[swapchain.swapchain])
+            .image_indices(&[image_index])
+            .build();
 
         unsafe {
-            swapchain
+            let swapchain_presentation_result = swapchain
                 .swapchain_loader
-                .queue_present(context.present_queue, &present_info)
-                .expect("Failed to execute queue present.");
+                .queue_present(self.context.present_queue, &present_info);
+
+            match swapchain_presentation_result {
+                Ok(is_suboptimal) if is_suboptimal => {
+                    // TODO: Recreate the swapchain
+                }
+                Err(vk::Result::ERROR_OUT_OF_DATE_KHR) => {
+                    // TODO: Recreate the swapchain
+                }
+                Err(error) => panic!("Failed to present queue. Cause: {}", error),
+                _ => {}
+            }
         }
 
         self.current_frame = (self.current_frame + 1) % MAX_FRAMES_IN_FLIGHT;

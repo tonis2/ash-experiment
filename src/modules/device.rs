@@ -1,9 +1,9 @@
-use ash::{version::InstanceV1_0, vk};
+use ash::{extensions::khr::Surface, version::InstanceV1_0, vk};
 
 use crate::utilities::platform::DeviceExtension;
 
 use super::queue::QueueFamilyIndices;
-use super::{surface::VkSurface, swapchain::SwapchainSupport};
+use super::swapchain::SwapchainSupport;
 use std::collections::HashSet;
 use std::ptr;
 
@@ -12,7 +12,8 @@ use std::os::raw::c_char;
 
 pub fn pick_physical_device(
     instance: &ash::Instance,
-    surface: &VkSurface,
+    surface_loader: &Surface,
+    surface: vk::SurfaceKHR,
     required_device_extensions: &DeviceExtension,
 ) -> vk::PhysicalDevice {
     let physical_devices = unsafe {
@@ -25,6 +26,7 @@ pub fn pick_physical_device(
         let is_suitable = is_physical_device_suitable(
             instance,
             **physical_device,
+            surface_loader,
             surface,
             required_device_extensions,
         );
@@ -41,18 +43,19 @@ pub fn pick_physical_device(
 pub fn is_physical_device_suitable(
     instance: &ash::Instance,
     physical_device: vk::PhysicalDevice,
-    surface_stuff: &VkSurface,
+    surface_loader: &Surface,
+    surface: vk::SurfaceKHR,
     required_device_extensions: &DeviceExtension,
 ) -> bool {
     let device_features = unsafe { instance.get_physical_device_features(physical_device) };
 
-    let indices = find_queue_family(instance, physical_device, surface_stuff);
+    let indices = find_queue_family(instance, physical_device, surface_loader, surface);
 
     let is_queue_family_supported = indices.is_complete();
     let is_device_extension_supported =
         check_device_extension_support(instance, physical_device, required_device_extensions);
     let is_swapchain_supported = if is_device_extension_supported {
-        let swapchain_support = query_swapchain_support(physical_device, surface_stuff);
+        let swapchain_support = query_swapchain_support(physical_device, surface_loader, surface);
         !swapchain_support.formats.is_empty() && !swapchain_support.present_modes.is_empty()
     } else {
         false
@@ -70,9 +73,10 @@ pub fn create_logical_device(
     physical_device: vk::PhysicalDevice,
     validation: &super::debug::ValidationInfo,
     device_extensions: &DeviceExtension,
-    surface: &VkSurface,
+    surface_loader: &Surface,
+    surface: &vk::SurfaceKHR,
 ) -> (ash::Device, QueueFamilyIndices) {
-    let indices = find_queue_family(instance, physical_device, surface);
+    let indices = find_queue_family(instance, physical_device, surface_loader, *surface);
 
     let mut unique_queue_families = HashSet::new();
     unique_queue_families.insert(indices.graphics_family.unwrap());
@@ -142,7 +146,8 @@ pub fn create_logical_device(
 pub fn find_queue_family(
     instance: &ash::Instance,
     physical_device: vk::PhysicalDevice,
-    surface: &VkSurface,
+    surface_loader: &Surface,
+    surface: vk::SurfaceKHR,
 ) -> QueueFamilyIndices {
     let queue_families =
         unsafe { instance.get_physical_device_queue_family_properties(physical_device) };
@@ -158,10 +163,10 @@ pub fn find_queue_family(
         }
 
         let is_present_support = unsafe {
-            surface.surface_loader.get_physical_device_surface_support(
+            surface_loader.get_physical_device_surface_support(
                 physical_device,
                 index as u32,
-                surface.surface,
+                surface,
             )
         };
         if queue_family.queue_count > 0 && is_present_support.unwrap() {
@@ -211,20 +216,18 @@ pub fn check_device_extension_support(
 
 pub fn query_swapchain_support(
     physical_device: vk::PhysicalDevice,
-    surface_stuff: &VkSurface,
+    surface_loader: &Surface,
+    surface: vk::SurfaceKHR,
 ) -> SwapchainSupport {
     unsafe {
-        let capabilities = surface_stuff
-            .surface_loader
-            .get_physical_device_surface_capabilities(physical_device, surface_stuff.surface)
+        let capabilities = surface_loader
+            .get_physical_device_surface_capabilities(physical_device, surface)
             .expect("Failed to query for surface capabilities.");
-        let formats = surface_stuff
-            .surface_loader
-            .get_physical_device_surface_formats(physical_device, surface_stuff.surface)
+        let formats = surface_loader
+            .get_physical_device_surface_formats(physical_device, surface)
             .expect("Failed to query for surface formats.");
-        let present_modes = surface_stuff
-            .surface_loader
-            .get_physical_device_surface_present_modes(physical_device, surface_stuff.surface)
+        let present_modes = surface_loader
+            .get_physical_device_surface_present_modes(physical_device, surface)
             .expect("Failed to query for surface present mode.");
 
         SwapchainSupport {

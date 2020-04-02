@@ -38,7 +38,7 @@ fn main() {
 
     let instance = VkInstance::new(vulkan.clone());
 
-    let swapchain = Swapchain::new(vulkan.clone(), &window);
+    let mut swapchain = Swapchain::new(vulkan.clone());
 
     let pipeline = pipeline::Pipeline::new(&swapchain, &instance);
 
@@ -80,6 +80,30 @@ fn main() {
                     _ => {}
                 },
             },
+            WindowEvent::Resized(_) => {
+                println!("resize");
+
+                // swapchain = Swapchain::new(vulkan.clone());
+                // framebuffers = swapchain
+                //     .image_views
+                //     .iter()
+                //     .map(|image| {
+                //         Framebuffer::new(
+                //             vk::FramebufferCreateInfo::builder()
+                //                 .layers(1)
+                //                 .render_pass(pipeline.renderpass)
+                //                 .attachments(&[*image])
+                //                 .width(swapchain.width())
+                //                 .height(swapchain.height())
+                //                 .build(),
+                //             vulkan.clone(),
+                //         )
+                //     })
+                //     .collect();
+                // pipeline = pipeline::Pipeline::new(&swapchain, &instance);
+
+                // queue.render_nothing(frame, &swapchain);
+            }
             _ => {}
         },
         Event::MainEventsCleared => {
@@ -103,7 +127,7 @@ fn main() {
                 max_depth: 1.0,
             }];
 
-            let next_frame = queue.next_frame(&swapchain);
+            let next_frame = queue.next_frame(&mut swapchain);
 
             let render_pass_info = vk::RenderPassBeginInfo::builder()
                 .framebuffer(framebuffers[next_frame.image_index].buffer())
@@ -153,7 +177,6 @@ fn main() {
                 &next_frame,
                 &swapchain,
                 command_buffers[next_frame.image_index],
-                vulkan.clone(),
             );
         }
         Event::LoopDestroyed => {}

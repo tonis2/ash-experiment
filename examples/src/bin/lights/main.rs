@@ -34,7 +34,7 @@ fn main() {
 
     let mut queue = Queue::new(vulkan.clone());
 
-    let swapchain = Swapchain::new(vulkan.clone(), &window);
+    let swapchain = Swapchain::new(vulkan.clone());
     let command_buffers = instance.create_command_buffers(swapchain.image_views.len());
 
     let pipeline = mesh_pipeline::Pipeline::new(&swapchain, &instance, camera, light);
@@ -100,23 +100,10 @@ fn main() {
         [1.0, 1.0, 1.0],
     );
 
-    let extent = vk::Rect2D {
-        offset: vk::Offset2D { x: 0, y: 0 },
-        extent: swapchain.extent,
-    };
-
-    let viewports = [vk::Viewport {
-        x: 0.0,
-        y: 0.0,
-        width: swapchain.extent.width as f32,
-        height: swapchain.extent.height as f32,
-        min_depth: 0.0,
-        max_depth: 1.0,
-    }];
-
     event_loop.run(move |event, _, control_flow| match event {
         Event::WindowEvent { event, .. } => match event {
             WindowEvent::CloseRequested => *control_flow = ControlFlow::Exit,
+            WindowEvent::Resized(_) => {}
             WindowEvent::KeyboardInput { input, .. } => match input {
                 KeyboardInput {
                     virtual_keycode,
@@ -139,6 +126,20 @@ fn main() {
         Event::RedrawRequested(_window_id) => {
             let delta_time = tick_counter.delta_time();
             // rotate scene
+
+            let extent = vk::Rect2D {
+                offset: vk::Offset2D { x: 0, y: 0 },
+                extent: swapchain.extent,
+            };
+
+            let viewports = [vk::Viewport {
+                x: 0.0,
+                y: 0.0,
+                width: swapchain.extent.width as f32,
+                height: swapchain.extent.height as f32,
+                min_depth: 0.0,
+                max_depth: 1.0,
+            }];
 
             use cgmath::Zero;
             let transform: cgmath::Decomposed<cgmath::Vector3<f32>, cgmath::Basis3<f32>> =
@@ -343,7 +344,6 @@ fn main() {
                 &next_frame,
                 &swapchain,
                 command_buffers[next_frame.image_index],
-                vulkan.clone(),
             );
         }
         Event::LoopDestroyed => {}
