@@ -138,7 +138,7 @@ fn main() {
         }
         Event::RedrawRequested(_window_id) => {
             let delta_time = tick_counter.delta_time();
-            // rotate cube
+            // rotate scene
 
             use cgmath::Zero;
             let transform: cgmath::Decomposed<cgmath::Vector3<f32>, cgmath::Basis3<f32>> =
