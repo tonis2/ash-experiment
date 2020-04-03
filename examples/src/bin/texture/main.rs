@@ -48,15 +48,15 @@ fn main() {
 
     let mut queue = Queue::new(vulkan.clone());
 
-    let swapchain = Swapchain::new(vulkan.clone());
+    let mut swapchain = Swapchain::new(vulkan.clone());
 
-    let pipeline = Pipeline::create_pipeline(&swapchain, &instance);
+    let mut pipeline = Pipeline::new(&swapchain, &instance);
 
     let index_buffer = instance.create_gpu_buffer(vk::BufferUsageFlags::INDEX_BUFFER, &indices);
     let vertex_buffer = instance.create_gpu_buffer(vk::BufferUsageFlags::VERTEX_BUFFER, &vertices);
 
     let command_buffers = instance.create_command_buffers(swapchain.image_views.len());
-    let framebuffers: Vec<Framebuffer> = swapchain
+    let mut framebuffers: Vec<Framebuffer> = swapchain
         .image_views
         .iter()
         .map(|image| {
@@ -112,66 +112,89 @@ fn main() {
                 min_depth: 0.0,
                 max_depth: 1.0,
             }];
+            let frame = queue.load_next_frame(&swapchain);
 
-            let next_frame = queue.next_frame(&swapchain);
+            if let Ok((image_index, _is_suboptimal)) = frame {
+                let render_pass_info = vk::RenderPassBeginInfo::builder()
+                    .framebuffer(framebuffers[image_index as usize].buffer())
+                    .render_pass(pipeline.renderpass)
+                    .clear_values(&[vk::ClearValue {
+                        color: vk::ClearColorValue {
+                            float32: [0.0, 0.0, 0.0, 1.0],
+                        },
+                    }])
+                    .render_area(extent)
+                    .build();
 
-            let render_pass_info = vk::RenderPassBeginInfo::builder()
-                .framebuffer(framebuffers[next_frame.image_index].buffer())
-                .render_pass(pipeline.renderpass)
-                .clear_values(&[vk::ClearValue {
-                    // clear value for color buffer
-                    color: vk::ClearColorValue {
-                        float32: [0.0, 0.0, 0.0, 1.0],
+                instance.build_command(
+                    command_buffers[image_index as usize],
+                    |command_buffer, device| unsafe {
+                        device.cmd_begin_render_pass(
+                            command_buffer,
+                            &render_pass_info,
+                            vk::SubpassContents::INLINE,
+                        );
+                        device.cmd_bind_pipeline(
+                            command_buffer,
+                            vk::PipelineBindPoint::GRAPHICS,
+                            pipeline.pipeline,
+                        );
+                        device.cmd_bind_descriptor_sets(
+                            command_buffer,
+                            vk::PipelineBindPoint::GRAPHICS,
+                            pipeline.layout,
+                            0,
+                            &[pipeline.pipeline_descriptor.set],
+                            &[],
+                        );
+                        device.cmd_set_viewport(command_buffer, 0, &viewports);
+                        device.cmd_set_scissor(command_buffer, 0, &[extent]);
+                        device.cmd_bind_vertex_buffers(
+                            command_buffer,
+                            0,
+                            &[vertex_buffer.buffer],
+                            &[0],
+                        );
+                        device.cmd_bind_index_buffer(
+                            command_buffer,
+                            index_buffer.buffer,
+                            0,
+                            vk::IndexType::UINT32,
+                        );
+                        device.cmd_draw_indexed(command_buffer, indices.len() as u32, 1, 0, 0, 1);
+                        device.cmd_end_render_pass(command_buffer);
                     },
-                }])
-                .render_area(extent)
-                .build();
+                );
 
-            instance.build_command(
-                command_buffers[next_frame.image_index],
-                |command_buffer, device| unsafe {
-                    device.cmd_begin_render_pass(
-                        command_buffer,
-                        &render_pass_info,
-                        vk::SubpassContents::INLINE,
-                    );
-                    device.cmd_bind_pipeline(
-                        command_buffer,
-                        vk::PipelineBindPoint::GRAPHICS,
-                        pipeline.pipeline,
-                    );
-                    device.cmd_bind_descriptor_sets(
-                        command_buffer,
-                        vk::PipelineBindPoint::GRAPHICS,
-                        pipeline.layout,
-                        0,
-                        &[pipeline.pipeline_descriptor.set],
-                        &[],
-                    );
-                    device.cmd_set_viewport(command_buffer, 0, &viewports);
-                    device.cmd_set_scissor(command_buffer, 0, &[extent]);
-                    device.cmd_bind_vertex_buffers(
-                        command_buffer,
-                        0,
-                        &[vertex_buffer.buffer],
-                        &[0],
-                    );
-                    device.cmd_bind_index_buffer(
-                        command_buffer,
-                        index_buffer.buffer,
-                        0,
-                        vk::IndexType::UINT32,
-                    );
-                    device.cmd_draw_indexed(command_buffer, indices.len() as u32, 1, 0, 0, 1);
-                    device.cmd_end_render_pass(command_buffer);
-                },
-            );
+                queue.render_frame(
+                    &swapchain,
+                    command_buffers[image_index as usize],
+                    image_index,
+                );
+            } else {
+                println!("Failed to draw frame {:?}", frame.err());
 
-            queue.render_frame(
-                &next_frame,
-                &swapchain,
-                command_buffers[next_frame.image_index],
-            );
+                vulkan.wait_idle();
+                swapchain = Swapchain::new(vulkan.clone());
+
+                pipeline = pipeline::Pipeline::new(&swapchain, &instance);
+                framebuffers = swapchain
+                    .image_views
+                    .iter()
+                    .map(|image| {
+                        Framebuffer::new(
+                            vk::FramebufferCreateInfo::builder()
+                                .layers(1)
+                                .render_pass(pipeline.renderpass)
+                                .attachments(&[*image])
+                                .width(swapchain.width())
+                                .height(swapchain.height())
+                                .build(),
+                            vulkan.clone(),
+                        )
+                    })
+                    .collect();
+            }
         }
         Event::LoopDestroyed => {}
         _ => {}

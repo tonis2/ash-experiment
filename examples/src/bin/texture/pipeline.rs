@@ -44,7 +44,7 @@ pub struct Pipeline {
 
 impl Pipeline {
     //Creates a new pipeline
-    pub fn create_pipeline(swapchain: &Swapchain, vulkan: &VkInstance) -> Pipeline {
+    pub fn new(swapchain: &Swapchain, vulkan: &VkInstance) -> Pipeline {
         let vertex_input_state_info = vk::PipelineVertexInputStateCreateInfo::builder()
             .vertex_binding_descriptions(&[vk::VertexInputBindingDescription {
                 binding: 0,

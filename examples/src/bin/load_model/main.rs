@@ -25,7 +25,7 @@ fn main() {
 
     let swapchain = Swapchain::new(vulkan.clone());
 
-    let mut pipeline = Pipeline::create_pipeline(&swapchain, &instance);
+    let mut pipeline = Pipeline::new(&swapchain, &instance);
 
     let (vertices, indices) = load_model(Path::new("assets/chalet.obj"));
     let index_buffer = instance.create_gpu_buffer(vk::BufferUsageFlags::INDEX_BUFFER, &indices);
@@ -158,13 +158,19 @@ fn main() {
                 .uniform_buffer
                 .upload_to_buffer(&[pipeline.uniform_transform], 0);
 
-            let next_frame = queue.next_frame(&swapchain);
+            let frame = queue.load_next_frame(&swapchain);
 
-            queue.render_frame(
-                &next_frame,
-                &swapchain,
-                command_buffers[next_frame.image_index],
-            );
+            if let Ok((image_index, _is_suboptimal)) = frame {
+                queue.render_frame(
+                    &swapchain,
+                    command_buffers[image_index as usize],
+                    image_index,
+                );
+            } else {
+                println!("Failed to draw frame {:?}", frame.err());
+
+                println!("Need to implement resize of swapchain here!")
+            }
         }
         Event::LoopDestroyed => {}
         _ => {}

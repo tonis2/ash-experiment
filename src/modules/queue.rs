@@ -6,16 +6,6 @@ use super::swapchain::Swapchain;
 use crate::constants::MAX_FRAMES_IN_FLIGHT;
 use std::ptr;
 
-#[derive(Debug)]
-pub struct Frame {
-    pub wait_fences: Vec<vk::Fence>,
-    pub signal_semaphores: Vec<vk::Semaphore>,
-    pub wait_semaphores: Vec<vk::Semaphore>,
-    pub image_index: usize,
-    pub is_sub_optimal: bool,
-    pub wait_stages: Vec<vk::PipelineStageFlags>,
-}
-
 #[derive(Debug, Clone)]
 pub struct QueueFamilyIndices {
     pub graphics_family: Option<u32>,
@@ -92,44 +82,59 @@ impl Queue {
         }
     }
 
+    pub fn load_next_frame(&self, swapchain: &Swapchain) -> Result<(u32, bool), vk::Result> {
+        unsafe {
+            self.context
+                .device
+                .wait_for_fences(
+                    &[self.inflight_fences[self.current_frame]],
+                    true,
+                    std::u64::MAX,
+                )
+                .expect("Failed to wait for Fence!");
+
+            swapchain.swapchain_loader.acquire_next_image(
+                swapchain.swapchain,
+                std::u64::MAX,
+                self.image_available_semaphores[self.current_frame],
+                vk::Fence::null(),
+            )
+        }
+    }
+
     pub fn render_frame(
         &mut self,
-        frame: &Frame,
         swapchain: &Swapchain,
         command_buffer: vk::CommandBuffer,
+        image: u32,
     ) {
-        let submit_infos = vec![vk::SubmitInfo {
-            s_type: vk::StructureType::SUBMIT_INFO,
-            p_next: ptr::null(),
-            wait_semaphore_count: frame.wait_semaphores.len() as u32,
-            p_wait_semaphores: frame.wait_semaphores.as_ptr(),
-            p_wait_dst_stage_mask: frame.wait_stages.as_ptr(),
-            command_buffer_count: 1,
-            p_command_buffers: &command_buffer,
-            signal_semaphore_count: frame.signal_semaphores.len() as u32,
-            p_signal_semaphores: frame.signal_semaphores.as_ptr(),
-        }];
+        let submit_info = vk::SubmitInfo::builder()
+            .wait_semaphores(&[self.image_available_semaphores[self.current_frame]])
+            .wait_dst_stage_mask(&[vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT])
+            .command_buffers(&[command_buffer])
+            .signal_semaphores(&[self.render_finished_semaphores[self.current_frame]])
+            .build();
 
         unsafe {
             self.context
                 .device
-                .reset_fences(&frame.wait_fences)
+                .reset_fences(&[self.inflight_fences[self.current_frame]])
                 .expect("Failed to reset Fence!");
+
             self.context
                 .device
                 .queue_submit(
                     self.context.graphics_queue,
-                    &submit_infos,
+                    &[submit_info],
                     self.inflight_fences[self.current_frame],
                 )
                 .expect("Failed to execute queue submit.");
         }
 
-        let image_index = frame.image_index as u32;
         let present_info = vk::PresentInfoKHR::builder()
-            .wait_semaphores(&frame.signal_semaphores)
+            .wait_semaphores(&[self.render_finished_semaphores[self.current_frame]])
             .swapchains(&[swapchain.swapchain])
-            .image_indices(&[image_index])
+            .image_indices(&[image])
             .build();
 
         unsafe {
@@ -150,40 +155,6 @@ impl Queue {
         }
 
         self.current_frame = (self.current_frame + 1) % MAX_FRAMES_IN_FLIGHT;
-    }
-
-    pub fn next_frame(&mut self, swapchain: &Swapchain) -> Frame {
-        let wait_fences = vec![self.inflight_fences[self.current_frame]];
-
-        let (image_index, is_sub_optimal) = unsafe {
-            self.context
-                .device
-                .wait_for_fences(&wait_fences, true, std::u64::MAX)
-                .expect("Failed to wait for Fence!");
-
-            swapchain
-                .swapchain_loader
-                .acquire_next_image(
-                    swapchain.swapchain,
-                    std::u64::MAX,
-                    self.image_available_semaphores[self.current_frame],
-                    vk::Fence::null(),
-                )
-                .expect("Failed to acquire next image.")
-        };
-
-        let wait_semaphores = vec![self.image_available_semaphores[self.current_frame]];
-        let wait_stages = vec![vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT];
-        let signal_semaphores = vec![self.render_finished_semaphores[self.current_frame]];
-
-        Frame {
-            wait_fences,
-            image_index: image_index as usize,
-            wait_semaphores,
-            wait_stages,
-            is_sub_optimal,
-            signal_semaphores,
-        }
     }
 }
 
