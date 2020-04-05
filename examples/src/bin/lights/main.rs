@@ -149,9 +149,8 @@ fn main() {
                 };
 
             scene_data.update_transform(transform);
-            let frame = queue.load_next_frame(&mut swapchain);
 
-            if let Ok((image_index, _s)) = frame {
+            if let Ok((image_index, _s)) = queue.load_next_frame(&mut swapchain) {
                 let scene_pass = vk::RenderPassBeginInfo::builder()
                     .framebuffer(framebuffers[image_index as usize].buffer())
                     .render_pass(pipeline.renderpass)
@@ -345,7 +344,7 @@ fn main() {
                     image_index,
                 );
             } else {
-                println!("Failed to draw frame {:?}", frame.err());
+                println!("Failed to draw frame");
                 //Resize
                 vulkan.wait_idle();
                 swapchain = Swapchain::new(vulkan.clone());
