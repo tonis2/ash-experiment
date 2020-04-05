@@ -284,28 +284,6 @@ fn main() {
                         );
 
                         //Ball
-
-                        device.cmd_bind_vertex_buffers(
-                            command_buffer,
-                            0,
-                            &[scene_vert_buffer.buffer],
-                            &[0],
-                        );
-                        device.cmd_bind_index_buffer(
-                            command_buffer,
-                            scene_index_buffer.buffer,
-                            0,
-                            vk::IndexType::UINT32,
-                        );
-                        device.cmd_draw_indexed(
-                            command_buffer,
-                            scene_batch.indices.len() as u32,
-                            1,
-                            0,
-                            0,
-                            1,
-                        );
-
                         device.cmd_push_constants(
                             command_buffer,
                             pipeline.layout,
