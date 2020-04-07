@@ -38,9 +38,8 @@ impl Importer {
         let mut batch = Batch::<Vertex>::new();
 
         for mesh in self.doc.meshes() {
-            let mut mesh_data = Mesh::<Vertex>::default();
-
             for primitive in mesh.primitives() {
+                let mut mesh_data = Mesh::<Vertex>::default();
                 let reader = primitive.reader(|buffer| Some(&self.buffers[buffer.index()]));
                 let indices_data: Option<Vec<u32>> = reader
                     .read_indices()
@@ -55,8 +54,8 @@ impl Importer {
                         position,
                         color: [1.0, 1.0, 1.0],
                     });
-                    batch.add(&mut mesh_data);
                 }
+                batch.add(&mut mesh_data);
             }
         }
         batch
