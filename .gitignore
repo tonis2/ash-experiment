@@ -11,6 +11,8 @@ Cargo.lock
 examples/assets/chalet.obj
 examples/assets/chalet.jpg
 examples/assets/texture.jpg
+examples/assets/model.gltf
+examples/assets/model.bin
 examples/Cargo.lock
 
 target
