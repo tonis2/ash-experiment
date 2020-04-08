@@ -20,10 +20,10 @@ pub struct Node {
     pub scale: [f32; 3],
 }
 
-#[derive(Debug, Clone)]
 pub struct GltfResult {
     pub meshes: Vec<Mesh>,
     pub nodes: Vec<Node>,
+    pub images: Vec<Image>,
 }
 
 #[derive(Clone, Debug)]
@@ -140,23 +140,27 @@ impl Importer {
             }
         }
 
-        GltfResult { meshes, nodes }
-    }
-
-    fn to_vk_texture_format(format: gltf::image::Format) -> vk::Format {
-        match format {
-            gltf::image::Format::R8 => vk::Format::R8_UNORM,
-            gltf::image::Format::R8G8 => vk::Format::R8G8_UNORM,
-            gltf::image::Format::R8G8B8A8 => vk::Format::R8G8B8A8_UNORM,
-            gltf::image::Format::B8G8R8A8 => vk::Format::B8G8R8A8_UNORM,
-            gltf::image::Format::R8G8B8 => vk::Format::R8G8B8_UNORM,
-            gltf::image::Format::B8G8R8 => vk::Format::B8G8R8_UNORM,
-            gltf::image::Format::R16 => vk::Format::R16_UNORM,
-            gltf::image::Format::R16G16 => vk::Format::B8G8R8_UNORM,
-            gltf::image::Format::R16G16B16 => vk::Format::R16G16B16_UNORM,
-            gltf::image::Format::R16G16B16A16 => vk::Format::R16G16B16A16_UNORM,
+        GltfResult {
+            meshes,
+            nodes,
+            images,
         }
     }
+
+    // fn to_vk_texture_format(format: gltf::image::Format) -> vk::Format {
+    //     match format {
+    //         gltf::image::Format::R8 => vk::Format::R8_UNORM,
+    //         gltf::image::Format::R8G8 => vk::Format::R8G8_UNORM,
+    //         gltf::image::Format::R8G8B8A8 => vk::Format::R8G8B8A8_UNORM,
+    //         gltf::image::Format::B8G8R8A8 => vk::Format::B8G8R8A8_UNORM,
+    //         gltf::image::Format::R8G8B8 => vk::Format::R8G8B8_UNORM,
+    //         gltf::image::Format::B8G8R8 => vk::Format::B8G8R8_UNORM,
+    //         gltf::image::Format::R16 => vk::Format::R16_UNORM,
+    //         gltf::image::Format::R16G16 => vk::Format::B8G8R8_UNORM,
+    //         gltf::image::Format::R16G16B16 => vk::Format::R16G16B16_UNORM,
+    //         gltf::image::Format::R16G16B16A16 => vk::Format::R16G16B16A16_UNORM,
+    //     }
+    // }
 
     fn create_texture_image(properties: &gltf::image::Data, vulkan: &VkInstance) -> Image {
         let format = vk::Format::R8G8B8A8_UNORM;
@@ -186,7 +190,9 @@ impl Importer {
                 array_layers: 1,
                 samples: vk::SampleCountFlags::TYPE_1,
                 tiling: vk::ImageTiling::OPTIMAL,
-                usage: vk::ImageUsageFlags::TRANSFER_DST | vk::ImageUsageFlags::SAMPLED,
+                usage: vk::ImageUsageFlags::TRANSFER_SRC
+                    | vk::ImageUsageFlags::TRANSFER_DST
+                    | vk::ImageUsageFlags::SAMPLED,
                 sharing_mode: vk::SharingMode::EXCLUSIVE,
                 ..Default::default()
             },

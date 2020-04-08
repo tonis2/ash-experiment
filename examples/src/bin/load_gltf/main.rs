@@ -25,7 +25,6 @@ fn main() {
 
     let model = gltf_importer::Importer::load(Path::new("assets/gltf_test.gltf")).build(&instance);
 
-    println!("{:?}", model);
     let camera = Camera::new(800.0 / 600.0);
     let mesh_pipeline = mesh_pipeline::Pipeline::new(&swapchain, camera, vulkan.clone());
 
