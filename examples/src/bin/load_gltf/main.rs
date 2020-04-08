@@ -23,7 +23,9 @@ fn main() {
     let mut swapchain = Swapchain::new(vulkan.clone());
     let mut queue = Queue::new(vulkan.clone());
 
-    let model = gltf_importer::Importer::load(Path::new("assets/gltf_test.gltf")).build();
+    let model = gltf_importer::Importer::load(Path::new("assets/gltf_test.gltf")).build(&instance);
+
+    println!("{:?}", model);
     let camera = Camera::new(800.0 / 600.0);
     let mesh_pipeline = mesh_pipeline::Pipeline::new(&swapchain, camera, vulkan.clone());
 
@@ -45,10 +47,10 @@ fn main() {
         })
         .collect();
 
-    let vertex_buffer =
-        instance.create_gpu_buffer(vk::BufferUsageFlags::VERTEX_BUFFER, &model.vertices);
-    let index_buffer =
-        instance.create_gpu_buffer(vk::BufferUsageFlags::INDEX_BUFFER, &model.indices);
+    // let vertex_buffer =
+    //     instance.create_gpu_buffer(vk::BufferUsageFlags::VERTEX_BUFFER, &model.vertices);
+    // let index_buffer =
+    //     instance.create_gpu_buffer(vk::BufferUsageFlags::INDEX_BUFFER, &model.indices);
 
     let mut tick_counter = FPSLimiter::new();
     event_loop.run(move |event, _, control_flow| match event {
@@ -134,26 +136,26 @@ fn main() {
                             &[],
                         );
 
-                        device.cmd_bind_vertex_buffers(
-                            command_buffer,
-                            0,
-                            &[vertex_buffer.buffer],
-                            &[0],
-                        );
-                        device.cmd_bind_index_buffer(
-                            command_buffer,
-                            index_buffer.buffer,
-                            0,
-                            vk::IndexType::UINT32,
-                        );
-                        device.cmd_draw_indexed(
-                            command_buffer,
-                            model.indices.len() as u32,
-                            1,
-                            0,
-                            0,
-                            1,
-                        );
+                        // device.cmd_bind_vertex_buffers(
+                        //     command_buffer,
+                        //     0,
+                        //     &[vertex_buffer.buffer],
+                        //     &[0],
+                        // );
+                        // device.cmd_bind_index_buffer(
+                        //     command_buffer,
+                        //     index_buffer.buffer,
+                        //     0,
+                        //     vk::IndexType::UINT32,
+                        // );
+                        // device.cmd_draw_indexed(
+                        //     command_buffer,
+                        //     model.indices.len() as u32,
+                        //     1,
+                        //     0,
+                        //     0,
+                        //     1,
+                        // );
 
                         device.cmd_end_render_pass(command_buffer);
                     },
