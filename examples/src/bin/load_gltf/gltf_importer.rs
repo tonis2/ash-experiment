@@ -23,7 +23,6 @@ pub struct Node {
 pub struct GltfResult {
     pub meshes: Vec<Mesh>,
     pub nodes: Vec<Node>,
-    pub images: Vec<Image>,
 }
 
 #[derive(Clone, Debug)]
@@ -53,12 +52,43 @@ impl Importer {
         let mut meshes: Vec<Mesh> = Vec::new();
         let mut nodes = Vec::new();
 
-        //Build image textures
-        let images: Vec<Image> = self
+        let mut textures: Vec<Image> = self
             .images
             .iter()
-            .map(|info| Self::create_texture_image(info, &vulkan))
+            .map(|image| Self::create_texture_image(image, &vulkan))
             .collect();
+
+        let samplers: Vec<vk::SamplerCreateInfo> = self
+            .doc
+            .samplers()
+            .map(|sampler| Self::build_sampler(&sampler))
+            .collect();
+
+        for texture in self.doc.textures() {
+            let image_index = texture.source().index();
+            let sampler_index = texture.sampler().index();
+
+            if sampler_index.is_some() {
+                textures[image_index].attach_sampler(samplers[sampler_index.unwrap()])
+            } else {
+                textures[image_index].attach_sampler(vk::SamplerCreateInfo {
+                    s_type: vk::StructureType::SAMPLER_CREATE_INFO,
+                    mag_filter: vk::Filter::LINEAR,
+                    min_filter: vk::Filter::LINEAR,
+                    mipmap_mode: vk::SamplerMipmapMode::LINEAR,
+                    address_mode_u: vk::SamplerAddressMode::REPEAT,
+                    address_mode_v: vk::SamplerAddressMode::REPEAT,
+                    address_mode_w: vk::SamplerAddressMode::REPEAT,
+                    max_lod: 1.0,
+                    mip_lod_bias: 0.0,
+                    anisotropy_enable: vk::TRUE,
+                    max_anisotropy: 16.0,
+                    ..Default::default()
+                })
+            }
+        }
+
+        //Build image textures
 
         //Store Nodes
         for node in self.doc.nodes() {
@@ -140,27 +170,70 @@ impl Importer {
             }
         }
 
-        GltfResult {
-            meshes,
-            nodes,
-            images,
-        }
+        GltfResult { meshes, nodes }
     }
 
-    // fn to_vk_texture_format(format: gltf::image::Format) -> vk::Format {
-    //     match format {
-    //         gltf::image::Format::R8 => vk::Format::R8_UNORM,
-    //         gltf::image::Format::R8G8 => vk::Format::R8G8_UNORM,
-    //         gltf::image::Format::R8G8B8A8 => vk::Format::R8G8B8A8_UNORM,
-    //         gltf::image::Format::B8G8R8A8 => vk::Format::B8G8R8A8_UNORM,
-    //         gltf::image::Format::R8G8B8 => vk::Format::R8G8B8_UNORM,
-    //         gltf::image::Format::B8G8R8 => vk::Format::B8G8R8_UNORM,
-    //         gltf::image::Format::R16 => vk::Format::R16_UNORM,
-    //         gltf::image::Format::R16G16 => vk::Format::B8G8R8_UNORM,
-    //         gltf::image::Format::R16G16B16 => vk::Format::R16G16B16_UNORM,
-    //         gltf::image::Format::R16G16B16A16 => vk::Format::R16G16B16A16_UNORM,
-    //     }
-    // }
+    fn build_sampler(sampler: &gltf::texture::Sampler) -> vk::SamplerCreateInfo {
+        use gltf::texture::MagFilter;
+        use gltf::texture::MinFilter;
+        use gltf::texture::WrappingMode;
+
+        fn address_mode(wrap_mode: WrappingMode) -> vk::SamplerAddressMode {
+            match wrap_mode {
+                WrappingMode::ClampToEdge => vk::SamplerAddressMode::CLAMP_TO_EDGE,
+                WrappingMode::Repeat => vk::SamplerAddressMode::REPEAT,
+                WrappingMode::MirroredRepeat => vk::SamplerAddressMode::MIRRORED_REPEAT,
+            }
+        };
+
+        fn min_filter_mimap_filter(min_filter: MinFilter) -> (vk::Filter, vk::SamplerMipmapMode) {
+            match min_filter {
+                MinFilter::Linear => (vk::Filter::LINEAR, vk::SamplerMipmapMode::LINEAR),
+                MinFilter::Nearest => (vk::Filter::NEAREST, vk::SamplerMipmapMode::NEAREST),
+                MinFilter::LinearMipmapLinear => {
+                    (vk::Filter::LINEAR, vk::SamplerMipmapMode::LINEAR)
+                }
+                MinFilter::LinearMipmapNearest => {
+                    (vk::Filter::LINEAR, vk::SamplerMipmapMode::NEAREST)
+                }
+                MinFilter::NearestMipmapNearest => {
+                    (vk::Filter::NEAREST, vk::SamplerMipmapMode::NEAREST)
+                }
+                MinFilter::NearestMipmapLinear => {
+                    (vk::Filter::NEAREST, vk::SamplerMipmapMode::LINEAR)
+                }
+            }
+        }
+
+        let (min_filter, mipmap_filter) = min_filter_mimap_filter(
+            sampler
+                .min_filter()
+                .unwrap_or(gltf::texture::MinFilter::Nearest),
+        );
+
+        let mag_filter = match sampler
+            .mag_filter()
+            .unwrap_or(gltf::texture::MagFilter::Nearest)
+        {
+            MagFilter::Nearest => vk::Filter::NEAREST,
+            MagFilter::Linear => vk::Filter::LINEAR,
+        };
+
+        vk::SamplerCreateInfo {
+            s_type: vk::StructureType::SAMPLER_CREATE_INFO,
+            mag_filter: mag_filter,
+            min_filter: min_filter,
+            mipmap_mode: mipmap_filter,
+            address_mode_u: address_mode(sampler.wrap_s()),
+            address_mode_v: address_mode(sampler.wrap_t()),
+            address_mode_w: vk::SamplerAddressMode::CLAMP_TO_EDGE,
+            max_lod: 1.0,
+            mip_lod_bias: 0.0,
+            anisotropy_enable: vk::TRUE,
+            max_anisotropy: 16.0,
+            ..Default::default()
+        }
+    }
 
     fn create_texture_image(properties: &gltf::image::Data, vulkan: &VkInstance) -> Image {
         let format = vk::Format::R8G8B8A8_UNORM;
@@ -256,21 +329,6 @@ impl Importer {
                 base_array_layer: 0,
                 layer_count: 1,
             },
-            ..Default::default()
-        });
-
-        image.attach_sampler(vk::SamplerCreateInfo {
-            s_type: vk::StructureType::SAMPLER_CREATE_INFO,
-            mag_filter: vk::Filter::LINEAR,
-            min_filter: vk::Filter::LINEAR,
-            mipmap_mode: vk::SamplerMipmapMode::LINEAR,
-            address_mode_u: vk::SamplerAddressMode::REPEAT,
-            address_mode_v: vk::SamplerAddressMode::REPEAT,
-            address_mode_w: vk::SamplerAddressMode::REPEAT,
-            max_lod: 1.0,
-            mip_lod_bias: 0.0,
-            anisotropy_enable: vk::TRUE,
-            max_anisotropy: 16.0,
             ..Default::default()
         });
 
