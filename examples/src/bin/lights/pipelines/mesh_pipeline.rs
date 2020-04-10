@@ -5,7 +5,7 @@ use vulkan::{
 
 use super::shadowmap_pipeline;
 use super::{Camera, Light, PushConstantModel, Vertex};
-use std::{default::Default, ffi::CString, mem, path::Path, ptr, sync::Arc};
+use std::{default::Default, ffi::CString, mem, path::Path, sync::Arc};
 
 pub struct Pipeline {
     pub pipeline: vk::Pipeline,
@@ -74,7 +74,7 @@ impl Pipeline {
                     descriptor_type: vk::DescriptorType::UNIFORM_BUFFER,
                     descriptor_count: 1,
                     stage_flags: vk::ShaderStageFlags::VERTEX,
-                    p_immutable_samplers: ptr::null(),
+                    ..Default::default()
                 },
                 vk::DescriptorSetLayoutBinding {
                     // light uniform
@@ -82,7 +82,7 @@ impl Pipeline {
                     descriptor_type: vk::DescriptorType::UNIFORM_BUFFER,
                     descriptor_count: 1,
                     stage_flags: vk::ShaderStageFlags::ALL_GRAPHICS,
-                    p_immutable_samplers: ptr::null(),
+                    ..Default::default()
                 },
                 vk::DescriptorSetLayoutBinding {
                     // Shadow image
@@ -90,7 +90,7 @@ impl Pipeline {
                     descriptor_type: vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
                     descriptor_count: 1,
                     stage_flags: vk::ShaderStageFlags::FRAGMENT,
-                    p_immutable_samplers: ptr::null(),
+                    ..Default::default()
                 },
             ],
             vec![
