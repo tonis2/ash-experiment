@@ -27,6 +27,7 @@ pub struct Context {
     pub graphics_queue: vk::Queue,
     pub present_queue: vk::Queue,
     pub memory: vk_mem::Allocator,
+    pub image_count: u32,
 }
 
 impl Context {
@@ -66,6 +67,19 @@ impl Context {
             debugger = Some(Debugger::new(&entry, &instance));
         }
 
+        let capabilities = unsafe {
+            surface_loader
+                .get_physical_device_surface_capabilities(physical_device, surface)
+                .expect("Failed to query for surface capabilities.")
+        };
+
+        let image_count = capabilities.min_image_count + 1;
+        if capabilities.max_image_count > 0 {
+            image_count.min(capabilities.max_image_count)
+        } else {
+            image_count
+        };
+
         unsafe {
             Context {
                 _entry: entry,
@@ -79,6 +93,7 @@ impl Context {
                 queue_family: queue,
                 device,
                 memory: vk_mem::Allocator::new(&memory_info).unwrap(),
+                image_count,
             }
         }
     }

@@ -71,7 +71,6 @@ impl Pipeline {
                 p_buffer_info: [lights].as_ptr(),
                 ..Default::default()
             }],
-            swapchain.images.len() as u32,
             vulkan.context(),
         );
 

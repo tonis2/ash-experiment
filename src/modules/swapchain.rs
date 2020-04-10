@@ -62,13 +62,7 @@ impl Swapchain {
 
             let surface_format = choose_swapchain_format(&swapchain_support.formats);
             let present_mode = choose_swapchain_present_mode(&swapchain_support.present_modes);
-            let image_count = swapchain_support.capabilities.min_image_count + 1;
-            let image_count = if swapchain_support.capabilities.max_image_count > 0 {
-                image_count.min(swapchain_support.capabilities.max_image_count)
-            } else {
-                image_count
-            };
-
+   
             let queue_family = &context.queue_family;
 
             let (image_sharing_mode, _queue_family_index_count, queue_family_indices) =
@@ -89,7 +83,7 @@ impl Swapchain {
                 .create_swapchain(
                     &vk::SwapchainCreateInfoKHR {
                         surface: context.surface,
-                        min_image_count: image_count,
+                        min_image_count: context.image_count,
                         image_color_space: surface_format.color_space,
                         image_format: surface_format.format,
                         image_extent: extent,

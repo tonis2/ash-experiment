@@ -62,7 +62,6 @@ impl Pipeline {
             ..Default::default()
         };
 
-
         //Create uniform buffer
 
         let uniform_data = create_uniform_data(&swapchain);
@@ -90,24 +89,21 @@ impl Pipeline {
                     p_immutable_samplers: ptr::null(),
                 },
             ],
-            vec![
-                vk::WriteDescriptorSet {
-                    // transform uniform
-                    s_type: vk::StructureType::WRITE_DESCRIPTOR_SET,
-                    dst_binding: 0,
-                    dst_array_element: 0,
-                    descriptor_count: 1,
-                    descriptor_type: vk::DescriptorType::UNIFORM_BUFFER,
-                    p_buffer_info: [vk::DescriptorBufferInfo {
-                        buffer: uniform_buffer.buffer,
-                        offset: 0,
-                        range: std::mem::size_of_val(&uniform_data) as u64,
-                    }]
-                    .as_ptr(),
-                    ..Default::default()
-                },
-            ],
-            swapchain.images.len() as u32,
+            vec![vk::WriteDescriptorSet {
+                // transform uniform
+                s_type: vk::StructureType::WRITE_DESCRIPTOR_SET,
+                dst_binding: 0,
+                dst_array_element: 0,
+                descriptor_count: 1,
+                descriptor_type: vk::DescriptorType::UNIFORM_BUFFER,
+                p_buffer_info: [vk::DescriptorBufferInfo {
+                    buffer: uniform_buffer.buffer,
+                    offset: 0,
+                    range: std::mem::size_of_val(&uniform_data) as u64,
+                }]
+                .as_ptr(),
+                ..Default::default()
+            }],
             vulkan.context(),
         );
 

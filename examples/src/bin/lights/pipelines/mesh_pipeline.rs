@@ -127,7 +127,6 @@ impl Pipeline {
                     ..Default::default()
                 },
             ],
-            swapchain.images.len() as u32,
             vulkan.context(),
         );
 

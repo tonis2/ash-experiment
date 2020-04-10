@@ -15,14 +15,13 @@ impl Descriptor {
     pub fn new(
         bindings: Vec<vk::DescriptorSetLayoutBinding>,
         write_set: Vec<vk::WriteDescriptorSet>,
-        pool_length: u32,
         context: Arc<Context>,
     ) -> Self {
         let pool_sizes: Vec<vk::DescriptorPoolSize> = bindings
             .iter()
             .map(|binding| vk::DescriptorPoolSize {
                 ty: binding.descriptor_type,
-                descriptor_count: pool_length,
+                descriptor_count: context.image_count,
             })
             .collect();
 
@@ -34,7 +33,7 @@ impl Descriptor {
                         s_type: vk::StructureType::DESCRIPTOR_POOL_CREATE_INFO,
                         p_next: ptr::null(),
                         flags: vk::DescriptorPoolCreateFlags::empty(),
-                        max_sets: pool_length,
+                        max_sets: context.image_count,
                         pool_size_count: pool_sizes.len() as u32,
                         p_pool_sizes: pool_sizes.as_ptr(),
                     },
