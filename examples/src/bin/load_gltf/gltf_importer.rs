@@ -1,11 +1,11 @@
-use std::path::Path;
-use vulkan::{prelude::*, Buffer, Image, VkInstance};
-
 use gltf::{
     material::{AlphaMode, Material as GltfMaterial, NormalTexture, OcclusionTexture},
     mesh::util::{colors, tex_coords, ReadNormals},
+    scene::Transform,
     texture,
 };
+use std::path::Path;
+use vulkan::{prelude::*, Buffer, Image, VkInstance};
 
 pub struct Importer {
     doc: gltf::Document,
@@ -28,18 +28,22 @@ pub struct Vertex {
 
 #[derive(Debug, Clone)]
 pub struct Node {
+    pub index: usize,
     pub parent: Option<usize>, //Parent Index
     pub children: Vec<usize>,  //Children Indices
-    pub translation: [f32; 3],
-    pub rotation: [f32; 4],
-    pub scale: [f32; 3],
+    pub translation: Transform,
+    pub transform_matrix: cgmath::Matrix4<f32>,
 }
 
-#[derive(Clone, Debug)]
 pub struct Mesh {
     pub vertices: Vec<Vertex>,
     pub indices: Option<Vec<u32>>,
-    pub skeleton_index: Option<usize>,
+    pub settings: MeshSettings,
+}
+
+pub struct MeshSettings {
+    vertices_len: usize,
+    index: usize,
 }
 
 #[derive(Clone, Debug)]
@@ -50,7 +54,6 @@ pub struct Material {
     pub metallic_factor: f32,
     pub roughness_factor: f32,
     pub emissive_color: [f32; 3],
-
     pub color: [f32; 4],
     pub emissive: [f32; 3],
     pub occlusion: f32,
@@ -97,6 +100,33 @@ impl<'a> From<GltfMaterial<'a>> for Material {
             Some(pbr) => pbr.diffuse_factor(),
             _ => material.pbr_metallic_roughness().base_color_factor(),
         };
+
+        fn get_texture(texture_info: Option<texture::Info>) -> Option<TextureInfo> {
+            texture_info.map(|tex_info| TextureInfo {
+                index: tex_info.texture().index(),
+                channel: tex_info.tex_coord(),
+            })
+        }
+
+        fn get_normals_texture(texture_info: Option<NormalTexture>) -> Option<TextureInfo> {
+            texture_info.map(|tex_info| TextureInfo {
+                index: tex_info.texture().index(),
+                channel: tex_info.tex_coord(),
+            })
+        }
+
+        fn get_occlusion(texture_info: Option<OcclusionTexture>) -> (f32, Option<TextureInfo>) {
+            let strength = texture_info
+                .as_ref()
+                .map_or(0.0, |tex_info| tex_info.strength());
+
+            let texture = texture_info.map(|tex_info| TextureInfo {
+                index: tex_info.texture().index(),
+                channel: tex_info.tex_coord(),
+            });
+
+            (strength, texture)
+        }
 
         let emissive = material.emissive_factor();
 
@@ -157,6 +187,7 @@ impl<'a> From<GltfMaterial<'a>> for Material {
 }
 
 impl Importer {
+    //Load gltf data from file
     pub fn load<P: AsRef<Path>>(path: P) -> Importer {
         let (doc, buffers, images) = gltf::import(path).expect("Failed to load gltf file");
         Importer {
@@ -165,7 +196,7 @@ impl Importer {
             images,
         }
     }
-
+    //Parse and build gltf data-s content
     pub fn build(&self, vulkan: &VkInstance) -> GltfResult {
         let mut meshes: Vec<Mesh> = Vec::new();
         let mut nodes = Vec::new();
@@ -212,8 +243,6 @@ impl Importer {
             }
         }
 
-        //Build image textures
-
         //Store Nodes
         for node in self.doc.nodes() {
             let children_indices = node
@@ -221,8 +250,8 @@ impl Importer {
                 .map(|child| child.index())
                 .collect::<Vec<usize>>();
 
-            let (translation, rotation, scale) = node.transform().decomposed();
-
+            let local_transform = node.transform();
+            let transform_matrix = compute_transform_matrix(&local_transform);
             let mut parent = None;
 
             //If we encounter ourselves (node) when searching children, we've found our parent
@@ -237,11 +266,11 @@ impl Importer {
             }
 
             nodes.push(Node {
+                index: node.index(),
                 parent: parent,
                 children: children_indices,
-                translation,
-                rotation,
-                scale,
+                translation: local_transform,
+                transform_matrix,
             });
         }
 
@@ -282,9 +311,12 @@ impl Importer {
                     }
                 }
                 meshes.push(Mesh {
-                    vertices,
+                    settings: MeshSettings {
+                        vertices_len: vertices.len(),
+                        index: mesh.index(),
+                    },
                     indices,
-                    skeleton_index: None,
+                    vertices,
                 });
             }
         }
@@ -454,29 +486,19 @@ impl Importer {
     }
 }
 
-fn get_texture(texture_info: Option<texture::Info>) -> Option<TextureInfo> {
-    texture_info.map(|tex_info| TextureInfo {
-        index: tex_info.texture().index(),
-        channel: tex_info.tex_coord(),
-    })
-}
-
-fn get_normals_texture(texture_info: Option<NormalTexture>) -> Option<TextureInfo> {
-    texture_info.map(|tex_info| TextureInfo {
-        index: tex_info.texture().index(),
-        channel: tex_info.tex_coord(),
-    })
-}
-
-fn get_occlusion(texture_info: Option<OcclusionTexture>) -> (f32, Option<TextureInfo>) {
-    let strength = texture_info
-        .as_ref()
-        .map_or(0.0, |tex_info| tex_info.strength());
-
-    let texture = texture_info.map(|tex_info| TextureInfo {
-        index: tex_info.texture().index(),
-        channel: tex_info.tex_coord(),
-    });
-
-    (strength, texture)
+fn compute_transform_matrix(transform: &Transform) -> cgmath::Matrix4<f32> {
+    match transform {
+        Transform::Matrix { matrix } => cgmath::Matrix4::from(*matrix),
+        Transform::Decomposed {
+            translation,
+            rotation: [xr, yr, zr, wr],
+            scale: [xs, ys, zs],
+        } => {
+            let translation =
+                cgmath::Matrix4::from_translation(cgmath::Vector3::from(*translation));
+            let rotation = cgmath::Matrix4::from(cgmath::Quaternion::new(*wr, *xr, *yr, *zr));
+            let scale = cgmath::Matrix4::from_nonuniform_scale(*xs, *ys, *zs);
+            translation * rotation * scale
+        }
+    }
 }
