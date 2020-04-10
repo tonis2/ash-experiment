@@ -1,12 +1,27 @@
 use std::path::Path;
 use vulkan::{prelude::*, Buffer, Image, VkInstance};
 
-use gltf::mesh::util::{colors, tex_coords, ReadNormals};
+use gltf::{
+    material::{AlphaMode, Material as GltfMaterial, NormalTexture, OcclusionTexture},
+    mesh::util::{colors, tex_coords, ReadNormals},
+    texture,
+};
+
+pub struct Importer {
+    doc: gltf::Document,
+    buffers: Vec<gltf::buffer::Data>,
+    images: Vec<gltf::image::Data>,
+}
+
+pub struct GltfResult {
+    pub meshes: Vec<Mesh>,
+    pub nodes: Vec<Node>,
+}
 
 #[derive(Clone, Debug, Copy)]
 pub struct Vertex {
     pub position: [f32; 3],
-    pub color: [u16; 3],
+    pub color: [f32; 4],
     pub normal: [f32; 3],
     pub uv: [f32; 2],
 }
@@ -20,11 +35,6 @@ pub struct Node {
     pub scale: [f32; 3],
 }
 
-pub struct GltfResult {
-    pub meshes: Vec<Mesh>,
-    pub nodes: Vec<Node>,
-}
-
 #[derive(Clone, Debug)]
 pub struct Mesh {
     pub vertices: Vec<Vertex>,
@@ -32,10 +42,118 @@ pub struct Mesh {
     pub skeleton_index: Option<usize>,
 }
 
-pub struct Importer {
-    doc: gltf::Document,
-    buffers: Vec<gltf::buffer::Data>,
-    images: Vec<gltf::image::Data>,
+#[derive(Clone, Debug)]
+pub struct Material {
+    pub name: Option<String>,
+    pub index: Option<usize>,
+    pub base_color: [f32; 4],
+    pub metallic_factor: f32,
+    pub roughness_factor: f32,
+    pub emissive_color: [f32; 3],
+
+    pub color: [f32; 4],
+    pub emissive: [f32; 3],
+    pub occlusion: f32,
+    pub color_texture: Option<TextureInfo>,
+    pub emissive_texture: Option<TextureInfo>,
+    pub normals_texture: Option<TextureInfo>,
+    pub occlusion_texture: Option<TextureInfo>,
+    pub workflow: Workflow,
+    pub alpha_mode: u32,
+    pub alpha_cutoff: f32,
+    pub double_sided: bool,
+    pub is_unlit: bool,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct TextureInfo {
+    index: usize,
+    channel: u32,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub enum Workflow {
+    MetallicRoughness(MetallicRoughnessWorkflow),
+    SpecularGlossiness(SpecularGlossinessWorkflow),
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct MetallicRoughnessWorkflow {
+    metallic: f32,
+    roughness: f32,
+    metallic_roughness_texture: Option<TextureInfo>,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct SpecularGlossinessWorkflow {
+    specular: [f32; 3],
+    glossiness: f32,
+    specular_glossiness_texture: Option<TextureInfo>,
+}
+
+impl<'a> From<GltfMaterial<'a>> for Material {
+    fn from(material: GltfMaterial) -> Material {
+        let color = match material.pbr_specular_glossiness() {
+            Some(pbr) => pbr.diffuse_factor(),
+            _ => material.pbr_metallic_roughness().base_color_factor(),
+        };
+
+        let emissive = material.emissive_factor();
+
+        let color_texture = match material.pbr_specular_glossiness() {
+            Some(pbr) => pbr.diffuse_texture(),
+            _ => material.pbr_metallic_roughness().base_color_texture(),
+        };
+        let color_texture = get_texture(color_texture);
+        let emissive_texture = get_texture(material.emissive_texture());
+        let normals_texture = get_normals_texture(material.normal_texture());
+        let (occlusion, occlusion_texture) = get_occlusion(material.occlusion_texture());
+
+        let workflow = match material.pbr_specular_glossiness() {
+            Some(pbr) => Workflow::SpecularGlossiness(SpecularGlossinessWorkflow {
+                specular: pbr.specular_factor(),
+                glossiness: pbr.glossiness_factor(),
+                specular_glossiness_texture: get_texture(pbr.specular_glossiness_texture()),
+            }),
+            _ => {
+                let pbr = material.pbr_metallic_roughness();
+                Workflow::MetallicRoughness(MetallicRoughnessWorkflow {
+                    metallic: pbr.metallic_factor(),
+                    roughness: pbr.roughness_factor(),
+                    metallic_roughness_texture: get_texture(pbr.metallic_roughness_texture()),
+                })
+            }
+        };
+
+        let alpha_mode = match material.alpha_mode() {
+            AlphaMode::Opaque => 1,
+            AlphaMode::Mask => 2,
+            AlphaMode::Blend => 3,
+        };
+
+        Material {
+            index: material.index(),
+            name: material.name().map(String::from),
+
+            base_color: material.pbr_metallic_roughness().base_color_factor(),
+            metallic_factor: material.pbr_metallic_roughness().metallic_factor(),
+            roughness_factor: material.pbr_metallic_roughness().roughness_factor(),
+            emissive_color: material.emissive_factor(),
+
+            color,
+            emissive,
+            occlusion,
+            color_texture,
+            emissive_texture,
+            normals_texture,
+            occlusion_texture,
+            workflow,
+            alpha_mode,
+            alpha_cutoff: material.alpha_cutoff(),
+            double_sided: material.double_sided(),
+            is_unlit: material.unlit(),
+        }
+    }
 }
 
 impl Importer {
@@ -62,6 +180,12 @@ impl Importer {
             .doc
             .samplers()
             .map(|sampler| Self::build_sampler(&sampler))
+            .collect();
+
+        let materials: Vec<Material> = self
+            .doc
+            .materials()
+            .map(|material| Material::from(material))
             .collect();
 
         for texture in self.doc.textures() {
@@ -115,15 +239,10 @@ impl Importer {
             nodes.push(Node {
                 parent: parent,
                 children: children_indices,
-                translation: translation,
-                rotation: rotation,
-                scale: scale,
+                translation,
+                rotation,
+                scale,
             });
-
-            // let parent_index = match nodes[nodes.len() - 1].parent {
-            //     Some(index) => index.to_string(),
-            //     None => "N/A".to_string(),
-            // };
         }
 
         for mesh in self.doc.meshes() {
@@ -135,8 +254,8 @@ impl Importer {
                 let indices: Option<Vec<u32>> = reader
                     .read_indices()
                     .map(|read_indices| read_indices.into_u32().collect());
-                let mut colors: Option<colors::CastingIter<colors::RgbU16>> =
-                    reader.read_colors(0).map(|color| color.into_rgb_u16());
+                let mut colors: Option<colors::CastingIter<colors::RgbaF32>> =
+                    reader.read_colors(0).map(|color| color.into_rgba_f32());
                 let mut normals: Option<ReadNormals> = reader.read_normals();
                 let mut uvs: Option<tex_coords::CastingIter<tex_coords::F32>> =
                     reader.read_tex_coords(0).map(|uvs| uvs.into_f32());
@@ -145,7 +264,7 @@ impl Importer {
                 for (index, position) in reader.read_positions().unwrap().enumerate() {
                     vertices.push(Vertex {
                         position,
-                        color: [1, 1, 1],
+                        color: [1.0, 1.0, 1.0, 1.0],
                         normal: [0.0, 0.0, 0.0],
                         uv: [0.0, 0.0],
                     });
@@ -220,9 +339,8 @@ impl Importer {
         };
 
         vk::SamplerCreateInfo {
-            s_type: vk::StructureType::SAMPLER_CREATE_INFO,
-            mag_filter: mag_filter,
-            min_filter: min_filter,
+            mag_filter,
+            min_filter,
             mipmap_mode: mipmap_filter,
             address_mode_u: address_mode(sampler.wrap_s()),
             address_mode_v: address_mode(sampler.wrap_t()),
@@ -334,4 +452,31 @@ impl Importer {
 
         image
     }
+}
+
+fn get_texture(texture_info: Option<texture::Info>) -> Option<TextureInfo> {
+    texture_info.map(|tex_info| TextureInfo {
+        index: tex_info.texture().index(),
+        channel: tex_info.tex_coord(),
+    })
+}
+
+fn get_normals_texture(texture_info: Option<NormalTexture>) -> Option<TextureInfo> {
+    texture_info.map(|tex_info| TextureInfo {
+        index: tex_info.texture().index(),
+        channel: tex_info.tex_coord(),
+    })
+}
+
+fn get_occlusion(texture_info: Option<OcclusionTexture>) -> (f32, Option<TextureInfo>) {
+    let strength = texture_info
+        .as_ref()
+        .map_or(0.0, |tex_info| tex_info.strength());
+
+    let texture = texture_info.map(|tex_info| TextureInfo {
+        index: tex_info.texture().index(),
+        channel: tex_info.tex_coord(),
+    });
+
+    (strength, texture)
 }

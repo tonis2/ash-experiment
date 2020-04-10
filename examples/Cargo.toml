@@ -13,4 +13,4 @@ vulkan = { path = "../" }
 
 [dependencies.gltf]
 version = "0.15"
-features = ["names"]
+features = ["names", "KHR_materials_pbrSpecularGlossiness", "KHR_materials_unlit"]
