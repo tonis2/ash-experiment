@@ -82,6 +82,12 @@ impl Queue {
         }
     }
 
+    pub fn wait_queue_idle(&self) {
+        unsafe {
+            self.context.device.queue_wait_idle(self.context.graphics_queue).expect("Failed to wait graphics queue");
+        }
+    }
+
     pub fn load_next_frame(&self, swapchain: &Swapchain) -> Result<(u32, bool), vk::Result> {
         unsafe {
             self.context
