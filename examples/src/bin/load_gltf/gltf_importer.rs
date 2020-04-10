@@ -13,9 +13,11 @@ pub struct Importer {
     images: Vec<gltf::image::Data>,
 }
 
-pub struct GltfResult {
+pub struct Scene {
     pub meshes: Vec<Mesh>,
     pub nodes: Vec<Node>,
+    pub textures: Vec<Image>,
+    pub materials: Vec<Material>,
 }
 
 #[derive(Clone, Debug, Copy)]
@@ -36,14 +38,10 @@ pub struct Node {
 }
 
 pub struct Mesh {
-    pub vertices: Vec<Vertex>,
-    pub indices: Option<Vec<u32>>,
-    pub settings: MeshSettings,
-}
-
-pub struct MeshSettings {
-    vertices_len: usize,
-    index: usize,
+    pub vertices: Buffer,
+    pub indices: Option<Buffer>,
+    pub vertices_len: usize,
+    pub index: usize,
 }
 
 #[derive(Clone, Debug)]
@@ -197,7 +195,7 @@ impl Importer {
         }
     }
     //Parse and build gltf data-s content
-    pub fn build(&self, vulkan: &VkInstance) -> GltfResult {
+    pub fn build(&self, vulkan: &VkInstance) -> Scene {
         let mut meshes: Vec<Mesh> = Vec::new();
         let mut nodes = Vec::new();
 
@@ -310,18 +308,29 @@ impl Importer {
                         vertices[index].uv = uv.next().unwrap();
                     }
                 }
+
+
                 meshes.push(Mesh {
-                    settings: MeshSettings {
-                        vertices_len: vertices.len(),
-                        index: mesh.index(),
+                    vertices_len: vertices.len(),
+                    index: mesh.index(),
+                    indices: match &indices {
+                        Some(indices) => Some(
+                            vulkan.create_gpu_buffer(vk::BufferUsageFlags::INDEX_BUFFER, &indices),
+                        ),
+                        None => None,
                     },
-                    indices,
-                    vertices,
+                    vertices: vulkan
+                        .create_gpu_buffer(vk::BufferUsageFlags::VERTEX_BUFFER, &vertices),
                 });
             }
         }
 
-        GltfResult { meshes, nodes }
+        Scene {
+            meshes,
+            nodes,
+            textures,
+            materials,
+        }
     }
 
     fn build_sampler(sampler: &gltf::texture::Sampler) -> vk::SamplerCreateInfo {

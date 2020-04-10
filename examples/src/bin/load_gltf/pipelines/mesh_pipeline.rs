@@ -6,6 +6,11 @@ use vulkan::{
 use super::{Camera, Vertex};
 use std::{default::Default, ffi::CString, mem, path::Path, ptr, sync::Arc};
 
+#[repr(C)]
+#[derive(Clone, Debug, Copy)]
+pub struct PushTransform {
+    pub transform: cgmath::Matrix4<f32>,
+}
 pub struct Pipeline {
     pub pipeline: vk::Pipeline,
     pub layout: vk::PipelineLayout,
@@ -21,11 +26,7 @@ pub struct Pipeline {
 
 impl Pipeline {
     //Creates a new pipeline
-    pub fn new(
-        swapchain: &Swapchain,
-        camera: Camera,
-        context: Arc<Context>,
-    ) -> Pipeline {
+    pub fn new(swapchain: &Swapchain, camera: Camera, context: Arc<Context>) -> Pipeline {
         //Create buffer data
         let depth_image = examples::create_depth_resources(&swapchain, context.clone());
 
@@ -38,36 +39,39 @@ impl Pipeline {
         uniform_buffer.upload_to_buffer(&[camera], 0);
 
         let pipeline_descriptor = Descriptor::new(
-            vec![
-                vk::DescriptorSetLayoutBinding {
-                    // transform uniform
-                    binding: 0,
-                    descriptor_type: vk::DescriptorType::UNIFORM_BUFFER,
-                    descriptor_count: 1,
-                    stage_flags: vk::ShaderStageFlags::VERTEX,
-                    p_immutable_samplers: ptr::null(),
-                },
-            ],
-            vec![
-                vk::WriteDescriptorSet {
-                    // transform uniform
-                    dst_binding: 0,
-                    dst_array_element: 0,
-                    descriptor_count: 1,
-                    descriptor_type: vk::DescriptorType::UNIFORM_BUFFER,
-                    p_buffer_info: [uniform_buffer.descriptor_info(0)].as_ptr(),
-                    ..Default::default()
-                },
-            ],
+            vec![vk::DescriptorSetLayoutBinding {
+                // transform uniform
+                binding: 0,
+                descriptor_type: vk::DescriptorType::UNIFORM_BUFFER,
+                descriptor_count: 1,
+                stage_flags: vk::ShaderStageFlags::VERTEX,
+                p_immutable_samplers: ptr::null(),
+            }],
+            vec![vk::WriteDescriptorSet {
+                // transform uniform
+                dst_binding: 0,
+                dst_array_element: 0,
+                descriptor_count: 1,
+                descriptor_type: vk::DescriptorType::UNIFORM_BUFFER,
+                p_buffer_info: [uniform_buffer.descriptor_info(0)].as_ptr(),
+                ..Default::default()
+            }],
             context.clone(),
         );
 
+        let push_contstant_descriptor = vk::PushConstantRange::builder()
+            .stage_flags(vk::ShaderStageFlags::VERTEX)
+            .size(mem::size_of::<PushTransform>() as u32)
+            .build();
+
         //Create pipeline stuff
         let pipeline_layout = unsafe {
-            context.device
+            context
+                .device
                 .create_pipeline_layout(
                     &vk::PipelineLayoutCreateInfo::builder()
                         .set_layouts(&[pipeline_descriptor.layout])
+                        .push_constant_ranges(&[push_contstant_descriptor])
                         .build(),
                     None,
                 )
@@ -85,7 +89,8 @@ impl Pipeline {
         let shader_name = CString::new("main").unwrap();
         let renderpass = create_render_pass(&swapchain, context.clone());
         let pipeline = unsafe {
-            context.device
+            context
+                .device
                 .create_graphics_pipelines(
                     vk::PipelineCache::null(),
                     &[vk::GraphicsPipelineCreateInfo::builder()
@@ -284,7 +289,8 @@ pub fn create_render_pass(swapchain: &Swapchain, context: Arc<Context>) -> vk::R
         .build();
 
     unsafe {
-        context.device
+        context
+            .device
             .create_render_pass(&renderpass_create_info, None)
             .expect("Failed to create render pass!")
     }

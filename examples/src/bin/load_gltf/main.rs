@@ -46,11 +46,6 @@ fn main() {
         })
         .collect();
 
-    // let vertex_buffer =
-    //     instance.create_gpu_buffer(vk::BufferUsageFlags::VERTEX_BUFFER, &model.vertices);
-    // let index_buffer =
-    //     instance.create_gpu_buffer(vk::BufferUsageFlags::INDEX_BUFFER, &model.indices);
-
     let mut tick_counter = FPSLimiter::new();
     event_loop.run(move |event, _, control_flow| match event {
         Event::WindowEvent { event, .. } => match event {
