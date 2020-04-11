@@ -3,14 +3,10 @@ use vulkan::{
     Descriptor, Image,
 };
 
-use super::{Camera, Vertex};
+use super::{Camera, Vertex, PushTransform};
 use std::{default::Default, ffi::CString, mem, path::Path, ptr, sync::Arc};
 
-#[repr(C)]
-#[derive(Clone, Debug, Copy)]
-pub struct PushTransform {
-    pub transform: cgmath::Matrix4<f32>,
-}
+
 pub struct Pipeline {
     pub pipeline: vk::Pipeline,
     pub layout: vk::PipelineLayout,

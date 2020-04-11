@@ -4,6 +4,12 @@ use cgmath::{Deg, Matrix4, Point3, Vector3};
 
 pub use crate::gltf_importer::Vertex;
 
+
+#[repr(C)]
+#[derive(Clone, Debug, Copy)]
+pub struct PushTransform {
+    pub transform: cgmath::Matrix4<f32>,
+}
 #[repr(C)]
 #[derive(Clone, Debug, Copy)]
 pub struct Light {
@@ -16,17 +22,15 @@ pub struct Light {
 #[repr(C)]
 #[derive(Clone, Debug, Copy)]
 pub struct Camera {
-    pub model: Matrix4<f32>,
     pub view: Matrix4<f32>,
     pub proj: Matrix4<f32>,
 }
 
 impl Camera {
-    pub fn new(aspect: f32) -> Camera {
+    pub fn new(aspect: f32, position: Point3<f32>) -> Camera {
         Camera {
-            model: Matrix4::from_angle_z(Deg(90.0)),
             view: Matrix4::look_at(
-                Point3::new(0.0, 5.0, 10.0),
+                position,
                 Point3::new(0.0, 0.0, 0.0),
                 Vector3::new(0.0, 1.0, 0.0),
             ),
@@ -35,7 +39,7 @@ impl Camera {
                     Deg(45.0),
                     aspect,
                     0.1,
-                    20.0,
+                    30.0,
                 );
     
                 examples::OPENGL_TO_VULKAN_MATRIX * proj

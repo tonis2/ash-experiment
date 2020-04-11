@@ -1,12 +1,13 @@
 pub mod gltf_importer;
 mod pipelines;
 use vulkan::{
-    prelude::*, utilities::FPSLimiter, Context, Framebuffer, Queue, Swapchain, VkInstance,
+    prelude::*, utilities::as_byte_slice, utilities::FPSLimiter, Context, Framebuffer, Queue,
+    Swapchain, VkInstance,
 };
 
 use std::{path::Path, sync::Arc};
 
-use pipelines::{mesh_pipeline, Camera};
+use pipelines::{mesh_pipeline, Camera, PushTransform};
 use winit::event::{ElementState, Event, KeyboardInput, VirtualKeyCode, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop};
 
@@ -25,7 +26,7 @@ fn main() {
 
     let model = gltf_importer::Importer::load(Path::new("assets/gltf_test.gltf")).build(&instance);
 
-    let camera = Camera::new(800.0 / 600.0);
+    let camera = Camera::new(800.0 / 600.0, cgmath::Point3::new(0.0, 5.0, 15.0));
     let mesh_pipeline = mesh_pipeline::Pipeline::new(&swapchain, camera, vulkan.clone());
 
     let command_buffers = instance.create_command_buffers(swapchain.image_views.len());
@@ -130,26 +131,43 @@ fn main() {
                             &[],
                         );
 
-                        // device.cmd_bind_vertex_buffers(
-                        //     command_buffer,
-                        //     0,
-                        //     &[vertex_buffer.buffer],
-                        //     &[0],
-                        // );
-                        // device.cmd_bind_index_buffer(
-                        //     command_buffer,
-                        //     index_buffer.buffer,
-                        //     0,
-                        //     vk::IndexType::UINT32,
-                        // );
-                        // device.cmd_draw_indexed(
-                        //     command_buffer,
-                        //     model.indices.len() as u32,
-                        //     1,
-                        //     0,
-                        //     0,
-                        //     1,
-                        // );
+                        for node in &model.nodes {
+                            if node.mesh_index.is_some() {
+                                let mesh = model.get_mesh(node.mesh_index.unwrap());
+
+                                if mesh.indices.is_some() {
+                                    device.cmd_push_constants(
+                                        command_buffer,
+                                        mesh_pipeline.layout,
+                                        vk::ShaderStageFlags::VERTEX,
+                                        0,
+                                        as_byte_slice(&PushTransform {
+                                            transform: node.transform_matrix,
+                                        }),
+                                    );
+                                    device.cmd_bind_vertex_buffers(
+                                        command_buffer,
+                                        0,
+                                        &[mesh.vertices.buffer],
+                                        &[0],
+                                    );
+                                    device.cmd_bind_index_buffer(
+                                        command_buffer,
+                                        mesh.indices.as_ref().unwrap().clone().buffer,
+                                        0,
+                                        vk::IndexType::UINT32,
+                                    );
+                                    device.cmd_draw_indexed(
+                                        command_buffer,
+                                        mesh.indices_len as u32,
+                                        1,
+                                        0,
+                                        0,
+                                        1,
+                                    );
+                                }
+                            }
+                        }
 
                         device.cmd_end_render_pass(command_buffer);
                     },

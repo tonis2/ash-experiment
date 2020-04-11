@@ -4,7 +4,7 @@ use gltf::{
     scene::Transform,
     texture,
 };
-use std::path::Path;
+use std::{path::Path, sync::Arc};
 use vulkan::{prelude::*, Buffer, Image, VkInstance};
 
 pub struct Importer {
@@ -31,16 +31,17 @@ pub struct Vertex {
 #[derive(Debug, Clone)]
 pub struct Node {
     pub index: usize,
-    pub parent: Option<usize>, //Parent Index
-    pub children: Vec<usize>,  //Children Indices
+    pub parent: Option<usize>,
+    pub mesh_index: Option<usize>, //Parent Index
+    pub children: Vec<usize>,      //Children Indices
     pub translation: Transform,
     pub transform_matrix: cgmath::Matrix4<f32>,
 }
-
 pub struct Mesh {
-    pub vertices: Buffer,
-    pub indices: Option<Buffer>,
+    pub vertices: Arc<Buffer>,
+    pub indices: Option<Arc<Buffer>>,
     pub vertices_len: usize,
+    pub indices_len: usize,
     pub index: usize,
 }
 
@@ -90,6 +91,12 @@ pub struct SpecularGlossinessWorkflow {
     specular: [f32; 3],
     glossiness: f32,
     specular_glossiness_texture: Option<TextureInfo>,
+}
+
+impl Scene {
+    pub fn get_mesh(&self, index: usize) -> &Mesh {
+        &self.meshes[index]
+    }
 }
 
 impl<'a> From<GltfMaterial<'a>> for Material {
@@ -265,6 +272,7 @@ impl Importer {
 
             nodes.push(Node {
                 index: node.index(),
+                mesh_index: node.mesh().map(|mesh| mesh.index()),
                 parent: parent,
                 children: children_indices,
                 translation: local_transform,
@@ -309,18 +317,27 @@ impl Importer {
                     }
                 }
 
+                let (index_buffer, indices_len) = {
+                    match &indices {
+                        Some(indices) => (
+                            Some(Arc::new(vulkan.create_gpu_buffer(
+                                vk::BufferUsageFlags::INDEX_BUFFER,
+                                &indices,
+                            ))),
+                            indices.len(),
+                        ),
+                        None => (None, 0),
+                    }
+                };
 
                 meshes.push(Mesh {
                     vertices_len: vertices.len(),
                     index: mesh.index(),
-                    indices: match &indices {
-                        Some(indices) => Some(
-                            vulkan.create_gpu_buffer(vk::BufferUsageFlags::INDEX_BUFFER, &indices),
-                        ),
-                        None => None,
-                    },
-                    vertices: vulkan
-                        .create_gpu_buffer(vk::BufferUsageFlags::VERTEX_BUFFER, &vertices),
+                    indices: index_buffer,
+                    indices_len,
+                    vertices: Arc::new(
+                        vulkan.create_gpu_buffer(vk::BufferUsageFlags::VERTEX_BUFFER, &vertices),
+                    ),
                 });
             }
         }
