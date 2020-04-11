@@ -135,37 +135,37 @@ fn main() {
                             if node.mesh_index.is_some() {
                                 let mesh = model.get_mesh(node.mesh_index.unwrap());
 
-                                if mesh.indices.is_some() {
-                                    device.cmd_push_constants(
-                                        command_buffer,
-                                        mesh_pipeline.layout,
-                                        vk::ShaderStageFlags::VERTEX,
-                                        0,
-                                        as_byte_slice(&PushTransform {
-                                            transform: node.transform_matrix,
-                                        }),
-                                    );
+                                device.cmd_push_constants(
+                                    command_buffer,
+                                    mesh_pipeline.layout,
+                                    vk::ShaderStageFlags::VERTEX,
+                                    0,
+                                    as_byte_slice(&PushTransform {
+                                        transform: node.transform_matrix,
+                                    }),
+                                );
+                                mesh.primitives.iter().for_each(|primitive| {
                                     device.cmd_bind_vertex_buffers(
                                         command_buffer,
                                         0,
-                                        &[mesh.vertices.buffer],
-                                        &[0],
+                                        &[model.vertices.clone().buffer],
+                                        &[primitive.vertex_offset as u64],
                                     );
                                     device.cmd_bind_index_buffer(
                                         command_buffer,
-                                        mesh.indices.as_ref().unwrap().clone().buffer,
-                                        0,
+                                        model.indices.clone().buffer,
+                                        primitive.indice_offset as u64,
                                         vk::IndexType::UINT32,
                                     );
                                     device.cmd_draw_indexed(
                                         command_buffer,
-                                        mesh.indices_len as u32,
+                                        model.indices_len,
                                         1,
                                         0,
                                         0,
                                         1,
                                     );
-                                }
+                                });
                             }
                         }
 

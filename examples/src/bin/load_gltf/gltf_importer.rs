@@ -1,6 +1,5 @@
 use gltf::{
     material::{AlphaMode, Material as GltfMaterial, NormalTexture, OcclusionTexture},
-    mesh::util::{colors, tex_coords, ReadNormals},
     scene::Transform,
     texture,
 };
@@ -18,6 +17,9 @@ pub struct Scene {
     pub nodes: Vec<Node>,
     pub textures: Vec<Image>,
     pub materials: Vec<Material>,
+    pub vertices: Arc<Buffer>,
+    pub indices: Arc<Buffer>,
+    pub indices_len: u32,
 }
 
 #[derive(Clone, Debug, Copy)]
@@ -31,17 +33,23 @@ pub struct Vertex {
 #[derive(Debug, Clone)]
 pub struct Node {
     pub index: usize,
+    pub mesh_index: Option<usize>,
     pub parent: Option<usize>,
-    pub mesh_index: Option<usize>, //Parent Index
-    pub children: Vec<usize>,      //Children Indices
+    pub children: Vec<usize>,
     pub translation: Transform,
     pub transform_matrix: cgmath::Matrix4<f32>,
 }
+
+#[derive(Clone, Debug)]
+pub struct Primitive {
+    pub vertex_offset: usize,
+    pub indice_offset: u64,
+    pub vertice_len: usize,
+}
+#[allow(dead_code)]
 pub struct Mesh {
-    pub vertices: Arc<Buffer>,
-    pub indices: Option<Arc<Buffer>>,
-    pub vertices_len: usize,
-    pub indices_len: usize,
+    pub name: Option<String>,
+    pub primitives: Vec<Primitive>,
     pub index: usize,
 }
 
@@ -248,6 +256,9 @@ impl Importer {
             }
         }
 
+        let mut vertices_data: Vec<Vertex> = Vec::new();
+        let mut indices_data: Vec<u32> = Vec::new();
+
         //Store Nodes
         for node in self.doc.nodes() {
             let children_indices = node
@@ -281,65 +292,62 @@ impl Importer {
         }
 
         for mesh in self.doc.meshes() {
-            for primitive in mesh.primitives() {
-                let mut vertices: Vec<Vertex> = Vec::new();
-                let reader = primitive.reader(|buffer| Some(&self.buffers[buffer.index()]));
+            let primitives: Vec<Primitive> = mesh
+                .primitives()
+                .map(|primitive| {
+                    let reader = primitive.reader(|buffer| Some(&self.buffers[buffer.index()]));
+                    //Read mesh data
+                    let mut indice_offset: u64 = 0;
+                    let indices: Option<Vec<u32>> = reader
+                        .read_indices()
+                        .map(|read_indices| read_indices.into_u32().collect());
+                    let colors: Vec<[f32; 4]> = reader
+                        .read_colors(0)
+                        .map_or(vec![], |color| color.into_rgba_f32().collect());
+                    let normals: Vec<[f32; 3]> = reader
+                        .read_normals()
+                        .map_or(vec![], |normals| normals.collect());
+                    let uvs: Vec<[f32; 2]> = reader
+                        .read_tex_coords(0)
+                        .map_or(vec![], |uvs| uvs.into_f32().collect());
 
-                //Read mesh data
-                let indices: Option<Vec<u32>> = reader
-                    .read_indices()
-                    .map(|read_indices| read_indices.into_u32().collect());
-                let mut colors: Option<colors::CastingIter<colors::RgbaF32>> =
-                    reader.read_colors(0).map(|color| color.into_rgba_f32());
-                let mut normals: Option<ReadNormals> = reader.read_normals();
-                let mut uvs: Option<tex_coords::CastingIter<tex_coords::F32>> =
-                    reader.read_tex_coords(0).map(|uvs| uvs.into_f32());
+                    let vertices: Vec<Vertex> = reader
+                        .read_positions()
+                        .unwrap()
+                        .enumerate()
+                        .map(|(index, position)| Vertex {
+                            position,
+                            color: *colors.get(index).unwrap_or(&[1.0, 1.0, 1.0, 1.0]),
+                            uv: *uvs.get(index).unwrap_or(&[0.0, 0.0]),
+                            normal: *normals.get(index).unwrap_or(&[1.0, 1.0, 1.0]),
+                        })
+                        .collect();
 
-                //Build mesh vertices
-                for (index, position) in reader.read_positions().unwrap().enumerate() {
-                    vertices.push(Vertex {
-                        position,
-                        color: [1.0, 1.0, 1.0, 1.0],
-                        normal: [0.0, 0.0, 0.0],
-                        uv: [0.0, 0.0],
-                    });
+                    vertices_data.extend_from_slice(&vertices);
 
-                    if let Some(color_iter) = &mut colors {
-                        vertices[index].color = color_iter.next().unwrap();
+                    if indices.is_some() {
+                        let indice_data = &indices.unwrap();
+
+                        indice_offset = (std::mem::size_of_val(&indice_data)
+                            - std::mem::size_of::<u64>())
+                            as u64;
+                        indices_data.extend_from_slice(indice_data);
                     }
 
-                    if let Some(normal_iter) = &mut normals {
-                        vertices[index].normal = normal_iter.next().unwrap();
+                    Primitive {
+                        vertex_offset: (vertices_data.len() - vertices.len())
+                            * std::mem::size_of::<Vertex>(),
+                        indice_offset,
+                        vertice_len: vertices.len(),
                     }
+                })
+                .collect();
 
-                    if let Some(uv) = &mut uvs {
-                        vertices[index].uv = uv.next().unwrap();
-                    }
-                }
-
-                let (index_buffer, indices_len) = {
-                    match &indices {
-                        Some(indices) => (
-                            Some(Arc::new(vulkan.create_gpu_buffer(
-                                vk::BufferUsageFlags::INDEX_BUFFER,
-                                &indices,
-                            ))),
-                            indices.len(),
-                        ),
-                        None => (None, 0),
-                    }
-                };
-
-                meshes.push(Mesh {
-                    vertices_len: vertices.len(),
-                    index: mesh.index(),
-                    indices: index_buffer,
-                    indices_len,
-                    vertices: Arc::new(
-                        vulkan.create_gpu_buffer(vk::BufferUsageFlags::VERTEX_BUFFER, &vertices),
-                    ),
-                });
-            }
+            meshes.push(Mesh {
+                index: mesh.index(),
+                name: mesh.name().map(String::from),
+                primitives,
+            });
         }
 
         Scene {
@@ -347,6 +355,13 @@ impl Importer {
             nodes,
             textures,
             materials,
+            indices_len: indices_data.len() as u32,
+            vertices: Arc::new(
+                vulkan.create_gpu_buffer(vk::BufferUsageFlags::VERTEX_BUFFER, &vertices_data),
+            ),
+            indices: Arc::new(
+                vulkan.create_gpu_buffer(vk::BufferUsageFlags::INDEX_BUFFER, &indices_data),
+            ),
         }
     }
 
