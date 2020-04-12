@@ -1,6 +1,6 @@
 use ash::{extensions::khr::Surface, version::InstanceV1_0, vk};
 
-use crate::utilities::platform::DeviceExtension;
+use super::platform::DeviceExtension;
 
 use super::queue::QueueFamilyIndices;
 use super::swapchain::SwapchainSupport;

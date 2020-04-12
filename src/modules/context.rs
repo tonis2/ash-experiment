@@ -10,7 +10,7 @@ use super::{
     queue::QueueFamilyIndices,
 };
 use crate::constants::*;
-use crate::utilities::platform::{create_surface, extension_names};
+use super::platform::{create_surface, extension_names};
 
 use std::ffi::CString;
 use winit::window::Window;

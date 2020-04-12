@@ -1,4 +1,4 @@
-use crate::utilities::platform::DeviceExtension;
+use crate::modules::platform::DeviceExtension;
 use std::os::raw::c_char;
 
 pub const DEVICE_EXTENSIONS: DeviceExtension = DeviceExtension {

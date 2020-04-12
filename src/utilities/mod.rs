@@ -1,4 +1,4 @@
-pub mod platform;
+
 pub mod tools;
 pub mod buffer;
 pub mod images;
