@@ -24,7 +24,7 @@ fn main() {
     let mut swapchain = Swapchain::new(vulkan.clone());
     let mut queue = Queue::new(vulkan.clone());
 
-    let model = gltf_importer::Importer::load(Path::new("assets/gltf_test.gltf")).build(&instance);
+    let mut model = gltf_importer::Importer::load(Path::new("assets/gltf_test.gltf")).build(&instance);
 
     let camera = Camera::new(800.0 / 600.0, cgmath::Point3::new(0.0, 5.0, 15.0));
     let mesh_pipeline = mesh_pipeline::Pipeline::new(&swapchain, camera, vulkan.clone());
@@ -51,6 +51,10 @@ fn main() {
     event_loop.run(move |event, _, control_flow| match event {
         Event::WindowEvent { event, .. } => match event {
             WindowEvent::CloseRequested => *control_flow = ControlFlow::Exit,
+            WindowEvent::DroppedFile(path) => {
+                println!("Loading model at {:?}", path);
+                model = gltf_importer::Importer::load(Path::new(&path)).build(&instance);
+            },
             WindowEvent::KeyboardInput { input, .. } => match input {
                 KeyboardInput {
                     virtual_keycode,
