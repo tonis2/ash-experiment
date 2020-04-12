@@ -1,9 +1,9 @@
 use image::GenericImageView;
-use vulkan::{prelude::*, Buffer, Context, Image, Swapchain, VkInstance};
+use vulkan::{prelude::*, Buffer, Context, Image, Swapchain, VkThread};
 
 use std::{default::Default, path::Path, sync::Arc};
 
-pub fn create_texture(image_path: &Path, vulkan: &VkInstance) -> Image {
+pub fn create_texture(image_path: &Path, vulkan: &VkThread) -> Image {
     let mut image_object = image::open(image_path).unwrap(); // this function is slow in debug mode.
     image_object = image_object.flipv();
     let (image_width, image_height) = (image_object.width(), image_object.height());

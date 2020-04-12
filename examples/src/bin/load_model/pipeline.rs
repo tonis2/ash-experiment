@@ -3,7 +3,7 @@ use vulkan::{
     offset_of,
     prelude::*,
     utilities::{tools::load_shader, Buffer, Image},
-    Context, Descriptor, VkInstance,
+    Context, Descriptor, VkThread,
 };
 
 use cgmath::{Deg, Matrix4, Point3, Vector3};
@@ -42,7 +42,7 @@ pub struct Pipeline {
 
 impl Pipeline {
     //Creates a new pipeline
-    pub fn new(swapchain: &Swapchain, vulkan: &VkInstance) -> Pipeline {
+    pub fn new(swapchain: &Swapchain, vulkan: &VkThread) -> Pipeline {
         let vertex_input_state_info = vk::PipelineVertexInputStateCreateInfo::builder()
             .vertex_binding_descriptions(&[vk::VertexInputBindingDescription {
                 binding: 0,
@@ -342,7 +342,7 @@ pub fn create_uniform_data(swapchain: &Swapchain) -> UniformBufferObject {
     }
 }
 
-pub fn create_texture(image_path: &Path, vulkan: &VkInstance) -> (Image, u32) {
+pub fn create_texture(image_path: &Path, vulkan: &VkThread) -> (Image, u32) {
     let mut image_object = image::open(image_path).unwrap(); // this function is slow in debug mode.
     image_object = image_object.flipv();
     let (image_width, image_height) = (image_object.width(), image_object.height());
@@ -467,7 +467,7 @@ pub fn create_texture(image_path: &Path, vulkan: &VkInstance) -> (Image, u32) {
     (image, mip_levels)
 }
 
-pub fn create_render_pass(swapchain: &Swapchain, vulkan: &VkInstance) -> vk::RenderPass {
+pub fn create_render_pass(swapchain: &Swapchain, vulkan: &VkThread) -> vk::RenderPass {
     let color_attachment = vk::AttachmentDescription {
         flags: vk::AttachmentDescriptionFlags::empty(),
         format: swapchain.format,

@@ -10,22 +10,22 @@ use std::sync::Arc;
 
 use crate::utilities::buffer::Buffer;
 
-pub struct VkInstance {
+pub struct VkThread {
     pub context: Arc<Context>,
     pub command_pool: vk::CommandPool,
 }
 
-impl VkInstance {
-    pub fn new(context: Arc<Context>) -> VkInstance {
+impl VkThread {
+    pub fn new(context: Arc<Context>) -> VkThread {
         let command_pool = Self::create_command_pool(context.clone());
 
-        VkInstance {
+        VkThread {
             context,
             command_pool,
         }
     }
 }
-impl VkInstance {
+impl VkThread {
     pub fn context(&self) -> Arc<Context> {
         self.context.clone()
     }
@@ -464,7 +464,7 @@ impl VkInstance {
     }
 }
 
-impl Drop for VkInstance {
+impl Drop for VkThread {
     fn drop(&mut self) {
         unsafe {
             self.context.wait_idle();

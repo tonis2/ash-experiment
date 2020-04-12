@@ -4,7 +4,7 @@ use vulkan::{
     offset_of,
     prelude::*,
     utilities::{tools::Shader, Buffer},
-    Context, Descriptor, VkInstance,
+    Context, Descriptor, VkThread,
 };
 
 use std::default::Default;
@@ -40,7 +40,7 @@ pub struct Pipeline {
 
 impl Pipeline {
     //Creates a new pipeline
-    pub fn new(swapchain: &Swapchain, vulkan: &VkInstance) -> Pipeline {
+    pub fn new(swapchain: &Swapchain, vulkan: &VkThread) -> Pipeline {
         let viewports = [vk::Viewport {
             x: 0.0,
             y: 0.0,
@@ -266,7 +266,7 @@ pub fn create_uniform_data(swapchain: &Swapchain) -> UniformBufferObject {
     }
 }
 
-pub fn create_render_pass(swapchain: &Swapchain, vulkan: &VkInstance) -> vk::RenderPass {
+pub fn create_render_pass(swapchain: &Swapchain, vulkan: &VkThread) -> vk::RenderPass {
     let color_attachment = vk::AttachmentDescription {
         flags: vk::AttachmentDescriptionFlags::empty(),
         format: swapchain.format,

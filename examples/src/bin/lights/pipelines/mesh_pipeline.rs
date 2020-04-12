@@ -1,6 +1,6 @@
 use vulkan::{
     modules::swapchain::Swapchain, offset_of, prelude::*, utilities::Shader, Buffer, Context,
-    Descriptor, Image, VkInstance,
+    Descriptor, Image, VkThread,
 };
 
 use super::shadowmap_pipeline;
@@ -30,7 +30,7 @@ impl Pipeline {
     //Creates a new pipeline
     pub fn new(
         swapchain: &Swapchain,
-        vulkan: &VkInstance,
+        vulkan: &VkThread,
         camera: Camera,
         light_data: Light,
     ) -> Pipeline {
@@ -301,7 +301,7 @@ impl Drop for Pipeline {
     }
 }
 
-pub fn create_render_pass(swapchain: &Swapchain, vulkan: &VkInstance) -> vk::RenderPass {
+pub fn create_render_pass(swapchain: &Swapchain, vulkan: &VkThread) -> vk::RenderPass {
     let depth_format = vulkan.context.find_depth_format(
         &[
             vk::Format::D32_SFLOAT,

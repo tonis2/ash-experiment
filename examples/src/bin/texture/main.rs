@@ -1,7 +1,7 @@
 mod pipeline;
 
 use vulkan::{
-    prelude::*, utilities::FPSLimiter, Context, Framebuffer, Queue, Swapchain, VkInstance,
+    prelude::*, utilities::FPSLimiter, Context, Framebuffer, Queue, Swapchain, VkThread,
 };
 use winit::event::{ElementState, Event, KeyboardInput, VirtualKeyCode, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop};
@@ -44,7 +44,7 @@ fn main() {
 
     let vulkan = Arc::new(Context::new(&window, "triangle", true));
 
-    let instance = VkInstance::new(vulkan.clone());
+    let instance = VkThread::new(vulkan.clone());
 
     let mut queue = Queue::new(vulkan.clone());
 

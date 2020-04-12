@@ -3,7 +3,7 @@ mod pipelines;
 use vulkan::{
     prelude::*,
     utilities::{as_byte_slice, Batch, FPSLimiter, Mesh},
-    Context, Framebuffer, Queue, Swapchain, VkInstance,
+    Context, Framebuffer, Queue, Swapchain, VkThread,
 };
 
 use pipelines::{mesh_pipeline, Camera, Light, PushConstantModel, Vertex};
@@ -29,7 +29,7 @@ fn main() {
     );
 
     let vulkan = Arc::new(Context::new(&window, "lights", true));
-    let instance = VkInstance::new(vulkan.clone());
+    let instance = VkThread::new(vulkan.clone());
 
     let mut queue = Queue::new(vulkan.clone());
 

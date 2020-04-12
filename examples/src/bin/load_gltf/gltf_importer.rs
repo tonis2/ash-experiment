@@ -4,7 +4,7 @@ use gltf::{
     texture,
 };
 use std::{path::Path, sync::Arc};
-use vulkan::{prelude::*, Buffer, Image, VkInstance};
+use vulkan::{prelude::*, Buffer, Image, VkThread};
 
 pub struct Importer {
     doc: gltf::Document,
@@ -210,7 +210,7 @@ impl Importer {
         }
     }
     //Parse and build gltf data-s content
-    pub fn build(&self, vulkan: &VkInstance) -> Scene {
+    pub fn build(&self, vulkan: &VkThread) -> Scene {
         let mut meshes: Vec<Mesh> = Vec::new();
         let mut nodes = Vec::new();
 
@@ -426,7 +426,7 @@ impl Importer {
         }
     }
 
-    fn create_texture_image(properties: &gltf::image::Data, vulkan: &VkInstance) -> Image {
+    fn create_texture_image(properties: &gltf::image::Data, vulkan: &VkThread) -> Image {
         let format = vk::Format::R8G8B8A8_UNORM;
         let image_size =
             (std::mem::size_of::<u8>() as u32 * properties.width * properties.height * 4)

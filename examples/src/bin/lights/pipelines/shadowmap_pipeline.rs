@@ -1,7 +1,7 @@
 use super::Vertex;
 use std::{default::Default, ffi::CString, mem, path::Path, ptr, sync::Arc};
 use vulkan::{
-    offset_of, prelude::*, utilities::Shader, Context, Descriptor, Image, Swapchain, VkInstance,
+    offset_of, prelude::*, utilities::Shader, Context, Descriptor, Image, Swapchain, VkThread,
 };
 
 pub struct Pipeline {
@@ -16,7 +16,7 @@ pub struct Pipeline {
 impl Pipeline {
     pub fn new(
         swapchain: &Swapchain,
-        vulkan: &VkInstance,
+        vulkan: &VkThread,
         lights: vk::DescriptorBufferInfo,
         pushconstant: vk::PushConstantRange,
     ) -> Self {

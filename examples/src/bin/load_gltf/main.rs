@@ -2,7 +2,7 @@ pub mod gltf_importer;
 mod pipelines;
 use vulkan::{
     prelude::*, utilities::as_byte_slice, utilities::FPSLimiter, Context, Framebuffer, Queue,
-    Swapchain, VkInstance,
+    Swapchain, VkThread,
 };
 
 use std::{path::Path, sync::Arc};
@@ -20,11 +20,12 @@ fn main() {
         .expect("Failed to create window.");
 
     let vulkan = Arc::new(Context::new(&window, "gltf", true));
-    let instance = VkInstance::new(vulkan.clone());
+    let instance = VkThread::new(vulkan.clone());
     let mut swapchain = Swapchain::new(vulkan.clone());
     let mut queue = Queue::new(vulkan.clone());
 
-    let mut model = gltf_importer::Importer::load(Path::new("assets/gltf_test.gltf")).build(&instance);
+    let mut model =
+        gltf_importer::Importer::load(Path::new("assets/gltf_test.gltf")).build(&instance);
 
     let camera = Camera::new(800.0 / 600.0, cgmath::Point3::new(0.0, 5.0, 15.0));
     let mesh_pipeline = mesh_pipeline::Pipeline::new(&swapchain, camera, vulkan.clone());
@@ -54,7 +55,7 @@ fn main() {
             WindowEvent::DroppedFile(path) => {
                 println!("Loading model at {:?}", path);
                 model = gltf_importer::Importer::load(Path::new(&path)).build(&instance);
-            },
+            }
             WindowEvent::KeyboardInput { input, .. } => match input {
                 KeyboardInput {
                     virtual_keycode,
