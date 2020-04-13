@@ -62,7 +62,7 @@ impl Buffer {
             );
             align.copy_from_slice(data);
         }
-        self.unmap_memory().expect("unmap failed");
+      
     }
 
     pub fn map_memory(&self) -> vk_mem::error::Result<*mut u8> {

@@ -1,3 +1,5 @@
+pub mod gltf_importer;
+
 use image::GenericImageView;
 use vulkan::{prelude::*, Buffer, Context, Image, Swapchain, VkThread};
 

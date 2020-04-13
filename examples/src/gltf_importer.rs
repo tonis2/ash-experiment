@@ -129,6 +129,13 @@ impl Scene {
             MaterialRaw::default()
         }
     }
+
+    pub fn get_raw_materials(&self) -> Vec<MaterialRaw> {
+        self.materials
+            .iter()
+            .map(|material| material.raw())
+            .collect()
+    }
 }
 
 impl Material {

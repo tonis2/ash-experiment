@@ -1,4 +1,4 @@
-pub mod gltf_importer;
+
 mod pipelines;
 use vulkan::{
     prelude::*, utilities::as_byte_slice, utilities::FPSLimiter, Context, Framebuffer, Queue,
@@ -6,7 +6,7 @@ use vulkan::{
 };
 
 use std::{path::Path, sync::Arc};
-
+use examples::gltf_importer;
 use pipelines::{mesh_pipeline, Camera, PushTransform};
 use winit::event::{ElementState, Event, KeyboardInput, VirtualKeyCode, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop};
@@ -27,8 +27,9 @@ fn main() {
     let mut model =
         gltf_importer::Importer::load(Path::new("assets/gltf_texture.gltf")).build(&instance);
 
-    let camera = Camera::new(800.0 / 600.0, cgmath::Point3::new(0.0, 5.0, 15.0));
-    let mesh_pipeline = mesh_pipeline::Pipeline::new(&swapchain, camera, vulkan.clone());
+ 
+    // (&swapchain, camera, vulkan.clone());
+    let mesh_pipeline = mesh_pipeline::Pipeline::build_for(&model, &swapchain, vulkan.clone());
 
     let command_buffers = instance.create_command_buffers(swapchain.image_views.len());
     let framebuffers: Vec<Framebuffer> = swapchain
@@ -137,8 +138,9 @@ fn main() {
                         );
 
                         for node in &model.nodes {
-                            if node.mesh_index.is_some() {
-                                let mesh = model.get_mesh(node.mesh_index.unwrap());
+                            if let Some(mesh_index) = node.mesh_index {
+
+                                let mesh = model.get_mesh(mesh_index);
                                 device.cmd_push_constants(
                                     command_buffer,
                                     mesh_pipeline.layout,
