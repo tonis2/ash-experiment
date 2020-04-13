@@ -139,7 +139,6 @@ fn main() {
                         for node in &model.nodes {
                             if node.mesh_index.is_some() {
                                 let mesh = model.get_mesh(node.mesh_index.unwrap());
-
                                 device.cmd_push_constants(
                                     command_buffer,
                                     mesh_pipeline.layout,
@@ -149,6 +148,7 @@ fn main() {
                                         transform: node.transform_matrix,
                                     }),
                                 );
+
                                 mesh.primitives.iter().for_each(|primitive| {
                                     device.cmd_bind_vertex_buffers(
                                         command_buffer,

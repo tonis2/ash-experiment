@@ -2,7 +2,7 @@ pub mod mesh_pipeline;
 
 use cgmath::{Deg, Matrix4, Point3, Vector3};
 
-pub use crate::gltf_importer::Vertex;
+pub use crate::gltf_importer::{Vertex, MaterialRaw};
 
 
 #[repr(C)]

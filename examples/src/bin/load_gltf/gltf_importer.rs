@@ -46,6 +46,7 @@ pub struct Primitive {
     pub indice_offset: u64,
     pub material_id: Option<usize>,
     pub vertice_len: usize,
+    pub primitive_topology: vk::PrimitiveTopology,
 }
 #[allow(dead_code)]
 pub struct Mesh {
@@ -65,20 +66,34 @@ pub struct Material {
     pub color: [f32; 4],
     pub emissive: [f32; 3],
     pub occlusion: f32,
-    pub color_texture: Option<TextureInfo>,
-    pub emissive_texture: Option<TextureInfo>,
-    pub normals_texture: Option<TextureInfo>,
-    pub occlusion_texture: Option<TextureInfo>,
+    pub color_texture: TextureInfo,
+    pub emissive_texture: TextureInfo,
+    pub normals_texture: TextureInfo,
+    pub occlusion_texture: TextureInfo,
     pub workflow: Workflow,
     pub alpha_mode: u32,
     pub alpha_cutoff: f32,
     pub double_sided: bool,
     pub is_unlit: bool,
 }
+#[derive(Clone, Debug, Copy)]
+pub struct MaterialRaw {
+    pub base_color: [f32; 4],
+    pub metallic_factor: f32,
+    pub roughness_factor: f32,
+    pub emissive_color: [f32; 3],
+    pub color: [f32; 4],
+    pub emissive: [f32; 3],
+    pub occlusion: f32,
+    pub color_texture: TextureInfo,
+    pub emissive_texture: TextureInfo,
+    pub normals_texture: TextureInfo,
+    pub occlusion_texture: TextureInfo,
+}
 
 #[derive(Clone, Copy, Debug)]
 pub struct TextureInfo {
-    index: usize,
+    index: isize,
     channel: u32,
 }
 
@@ -92,19 +107,71 @@ pub enum Workflow {
 pub struct MetallicRoughnessWorkflow {
     metallic: f32,
     roughness: f32,
-    metallic_roughness_texture: Option<TextureInfo>,
+    metallic_roughness_texture: TextureInfo,
 }
 
 #[derive(Clone, Copy, Debug)]
 pub struct SpecularGlossinessWorkflow {
     specular: [f32; 3],
     glossiness: f32,
-    specular_glossiness_texture: Option<TextureInfo>,
+    specular_glossiness_texture: TextureInfo,
 }
 
 impl Scene {
     pub fn get_mesh(&self, index: usize) -> &Mesh {
         &self.meshes[index]
+    }
+
+    pub fn get_material_for_primitive(&self, primitive: &Primitive) -> MaterialRaw {
+        if primitive.material_id.is_some() {
+            return self.materials[primitive.material_id.unwrap()].raw();
+        } else {
+            MaterialRaw::default()
+        }
+    }
+}
+
+impl Material {
+    pub fn raw(&self) -> MaterialRaw {
+        MaterialRaw {
+            base_color: self.base_color,
+            metallic_factor: self.metallic_factor,
+            roughness_factor: self.roughness_factor,
+            emissive_color: self.emissive_color,
+            color: self.color,
+            emissive: self.emissive,
+            occlusion: self.occlusion,
+            color_texture: self.color_texture,
+            emissive_texture: self.emissive_texture,
+            normals_texture: self.normals_texture,
+            occlusion_texture: self.occlusion_texture,
+        }
+    }
+}
+impl Default for TextureInfo {
+    fn default() -> Self {
+        TextureInfo {
+            index: -1,
+            channel: 0,
+        }
+    }
+}
+
+impl Default for MaterialRaw {
+    fn default() -> Self {
+        MaterialRaw {
+            base_color: [1.0, 1.0, 1.0, 1.0],
+            metallic_factor: 0.0,
+            roughness_factor: 0.0,
+            emissive_color: [1.0, 1.0, 1.0],
+            color: [1.0, 1.0, 1.0, 1.0],
+            emissive: [1.0, 1.0, 1.0],
+            occlusion: 1.0,
+            color_texture: TextureInfo::default(),
+            emissive_texture: TextureInfo::default(),
+            normals_texture: TextureInfo::default(),
+            occlusion_texture: TextureInfo::default(),
+        }
     }
 }
 
@@ -115,29 +182,44 @@ impl<'a> From<GltfMaterial<'a>> for Material {
             _ => material.pbr_metallic_roughness().base_color_factor(),
         };
 
-        fn get_texture(texture_info: Option<texture::Info>) -> Option<TextureInfo> {
-            texture_info.map(|tex_info| TextureInfo {
-                index: tex_info.texture().index(),
-                channel: tex_info.tex_coord(),
-            })
+        fn get_texture(texture_info: Option<texture::Info>) -> TextureInfo {
+            texture_info
+                .map(|tex_info| TextureInfo {
+                    index: tex_info.texture().index() as isize,
+                    channel: tex_info.tex_coord(),
+                })
+                .unwrap_or(TextureInfo {
+                    index: -1,
+                    channel: 0,
+                })
         }
 
-        fn get_normals_texture(texture_info: Option<NormalTexture>) -> Option<TextureInfo> {
-            texture_info.map(|tex_info| TextureInfo {
-                index: tex_info.texture().index(),
-                channel: tex_info.tex_coord(),
-            })
+        fn get_normals_texture(texture_info: Option<NormalTexture>) -> TextureInfo {
+            texture_info
+                .map(|tex_info| TextureInfo {
+                    index: tex_info.texture().index() as isize,
+                    channel: tex_info.tex_coord(),
+                })
+                .unwrap_or(TextureInfo {
+                    index: -1,
+                    channel: 0,
+                })
         }
 
-        fn get_occlusion(texture_info: Option<OcclusionTexture>) -> (f32, Option<TextureInfo>) {
+        fn get_occlusion(texture_info: Option<OcclusionTexture>) -> (f32, TextureInfo) {
             let strength = texture_info
                 .as_ref()
                 .map_or(0.0, |tex_info| tex_info.strength());
 
-            let texture = texture_info.map(|tex_info| TextureInfo {
-                index: tex_info.texture().index(),
-                channel: tex_info.tex_coord(),
-            });
+            let texture = texture_info
+                .map(|tex_info| TextureInfo {
+                    index: tex_info.texture().index() as isize,
+                    channel: tex_info.tex_coord(),
+                })
+                .unwrap_or(TextureInfo {
+                    index: -1,
+                    channel: 0,
+                });
 
             (strength, texture)
         }
@@ -298,6 +380,15 @@ impl Importer {
                 .map(|primitive| {
                     let reader = primitive.reader(|buffer| Some(&self.buffers[buffer.index()]));
                     //Read mesh data
+                    use gltf::mesh::Mode;
+                    let primitive_topology = match primitive.mode() {
+                        Mode::Triangles => vk::PrimitiveTopology::TRIANGLE_LIST,
+                        Mode::TriangleStrip => vk::PrimitiveTopology::TRIANGLE_STRIP,
+                        Mode::Lines => vk::PrimitiveTopology::LINE_LIST,
+                        Mode::LineStrip => vk::PrimitiveTopology::LINE_STRIP,
+                        Mode::Points => vk::PrimitiveTopology::POINT_LIST,
+                        mode @ _ => panic!("unsupported primitive mode: {:?}", mode),
+                    };
 
                     let indices: Option<Vec<u32>> = reader
                         .read_indices()
@@ -342,6 +433,7 @@ impl Importer {
                         indice_offset,
                         material_id: primitive.material().index(),
                         vertice_len: vertices.len(),
+                        primitive_topology,
                     }
                 })
                 .collect();
@@ -431,7 +523,7 @@ impl Importer {
 
     fn create_texture_image(properties: &gltf::image::Data, vulkan: &VkThread) -> Image {
         use gltf::image::Format;
-        use image::{Bgr, ConvertBuffer, ImageBuffer, Rgb, Rgba, Bgra};
+        use image::{Bgr, Bgra, ConvertBuffer, ImageBuffer, Rgb, Rgba};
         let format = vk::Format::R8G8B8A8_UNORM;
         type RgbaImage = ImageBuffer<Rgba<u8>, Vec<u8>>;
         type BgraImage = ImageBuffer<Bgra<u8>, Vec<u8>>;
