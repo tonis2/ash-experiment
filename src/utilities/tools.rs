@@ -44,6 +44,12 @@ impl Shader {
             context: context,
         }
     }
+
+    pub fn use_specialization(&mut self, info: vk::SpecializationInfo) -> &Self {
+        self.shader_info.p_specialization_info = [info].as_ptr();
+        self
+    }
+
     pub fn info(&self) -> vk::PipelineShaderStageCreateInfo {
         self.shader_info
     }

@@ -127,15 +127,7 @@ fn main() {
                             vk::PipelineBindPoint::GRAPHICS,
                             mesh_pipeline.pipeline,
                         );
-                        // device.cmd_bind_descriptor_sets(
-                        //     command_buffer,
-                        //     vk::PipelineBindPoint::GRAPHICS,
-                        //     mesh_pipeline.layout,
-                        //     0,
-                        //     &[mesh_pipeline.pipeline_descriptor.set],
-                        //     &[],
-                        // );
-
+        
                         for node in &model.nodes {
                             if let Some(mesh_index) = node.mesh_index {
                                 let mesh = model.get_mesh(mesh_index);
@@ -151,6 +143,8 @@ fn main() {
 
                                 mesh.primitives.iter().for_each(|primitive| {
                                     if let Some(material_index) = primitive.material_id {
+
+                                        //Lets dynamically bind descriptor sets with 1 offset, because we have 1 Dynamic buffer
                                         device.cmd_bind_descriptor_sets(
                                             command_buffer,
                                             vk::PipelineBindPoint::GRAPHICS,

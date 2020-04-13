@@ -2,8 +2,10 @@ pub mod mesh_pipeline;
 
 use cgmath::{Deg, Matrix4, Point3, Vector3};
 
-pub use crate::gltf_importer::{Vertex, MaterialRaw};
-
+pub struct SpecializationData {
+    pub materials_amount: u32,
+    pub textures_amount: u32,
+}
 
 #[repr(C)]
 #[derive(Clone, Debug, Copy)]
@@ -35,13 +37,8 @@ impl Camera {
                 Vector3::new(0.0, 1.0, 0.0),
             ),
             proj: {
-                let proj = cgmath::perspective(
-                    Deg(45.0),
-                    aspect,
-                    0.1,
-                    30.0,
-                );
-    
+                let proj = cgmath::perspective(Deg(45.0), aspect, 0.1, 30.0);
+
                 examples::OPENGL_TO_VULKAN_MATRIX * proj
             },
         }

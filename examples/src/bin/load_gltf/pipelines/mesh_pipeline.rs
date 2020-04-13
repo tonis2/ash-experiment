@@ -1,10 +1,13 @@
 use vulkan::{
-    modules::swapchain::Swapchain, offset_of, prelude::*, utilities::Shader, Buffer, Context,
-    Descriptor, Image,
+    modules::swapchain::Swapchain,
+    offset_of,
+    prelude::*,
+    utilities::{as_byte_slice, Shader},
+    Buffer, Context, Descriptor, Image,
 };
 
-use super::{Camera, PushTransform, Vertex};
-use examples::gltf_importer::{self, MaterialRaw};
+use super::{Camera, PushTransform, SpecializationData};
+use examples::gltf_importer::{self, MaterialRaw, Vertex};
 use std::{default::Default, ffi::CString, mem, path::Path, ptr, sync::Arc};
 
 pub struct Pipeline {
@@ -154,6 +157,27 @@ impl Pipeline {
             ..Default::default()
         };
 
+        let specialization_info = unsafe {
+            vk::SpecializationInfo::builder()
+                .map_entries(&vec![
+                    vk::SpecializationMapEntry {
+                        constant_id: 0,
+                        offset: 0,
+                        size: std::mem::size_of::<u32>(),
+                    },
+                    vk::SpecializationMapEntry {
+                        constant_id: 1,
+                        offset: std::mem::size_of::<u32>() as _,
+                        size: std::mem::size_of::<u32>(),
+                    },
+                ])
+                .data(&as_byte_slice(&[
+                    scene.textures.len() as u32,
+                    scene.materials.len() as u32,
+                ]))
+                .build()
+        };
+
         let shader_name = CString::new("main").unwrap();
         let renderpass = create_render_pass(&swapchain, context.clone());
         let pipeline = unsafe {
@@ -197,6 +221,18 @@ impl Pipeline {
                                         location: 1,
                                         format: vk::Format::R32G32_SFLOAT,
                                         offset: offset_of!(Vertex, color) as u32,
+                                    },
+                                    vk::VertexInputAttributeDescription {
+                                        binding: 0,
+                                        location: 2,
+                                        format: vk::Format::R32G32_SFLOAT,
+                                        offset: offset_of!(Vertex, normal) as u32,
+                                    },
+                                    vk::VertexInputAttributeDescription {
+                                        binding: 0,
+                                        location: 3,
+                                        format: vk::Format::R32G32_SFLOAT,
+                                        offset: offset_of!(Vertex, uv) as u32,
                                     },
                                 ])
                                 .build(),
