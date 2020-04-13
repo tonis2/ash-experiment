@@ -25,7 +25,7 @@ fn main() {
     let mut queue = Queue::new(vulkan.clone());
 
     let mut model =
-        gltf_importer::Importer::load(Path::new("assets/gltf_test.gltf")).build(&instance);
+        gltf_importer::Importer::load(Path::new("assets/gltf_texture.gltf")).build(&instance);
 
     let camera = Camera::new(800.0 / 600.0, cgmath::Point3::new(0.0, 5.0, 15.0));
     let mesh_pipeline = mesh_pipeline::Pipeline::new(&swapchain, camera, vulkan.clone());

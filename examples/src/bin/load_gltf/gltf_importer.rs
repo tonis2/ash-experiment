@@ -298,7 +298,7 @@ impl Importer {
                 .map(|primitive| {
                     let reader = primitive.reader(|buffer| Some(&self.buffers[buffer.index()]));
                     //Read mesh data
-               
+
                     let indices: Option<Vec<u32>> = reader
                         .read_indices()
                         .map(|read_indices| read_indices.into_u32().collect());
@@ -326,7 +326,7 @@ impl Importer {
 
                     vertices_data.extend_from_slice(&vertices);
 
-                    let mut indice_offset: u64 = 0;    
+                    let mut indice_offset: u64 = 0;
                     if indices.is_some() {
                         let indice_data = &indices.unwrap();
 
@@ -430,7 +430,67 @@ impl Importer {
     }
 
     fn create_texture_image(properties: &gltf::image::Data, vulkan: &VkThread) -> Image {
+        use gltf::image::Format;
+        use image::{ConvertBuffer, ImageBuffer, Rgb, Rgba};
         let format = vk::Format::R8G8B8A8_UNORM;
+        type RgbaImage = ImageBuffer<Rgba<u8>, Vec<u8>>;
+        // type BgraImage = ImageBuffer<Rgba<u8>, Vec<u8>>;
+        type RgbImage = ImageBuffer<Rgb<u8>, Vec<u8>>;
+        type BgrImage = ImageBuffer<Rgb<u8>, Vec<u8>>;
+
+        //Convert image format to R8G8B8A8_UNORM
+        let data = match properties.format {
+            Format::R8 => {
+                let rgba: RgbaImage = RgbImage::from_raw(
+                    properties.width,
+                    properties.height,
+                    properties.pixels.clone(),
+                )
+                .unwrap()
+                .convert();
+
+                rgba.into_raw()
+            }
+            Format::R8G8 => {
+                let rgba: RgbaImage = RgbImage::from_raw(
+                    properties.width,
+                    properties.height,
+                    properties.pixels.clone(),
+                )
+                .unwrap()
+                .convert();
+
+                rgba.into_raw()
+            }
+            Format::R8G8B8 => {
+                let rgba: RgbaImage = RgbImage::from_raw(
+                    properties.width,
+                    properties.height,
+                    properties.pixels.clone(),
+                )
+                .unwrap()
+                .convert();
+
+                rgba.into_raw()
+            }
+            Format::B8G8R8 => {
+                let bgra: RgbaImage = BgrImage::from_raw(
+                    properties.width,
+                    properties.height,
+                    properties.pixels.clone(),
+                )
+                .unwrap()
+                .convert();
+
+                bgra.into_raw()
+            }
+            Format::R8G8B8A8 => properties.pixels.clone(),
+            Format::B8G8R8A8 => properties.pixels.clone(),
+            _ => {
+                panic!("Unsupported texture format: {:?}", properties.format);
+            }
+        };
+
         let image_size =
             (std::mem::size_of::<u8>() as u32 * properties.width * properties.height * 4)
                 as vk::DeviceSize;
@@ -442,7 +502,7 @@ impl Importer {
             vulkan.context(),
         );
 
-        buffer.upload_to_buffer::<u8>(&properties.pixels, 0);
+        buffer.upload_to_buffer::<u8>(&data, 0);
         let mut image = Image::create_image(
             vk::ImageCreateInfo {
                 s_type: vk::StructureType::IMAGE_CREATE_INFO,
