@@ -98,6 +98,25 @@ impl Context {
         }
     }
 
+    fn get_min_uniform_buffer_offset_alignment(&self) -> u32 {
+        let props = unsafe {
+            self.instance
+                .get_physical_device_properties(self.physical_device)
+        };
+        props.limits.min_uniform_buffer_offset_alignment as _
+    }
+
+    pub fn get_ubo_alignment<T>(&self) -> u32 {
+        let min_alignment = self.get_min_uniform_buffer_offset_alignment();
+        let t_size = std::mem::size_of::<T>() as u32;
+
+        if t_size <= min_alignment {
+            min_alignment
+        } else {
+            min_alignment * (t_size as f32 / min_alignment as f32).ceil() as u32
+        }
+    }
+
     pub fn find_depth_format(
         &self,
         candidate_formats: &[vk::Format],

@@ -1,13 +1,12 @@
-
 mod pipelines;
 use vulkan::{
     prelude::*, utilities::as_byte_slice, utilities::FPSLimiter, Context, Framebuffer, Queue,
     Swapchain, VkThread,
 };
 
+use examples::gltf_importer::{self, MaterialRaw};
+use pipelines::{mesh_pipeline, PushTransform};
 use std::{path::Path, sync::Arc};
-use examples::gltf_importer;
-use pipelines::{mesh_pipeline, Camera, PushTransform};
 use winit::event::{ElementState, Event, KeyboardInput, VirtualKeyCode, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop};
 
@@ -27,9 +26,7 @@ fn main() {
     let mut model =
         gltf_importer::Importer::load(Path::new("assets/gltf_texture.gltf")).build(&instance);
 
- 
-    // (&swapchain, camera, vulkan.clone());
-    let mesh_pipeline = mesh_pipeline::Pipeline::build_for(&model, &swapchain, vulkan.clone());
+    let mut mesh_pipeline = mesh_pipeline::Pipeline::build_for(&model, &swapchain, vulkan.clone());
 
     let command_buffers = instance.create_command_buffers(swapchain.image_views.len());
     let framebuffers: Vec<Framebuffer> = swapchain
@@ -55,7 +52,9 @@ fn main() {
             WindowEvent::CloseRequested => *control_flow = ControlFlow::Exit,
             WindowEvent::DroppedFile(path) => {
                 println!("Loading model at {:?}", path);
-                model = gltf_importer::Importer::load(Path::new(&path)).build(&instance);
+                model = gltf_importer::Importer::load(&path).build(&instance);
+                mesh_pipeline =
+                    mesh_pipeline::Pipeline::build_for(&model, &swapchain, vulkan.clone());
             }
             WindowEvent::KeyboardInput { input, .. } => match input {
                 KeyboardInput {
@@ -128,18 +127,17 @@ fn main() {
                             vk::PipelineBindPoint::GRAPHICS,
                             mesh_pipeline.pipeline,
                         );
-                        device.cmd_bind_descriptor_sets(
-                            command_buffer,
-                            vk::PipelineBindPoint::GRAPHICS,
-                            mesh_pipeline.layout,
-                            0,
-                            &[mesh_pipeline.pipeline_descriptor.set],
-                            &[],
-                        );
+                        // device.cmd_bind_descriptor_sets(
+                        //     command_buffer,
+                        //     vk::PipelineBindPoint::GRAPHICS,
+                        //     mesh_pipeline.layout,
+                        //     0,
+                        //     &[mesh_pipeline.pipeline_descriptor.set],
+                        //     &[],
+                        // );
 
                         for node in &model.nodes {
                             if let Some(mesh_index) = node.mesh_index {
-
                                 let mesh = model.get_mesh(mesh_index);
                                 device.cmd_push_constants(
                                     command_buffer,
@@ -152,6 +150,19 @@ fn main() {
                                 );
 
                                 mesh.primitives.iter().for_each(|primitive| {
+                                    if let Some(material_index) = primitive.material_id {
+                                        device.cmd_bind_descriptor_sets(
+                                            command_buffer,
+                                            vk::PipelineBindPoint::GRAPHICS,
+                                            mesh_pipeline.layout,
+                                            0,
+                                            &[mesh_pipeline.pipeline_descriptor.set],
+                                            &[(material_index as u32
+                                                * vulkan.get_ubo_alignment::<MaterialRaw>())
+                                                as u32],
+                                        );
+                                    }
+
                                     device.cmd_bind_vertex_buffers(
                                         command_buffer,
                                         0,

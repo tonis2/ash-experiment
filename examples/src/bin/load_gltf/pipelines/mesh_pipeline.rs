@@ -41,7 +41,7 @@ impl Pipeline {
         uniform_buffer.upload_to_buffer(&[camera], 0);
 
         let material_buffer = Buffer::new_mapped_basic(
-            mem::size_of::<MaterialRaw>() as vk::DeviceSize,
+            context.get_ubo_alignment::<MaterialRaw>() as vk::DeviceSize,
             vk::BufferUsageFlags::UNIFORM_BUFFER,
             vk_mem::MemoryUsage::CpuOnly,
             context.clone(),
@@ -72,7 +72,7 @@ impl Pipeline {
                 vk::DescriptorSetLayoutBinding {
                     // Material uniform
                     binding: 1,
-                    descriptor_type: vk::DescriptorType::UNIFORM_BUFFER,
+                    descriptor_type: vk::DescriptorType::UNIFORM_BUFFER_DYNAMIC,
                     descriptor_count: 1,
                     stage_flags: vk::ShaderStageFlags::FRAGMENT,
                     p_immutable_samplers: ptr::null(),
@@ -106,7 +106,7 @@ impl Pipeline {
                     dst_binding: 1,
                     dst_array_element: 0,
                     descriptor_count: 1,
-                    descriptor_type: vk::DescriptorType::UNIFORM_BUFFER,
+                    descriptor_type: vk::DescriptorType::UNIFORM_BUFFER_DYNAMIC,
                     p_buffer_info: [vk::DescriptorBufferInfo {
                         buffer: material_buffer.buffer,
                         offset: 0,
