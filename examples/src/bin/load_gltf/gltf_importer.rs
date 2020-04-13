@@ -44,6 +44,7 @@ pub struct Node {
 pub struct Primitive {
     pub vertex_offset: usize,
     pub indice_offset: u64,
+    pub material_id: Option<usize>,
     pub vertice_len: usize,
 }
 #[allow(dead_code)]
@@ -209,7 +210,7 @@ impl Importer {
             images,
         }
     }
-    //Parse and build gltf data-s content
+    //Parse and build gltf content
     pub fn build(&self, vulkan: &VkThread) -> Scene {
         let mut meshes: Vec<Mesh> = Vec::new();
         let mut nodes = Vec::new();
@@ -297,7 +298,7 @@ impl Importer {
                 .map(|primitive| {
                     let reader = primitive.reader(|buffer| Some(&self.buffers[buffer.index()]));
                     //Read mesh data
-                    let mut indice_offset: u64 = 0;
+               
                     let indices: Option<Vec<u32>> = reader
                         .read_indices()
                         .map(|read_indices| read_indices.into_u32().collect());
@@ -325,6 +326,7 @@ impl Importer {
 
                     vertices_data.extend_from_slice(&vertices);
 
+                    let mut indice_offset: u64 = 0;    
                     if indices.is_some() {
                         let indice_data = &indices.unwrap();
 
@@ -338,6 +340,7 @@ impl Importer {
                         vertex_offset: (vertices_data.len() - vertices.len())
                             * std::mem::size_of::<Vertex>(),
                         indice_offset,
+                        material_id: primitive.material().index(),
                         vertice_len: vertices.len(),
                     }
                 })
