@@ -128,11 +128,6 @@ impl Pipeline {
             context.clone(),
         );
 
-        let push_contstant_descriptor = vk::PushConstantRange::builder()
-            .stage_flags(vk::ShaderStageFlags::VERTEX)
-            .size(mem::size_of::<PushTransform>() as u32)
-            .build();
-
         //Create pipeline stuff
         let pipeline_layout = unsafe {
             context
@@ -140,7 +135,11 @@ impl Pipeline {
                 .create_pipeline_layout(
                     &vk::PipelineLayoutCreateInfo::builder()
                         .set_layouts(&[pipeline_descriptor.layout])
-                        .push_constant_ranges(&[push_contstant_descriptor])
+                        .push_constant_ranges(&[vk::PushConstantRange {
+                            stage_flags: vk::ShaderStageFlags::VERTEX,
+                            size: mem::size_of::<PushTransform>() as u32,
+                            offset: 0,
+                        }])
                         .build(),
                     None,
                 )
