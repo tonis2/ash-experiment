@@ -431,38 +431,16 @@ impl Importer {
 
     fn create_texture_image(properties: &gltf::image::Data, vulkan: &VkThread) -> Image {
         use gltf::image::Format;
-        use image::{ConvertBuffer, ImageBuffer, Rgb, Rgba};
+        use image::{Bgr, ConvertBuffer, ImageBuffer, Rgb, Rgba, Bgra};
         let format = vk::Format::R8G8B8A8_UNORM;
         type RgbaImage = ImageBuffer<Rgba<u8>, Vec<u8>>;
-        // type BgraImage = ImageBuffer<Rgba<u8>, Vec<u8>>;
+        type BgraImage = ImageBuffer<Bgra<u8>, Vec<u8>>;
         type RgbImage = ImageBuffer<Rgb<u8>, Vec<u8>>;
-        type BgrImage = ImageBuffer<Rgb<u8>, Vec<u8>>;
+        type BgrImage = ImageBuffer<Bgr<u8>, Vec<u8>>;
 
         //Convert image format to R8G8B8A8_UNORM
         let data = match properties.format {
-            Format::R8 => {
-                let rgba: RgbaImage = RgbImage::from_raw(
-                    properties.width,
-                    properties.height,
-                    properties.pixels.clone(),
-                )
-                .unwrap()
-                .convert();
-
-                rgba.into_raw()
-            }
-            Format::R8G8 => {
-                let rgba: RgbaImage = RgbImage::from_raw(
-                    properties.width,
-                    properties.height,
-                    properties.pixels.clone(),
-                )
-                .unwrap()
-                .convert();
-
-                rgba.into_raw()
-            }
-            Format::R8G8B8 => {
+            Format::R8 | Format::R8G8 | Format::R8G8B8 => {
                 let rgba: RgbaImage = RgbImage::from_raw(
                     properties.width,
                     properties.height,
@@ -484,8 +462,18 @@ impl Importer {
 
                 bgra.into_raw()
             }
+            Format::B8G8R8A8 => {
+                let bgra: RgbaImage = BgraImage::from_raw(
+                    properties.width,
+                    properties.height,
+                    properties.pixels.clone(),
+                )
+                .unwrap()
+                .convert();
+
+                bgra.into_raw()
+            }
             Format::R8G8B8A8 => properties.pixels.clone(),
-            Format::B8G8R8A8 => properties.pixels.clone(),
             _ => {
                 panic!("Unsupported texture format: {:?}", properties.format);
             }
