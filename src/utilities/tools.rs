@@ -45,8 +45,8 @@ impl Shader {
         }
     }
 
-    pub fn use_specialization(&mut self, info: vk::SpecializationInfo) -> &Self {
-        self.shader_info.p_specialization_info = [info].as_ptr();
+    pub fn use_specialization(mut self, info: vk::SpecializationInfo) -> Self {
+        self.shader_info.p_specialization_info = &info;
         self
     }
 

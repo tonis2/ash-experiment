@@ -409,7 +409,7 @@ impl Importer {
                     let uvs: Vec<[f32; 2]> = reader
                         .read_tex_coords(0)
                         .map_or(vec![], |uvs| uvs.into_f32().collect());
-
+                   
                     let vertices: Vec<Vertex> = reader
                         .read_positions()
                         .unwrap()

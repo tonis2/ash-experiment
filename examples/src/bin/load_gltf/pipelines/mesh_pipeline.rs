@@ -119,7 +119,7 @@ impl Pipeline {
                     ..Default::default()
                 },
                 vk::WriteDescriptorSet {
-                    // Material uniform
+                    // Textures uniform
                     dst_binding: 2,
                     dst_array_element: 0,
                     descriptor_count: scene.textures.len() as u32,
@@ -157,24 +157,15 @@ impl Pipeline {
             ..Default::default()
         };
 
+        let specialization_data = SpecializationData {
+            materials_amount: scene.materials.len() as u32,
+            textures_amount: scene.textures.len() as u32,
+        };
+
         let specialization_info = unsafe {
             vk::SpecializationInfo::builder()
-                .map_entries(&vec![
-                    vk::SpecializationMapEntry {
-                        constant_id: 0,
-                        offset: 0,
-                        size: std::mem::size_of::<u32>(),
-                    },
-                    vk::SpecializationMapEntry {
-                        constant_id: 1,
-                        offset: std::mem::size_of::<u32>() as _,
-                        size: std::mem::size_of::<u32>(),
-                    },
-                ])
-                .data(&as_byte_slice(&[
-                    scene.textures.len() as u32,
-                    scene.materials.len() as u32,
-                ]))
+                .map_entries(&specialization_data.specialization_map_entries())
+                .data(as_byte_slice(&specialization_data))
                 .build()
         };
 
@@ -200,6 +191,7 @@ impl Pipeline {
                                 &shader_name,
                                 context.clone(),
                             )
+                            .use_specialization(specialization_info)
                             .info(),
                         ])
                         .vertex_input_state(
