@@ -28,6 +28,7 @@ pub struct Vertex {
     pub color: [f32; 4],
     pub normal: [f32; 3],
     pub uv: [f32; 2],
+    pub material_id: isize,
 }
 
 #[derive(Debug, Clone)]
@@ -44,7 +45,7 @@ pub struct Node {
 pub struct Primitive {
     pub vertex_offset: usize,
     pub indice_offset: u64,
-    pub material_id: Option<usize>,
+    pub material_id: Option<isize>,
     pub vertice_len: usize,
     pub primitive_topology: vk::PrimitiveTopology,
 }
@@ -53,6 +54,12 @@ pub struct Mesh {
     pub name: Option<String>,
     pub primitives: Vec<Primitive>,
     pub index: usize,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct TextureInfo {
+    index: isize,
+    channel: u32,
 }
 
 #[derive(Clone, Debug)]
@@ -76,25 +83,21 @@ pub struct Material {
     pub double_sided: bool,
     pub is_unlit: bool,
 }
+
+#[repr(C)]
 #[derive(Clone, Debug, Copy)]
 pub struct MaterialRaw {
     pub base_color: [f32; 4],
+    pub color: [f32; 4],
+    pub emissive: [f32; 4],
+    pub emissive_color: [f32; 4],
     pub metallic_factor: f32,
     pub roughness_factor: f32,
-    pub emissive_color: [f32; 3],
-    pub color: [f32; 4],
-    pub emissive: [f32; 3],
     pub occlusion: f32,
     pub color_texture: TextureInfo,
     pub emissive_texture: TextureInfo,
     pub normals_texture: TextureInfo,
     pub occlusion_texture: TextureInfo,
-}
-
-#[derive(Clone, Copy, Debug)]
-pub struct TextureInfo {
-    index: isize,
-    channel: u32,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -122,14 +125,6 @@ impl Scene {
         &self.meshes[index]
     }
 
-    pub fn get_material_for_primitive(&self, primitive: &Primitive) -> MaterialRaw {
-        if primitive.material_id.is_some() {
-            return self.materials[primitive.material_id.unwrap()].raw();
-        } else {
-            MaterialRaw::default()
-        }
-    }
-
     pub fn get_raw_materials(&self) -> Vec<MaterialRaw> {
         self.materials
             .iter()
@@ -142,11 +137,16 @@ impl Material {
     pub fn raw(&self) -> MaterialRaw {
         MaterialRaw {
             base_color: self.base_color,
+            color: self.color,
+            emissive: [self.emissive[0], self.emissive[1], self.emissive[2], 1.0],
+            emissive_color: [
+                self.emissive_color[0],
+                self.emissive_color[1],
+                self.emissive_color[2],
+                1.0,
+            ],
             metallic_factor: self.metallic_factor,
             roughness_factor: self.roughness_factor,
-            emissive_color: self.emissive_color,
-            color: self.color,
-            emissive: self.emissive,
             occlusion: self.occlusion,
             color_texture: self.color_texture,
             emissive_texture: self.emissive_texture,
@@ -164,23 +164,23 @@ impl Default for TextureInfo {
     }
 }
 
-impl Default for MaterialRaw {
-    fn default() -> Self {
-        MaterialRaw {
-            base_color: [1.0, 1.0, 1.0, 1.0],
-            metallic_factor: 0.0,
-            roughness_factor: 0.0,
-            emissive_color: [1.0, 1.0, 1.0],
-            color: [1.0, 1.0, 1.0, 1.0],
-            emissive: [1.0, 1.0, 1.0],
-            occlusion: 1.0,
-            color_texture: TextureInfo::default(),
-            emissive_texture: TextureInfo::default(),
-            normals_texture: TextureInfo::default(),
-            occlusion_texture: TextureInfo::default(),
-        }
-    }
-}
+// impl Default for MaterialRaw {
+//     fn default() -> Self {
+//         MaterialRaw {
+//             base_color: [1.0, 1.0, 1.0, 1.0],
+//             metallic_factor: 0.0,
+//             roughness_factor: 0.0,
+//             emissive_color: [1.0, 1.0, 1.0, 1.0],
+//             color: [1.0, 1.0, 1.0, 1.0],
+//             emissive: [1.0, 1.0, 1.0, 1.0],
+//             occlusion: 1.0,
+//             color_texture: TextureInfo::default(),
+//             emissive_texture: TextureInfo::default(),
+//             normals_texture: TextureInfo::default(),
+//             occlusion_texture: TextureInfo::default(),
+//         }
+//     }
+// }
 
 impl<'a> From<GltfMaterial<'a>> for Material {
     fn from(material: GltfMaterial) -> Material {
@@ -409,7 +409,8 @@ impl Importer {
                     let uvs: Vec<[f32; 2]> = reader
                         .read_tex_coords(0)
                         .map_or(vec![], |uvs| uvs.into_f32().collect());
-                   
+                    let material_id: Option<isize> =
+                        primitive.material().index().map(|num| num as isize);
                     let vertices: Vec<Vertex> = reader
                         .read_positions()
                         .unwrap()
@@ -419,6 +420,7 @@ impl Importer {
                             color: *colors.get(index).unwrap_or(&[1.0, 1.0, 1.0, 1.0]),
                             uv: *uvs.get(index).unwrap_or(&[0.0, 0.0]),
                             normal: *normals.get(index).unwrap_or(&[1.0, 1.0, 1.0]),
+                            material_id: material_id.unwrap_or(-1),
                         })
                         .collect();
 
@@ -438,7 +440,7 @@ impl Importer {
                         vertex_offset: (vertices_data.len() - vertices.len())
                             * std::mem::size_of::<Vertex>(),
                         indice_offset,
-                        material_id: primitive.material().index(),
+                        material_id,
                         vertice_len: vertices.len(),
                         primitive_topology,
                     }

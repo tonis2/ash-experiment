@@ -6,9 +6,9 @@ use vulkan::{
     Buffer, Context, Descriptor, Image,
 };
 
-use super::{Camera, PushTransform, SpecializationData};
+use super::definitions::{Camera, PushTransform, SpecializationData};
 use examples::gltf_importer::{self, MaterialRaw, Vertex};
-use std::{default::Default, ffi::CString, mem, path::Path, ptr, sync::Arc};
+use std::{default::Default, ffi::CString, mem, path::Path, sync::Arc};
 
 pub struct Pipeline {
     pub pipeline: vk::Pipeline,
@@ -17,6 +17,7 @@ pub struct Pipeline {
 
     pub depth_image: Image,
     pub uniform_buffer: Buffer,
+    pub material_buffer: Buffer,
     pub uniform_transform: Camera,
     pub renderpass: vk::RenderPass,
 
@@ -31,26 +32,37 @@ impl Pipeline {
         context: Arc<Context>,
     ) -> Pipeline {
         //Create buffer data
-
         let camera = Camera::new(800.0 / 600.0, cgmath::Point3::new(0.0, 5.0, 15.0));
         let depth_image = examples::create_depth_resources(&swapchain, context.clone());
 
         let uniform_buffer = Buffer::new_mapped_basic(
-            mem::size_of::<Camera>() as vk::DeviceSize,
+            mem::size_of::<Camera>() as u64,
             vk::BufferUsageFlags::UNIFORM_BUFFER,
             vk_mem::MemoryUsage::CpuOnly,
             context.clone(),
         );
+
         uniform_buffer.upload_to_buffer(&[camera], 0);
 
         let material_buffer = Buffer::new_mapped_basic(
-            context.get_ubo_alignment::<MaterialRaw>() as vk::DeviceSize,
+            context.get_ubo_alignment::<MaterialRaw>() as u64,
             vk::BufferUsageFlags::UNIFORM_BUFFER,
             vk_mem::MemoryUsage::CpuOnly,
             context.clone(),
         );
 
         material_buffer.upload_to_buffer(&scene.get_raw_materials()[..], 0);
+
+        let material_buffer_bindings: Vec<vk::DescriptorBufferInfo> = scene
+            .materials
+            .iter()
+            .enumerate()
+            .map(|(index, _material)| vk::DescriptorBufferInfo {
+                buffer: material_buffer.buffer,
+                offset: (index * mem::size_of::<MaterialRaw>() as usize) as u64,
+                range: material_buffer.size,
+            })
+            .collect();
 
         let texture_data: Vec<vk::DescriptorImageInfo> = scene
             .textures
@@ -70,15 +82,15 @@ impl Pipeline {
                     descriptor_type: vk::DescriptorType::UNIFORM_BUFFER,
                     descriptor_count: 1,
                     stage_flags: vk::ShaderStageFlags::VERTEX,
-                    p_immutable_samplers: ptr::null(),
+                    ..Default::default()
                 },
                 vk::DescriptorSetLayoutBinding {
                     // Material uniform
                     binding: 1,
-                    descriptor_type: vk::DescriptorType::UNIFORM_BUFFER_DYNAMIC,
+                    descriptor_type: vk::DescriptorType::UNIFORM_BUFFER,
                     descriptor_count: 1,
                     stage_flags: vk::ShaderStageFlags::FRAGMENT,
-                    p_immutable_samplers: ptr::null(),
+                    ..Default::default()
                 },
                 vk::DescriptorSetLayoutBinding {
                     // Textures uniform
@@ -86,7 +98,7 @@ impl Pipeline {
                     descriptor_type: vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
                     descriptor_count: scene.textures.len() as u32,
                     stage_flags: vk::ShaderStageFlags::FRAGMENT,
-                    p_immutable_samplers: ptr::null(),
+                    ..Default::default()
                 },
             ],
             vec![
@@ -109,13 +121,8 @@ impl Pipeline {
                     dst_binding: 1,
                     dst_array_element: 0,
                     descriptor_count: 1,
-                    descriptor_type: vk::DescriptorType::UNIFORM_BUFFER_DYNAMIC,
-                    p_buffer_info: [vk::DescriptorBufferInfo {
-                        buffer: material_buffer.buffer,
-                        offset: 0,
-                        range: material_buffer.size,
-                    }]
-                    .as_ptr(),
+                    descriptor_type: vk::DescriptorType::UNIFORM_BUFFER,
+                    p_buffer_info: material_buffer_bindings.as_ptr(),
                     ..Default::default()
                 },
                 vk::WriteDescriptorSet {
@@ -226,6 +233,12 @@ impl Pipeline {
                                         format: vk::Format::R32G32_SFLOAT,
                                         offset: offset_of!(Vertex, uv) as u32,
                                     },
+                                    vk::VertexInputAttributeDescription {
+                                        binding: 0,
+                                        location: 4,
+                                        format: vk::Format::R16_SINT,
+                                        offset: offset_of!(Vertex, material_id) as u32,
+                                    },
                                 ])
                                 .build(),
                         )
@@ -301,6 +314,7 @@ impl Pipeline {
             layout: pipeline_layout,
             depth_image,
             uniform_buffer,
+            material_buffer,
             uniform_transform: camera,
             renderpass,
             context,

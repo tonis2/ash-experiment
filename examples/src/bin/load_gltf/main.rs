@@ -4,8 +4,8 @@ use vulkan::{
     Swapchain, VkThread,
 };
 
-use examples::gltf_importer::{self, MaterialRaw};
-use pipelines::{mesh_pipeline, PushTransform};
+use examples::gltf_importer;
+use pipelines::{definitions::PushTransform, mesh_pipeline};
 use std::{path::Path, sync::Arc};
 use winit::event::{ElementState, Event, KeyboardInput, VirtualKeyCode, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop};
@@ -127,10 +127,11 @@ fn main() {
                             vk::PipelineBindPoint::GRAPHICS,
                             mesh_pipeline.pipeline,
                         );
-        
+
                         for node in &model.nodes {
                             if let Some(mesh_index) = node.mesh_index {
                                 let mesh = model.get_mesh(mesh_index);
+
                                 device.cmd_push_constants(
                                     command_buffer,
                                     mesh_pipeline.layout,
@@ -141,22 +142,16 @@ fn main() {
                                     }),
                                 );
 
+                                device.cmd_bind_descriptor_sets(
+                                    command_buffer,
+                                    vk::PipelineBindPoint::GRAPHICS,
+                                    mesh_pipeline.layout,
+                                    0,
+                                    &[mesh_pipeline.pipeline_descriptor.set],
+                                    &[],
+                                );
+
                                 mesh.primitives.iter().for_each(|primitive| {
-                                    if let Some(material_index) = primitive.material_id {
-
-                                        //Lets dynamically bind descriptor sets with 1 offset, because we have 1 Dynamic buffer
-                                        device.cmd_bind_descriptor_sets(
-                                            command_buffer,
-                                            vk::PipelineBindPoint::GRAPHICS,
-                                            mesh_pipeline.layout,
-                                            0,
-                                            &[mesh_pipeline.pipeline_descriptor.set],
-                                            &[(material_index as u32
-                                                * vulkan.get_ubo_alignment::<MaterialRaw>())
-                                                as u32],
-                                        );
-                                    }
-
                                     device.cmd_bind_vertex_buffers(
                                         command_buffer,
                                         0,
