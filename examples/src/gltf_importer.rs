@@ -347,9 +347,10 @@ impl Importer {
                 })
             }
         }
-        
+
         //Store Nodes
         for node in self.doc.nodes() {
+    
             let children_indices = node
                 .children()
                 .map(|child| child.index())

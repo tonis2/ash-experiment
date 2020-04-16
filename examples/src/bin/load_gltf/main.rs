@@ -24,7 +24,7 @@ fn main() {
     let mut queue = Queue::new(vulkan.clone());
 
     let mut scene =
-        gltf_importer::Importer::load(Path::new("assets/gltf_test.gltf")).build(&instance);
+        gltf_importer::Importer::load(Path::new("assets/gltf_texture.gltf")).build(&instance);
 
     let mut mesh_pipeline = mesh_pipeline::Pipeline::build_for(&scene, &swapchain, &instance);
 
