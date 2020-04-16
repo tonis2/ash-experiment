@@ -23,10 +23,10 @@ fn main() {
     let mut swapchain = Swapchain::new(vulkan.clone());
     let mut queue = Queue::new(vulkan.clone());
 
-    let mut model =
+    let mut scene =
         gltf_importer::Importer::load(Path::new("assets/gltf_test.gltf")).build(&instance);
 
-    let mut mesh_pipeline = mesh_pipeline::Pipeline::build_for(&model, &swapchain, &instance);
+    let mut mesh_pipeline = mesh_pipeline::Pipeline::build_for(&scene, &swapchain, &instance);
 
     let command_buffers = instance.create_command_buffers(swapchain.image_views.len());
     let mut framebuffers: Vec<Framebuffer> = swapchain
@@ -52,8 +52,8 @@ fn main() {
             WindowEvent::CloseRequested => *control_flow = ControlFlow::Exit,
             WindowEvent::DroppedFile(path) => {
                 println!("Loading model at {:?}", path);
-                model = gltf_importer::Importer::load(&path).build(&instance);
-                mesh_pipeline = mesh_pipeline::Pipeline::build_for(&model, &swapchain, &instance);
+                scene = gltf_importer::Importer::load(&path).build(&instance);
+                mesh_pipeline = mesh_pipeline::Pipeline::build_for(&scene, &swapchain, &instance);
                 framebuffers = swapchain
                     .image_views
                     .iter()
@@ -143,9 +143,9 @@ fn main() {
                             mesh_pipeline.pipeline,
                         );
 
-                        for node in &model.nodes {
+                        for node in &scene.nodes {
                             if let Some(mesh_index) = node.mesh_index {
-                                let mesh = model.get_mesh(mesh_index);
+                                let mesh = scene.get_mesh(mesh_index);
 
                                 device.cmd_push_constants(
                                     command_buffer,
@@ -170,18 +170,18 @@ fn main() {
                                     device.cmd_bind_vertex_buffers(
                                         command_buffer,
                                         0,
-                                        &[model.vertices.clone().buffer],
+                                        &[scene.vertices.clone().buffer],
                                         &[primitive.vertex_offset as u64],
                                     );
                                     device.cmd_bind_index_buffer(
                                         command_buffer,
-                                        model.indices.clone().buffer,
+                                        scene.indices.clone().buffer,
                                         primitive.indice_offset as u64,
                                         vk::IndexType::UINT32,
                                     );
                                     device.cmd_draw_indexed(
                                         command_buffer,
-                                        model.indices_len,
+                                        scene.indices_len,
                                         1,
                                         0,
                                         0,
@@ -205,7 +205,7 @@ fn main() {
 
                 vulkan.wait_idle();
                 swapchain = Swapchain::new(vulkan.clone());
-                mesh_pipeline = mesh_pipeline::Pipeline::build_for(&model, &swapchain, &instance);
+                mesh_pipeline = mesh_pipeline::Pipeline::build_for(&scene, &swapchain, &instance);
                 framebuffers = swapchain
                     .image_views
                     .iter()
