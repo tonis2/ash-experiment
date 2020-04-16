@@ -303,6 +303,8 @@ impl Importer {
     pub fn build(&self, vulkan: &VkThread) -> Scene {
         let mut meshes: Vec<Mesh> = Vec::new();
         let mut nodes = Vec::new();
+        let mut vertices_data: Vec<Vertex> = Vec::new();
+        let mut indices_data: Vec<u32> = Vec::new();
 
         let mut textures: Vec<Image> = self
             .images
@@ -345,10 +347,7 @@ impl Importer {
                 })
             }
         }
-
-        let mut vertices_data: Vec<Vertex> = Vec::new();
-        let mut indices_data: Vec<u32> = Vec::new();
-
+        
         //Store Nodes
         for node in self.doc.nodes() {
             let children_indices = node
