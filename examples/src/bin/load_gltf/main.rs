@@ -47,6 +47,7 @@ fn main() {
         .collect();
 
     let mut tick_counter = FPSLimiter::new();
+    let mut events = examples::events::Event::new();
     event_loop.run(move |event, _, control_flow| match event {
         Event::WindowEvent { event, .. } => match event {
             WindowEvent::CloseRequested => *control_flow = ControlFlow::Exit,
@@ -83,12 +84,20 @@ fn main() {
                     _ => {}
                 },
             },
-            _ => {}
+            _ => {
+                events.handle_event(event);
+            }
         },
         Event::MainEventsCleared => {
             window.request_redraw();
             print!("FPS: {}\r", tick_counter.fps());
             tick_counter.tick_frame();
+            mesh_pipeline
+                .camera
+                .update_position(0.0, 0.0, 0.0);
+            mesh_pipeline
+                .uniform_buffer
+                .upload_to_buffer(&[mesh_pipeline.camera], 0);
         }
         Event::RedrawRequested(_window_id) => {
             let extent = vk::Rect2D {

@@ -1,4 +1,4 @@
-use cgmath::{Deg, Matrix4, Point3, Vector3};
+use cgmath::{Deg, Matrix4, Point3, Vector3, Vector4};
 use std::mem;
 use vulkan::{offset_of, prelude::*};
 
@@ -42,6 +42,7 @@ pub struct Light {
 #[repr(C)]
 #[derive(Clone, Debug, Copy)]
 pub struct Camera {
+    pub position: Vector4<f32>,
     pub view: Matrix4<f32>,
     pub proj: Matrix4<f32>,
 }
@@ -49,6 +50,7 @@ pub struct Camera {
 impl Camera {
     pub fn new(aspect: f32, position: Point3<f32>) -> Camera {
         Camera {
+            position: position.to_homogeneous(),
             view: Matrix4::look_at(
                 position,
                 Point3::new(0.0, 0.0, 0.0),
@@ -56,10 +58,17 @@ impl Camera {
             ),
             proj: {
                 let proj = cgmath::perspective(Deg(45.0), aspect, 0.1, 30.0);
-
                 examples::OPENGL_TO_VULKAN_MATRIX * proj
             },
         }
+    }
+
+    pub fn update_position(&mut self, x: f32, y: f32, z: f32) {
+        self.view = self.view * Matrix4::look_at(
+            cgmath::Point3::new(0.0, 0.0, 0.0),
+            Point3::new(0.0, 0.0, 0.0),
+            Vector3::new(0.0, 0.0, 0.0),
+        );
     }
 }
 

@@ -19,7 +19,7 @@ pub struct Pipeline {
     pub depth_image: Image,
     pub uniform_buffer: Buffer,
     pub material_buffer: Buffer,
-    pub uniform_transform: Camera,
+    pub camera: Camera,
     pub renderpass: vk::RenderPass,
 
     context: Arc<Context>,
@@ -341,7 +341,7 @@ impl Pipeline {
             _empty_image: empty_image,
             uniform_buffer,
             material_buffer,
-            uniform_transform: camera,
+            camera,
             renderpass,
             context,
         }
