@@ -15,7 +15,7 @@ pub struct Pipeline {
     pub layout: vk::PipelineLayout,
     pub pipeline_descriptor: Descriptor,
 
-    empty_image: Image,
+    _empty_image: Image,
     pub depth_image: Image,
     pub uniform_buffer: Buffer,
     pub material_buffer: Buffer,
@@ -70,7 +70,7 @@ impl Pipeline {
                 range: material_buffer.size,
             })
             .collect();
-        let empty_image =  examples::create_empty_image(&vulkan);
+        let empty_image = examples::create_empty_image(&vulkan);
         let texture_data: Vec<vk::DescriptorImageInfo> = {
             if scene.textures.len() > 0 {
                 scene
@@ -84,7 +84,7 @@ impl Pipeline {
                     .collect()
             } else {
                 //Create empty placeholder texture for shader
-               
+
                 vec![vk::DescriptorImageInfo {
                     sampler: empty_image.sampler(),
                     image_view: empty_image.view(),
@@ -338,7 +338,7 @@ impl Pipeline {
             pipeline_descriptor,
             layout: pipeline_layout,
             depth_image,
-            empty_image,
+            _empty_image: empty_image,
             uniform_buffer,
             material_buffer,
             uniform_transform: camera,
