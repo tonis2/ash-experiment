@@ -36,6 +36,7 @@ impl Image {
             context: context.clone(),
         }
     }
+    
 
     pub fn attach_view(&mut self, image_info: vk::ImageViewCreateInfo) {
         self.image_view = Some(unsafe {
@@ -55,6 +56,10 @@ impl Image {
         });
     }
 
+    pub fn image(&self) -> vk::Image {
+        self.image
+    }
+
     pub fn view(&self) -> vk::ImageView {
         self.image_view.expect("No image attached")
     }
@@ -62,6 +67,35 @@ impl Image {
     pub fn sampler(&self) -> vk::Sampler {
         self.sampler.expect("No sampler attached")
     }
+
+    pub fn create_sampler(
+        context: Arc<Context>,
+        sampler_info: vk::SamplerCreateInfo,
+    ) -> vk::Sampler {
+        unsafe {
+            context
+                .device
+                .create_sampler(&sampler_info, None)
+                .expect("Failed to create Sampler!")
+        }
+    }
+
+    pub fn create_view(
+        context: Arc<Context>,
+        image_info: vk::ImageViewCreateInfo,
+    ) -> vk::ImageView {
+        unsafe {
+            context
+                .device
+                .create_image_view(&image_info, None)
+                .expect("Failed to create Image View!")
+        }
+    }
+
+    // pub fn create_empty_image(context: Arc<Context>) -> Image {
+    
+    //     image
+    // }
 }
 
 impl Drop for Image {

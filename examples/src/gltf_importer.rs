@@ -164,23 +164,23 @@ impl Default for TextureInfo {
     }
 }
 
-// impl Default for MaterialRaw {
-//     fn default() -> Self {
-//         MaterialRaw {
-//             base_color: [1.0, 1.0, 1.0, 1.0],
-//             metallic_factor: 0.0,
-//             roughness_factor: 0.0,
-//             emissive_color: [1.0, 1.0, 1.0, 1.0],
-//             color: [1.0, 1.0, 1.0, 1.0],
-//             emissive: [1.0, 1.0, 1.0, 1.0],
-//             occlusion: 1.0,
-//             color_texture: TextureInfo::default(),
-//             emissive_texture: TextureInfo::default(),
-//             normals_texture: TextureInfo::default(),
-//             occlusion_texture: TextureInfo::default(),
-//         }
-//     }
-// }
+impl Default for MaterialRaw {
+    fn default() -> Self {
+        MaterialRaw {
+            base_color: [1.0, 1.0, 1.0, 1.0],
+            metallic_factor: 0.0,
+            roughness_factor: 0.0,
+            emissive_color: [1.0, 1.0, 1.0, 1.0],
+            color: [1.0, 1.0, 1.0, 1.0],
+            emissive: [1.0, 1.0, 1.0, 1.0],
+            occlusion: 1.0,
+            color_texture: TextureInfo::default(),
+            emissive_texture: TextureInfo::default(),
+            normals_texture: TextureInfo::default(),
+            occlusion_texture: TextureInfo::default(),
+        }
+    }
+}
 
 impl<'a> From<GltfMaterial<'a>> for Material {
     fn from(material: GltfMaterial) -> Material {

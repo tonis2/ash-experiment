@@ -3,7 +3,7 @@ use vulkan::{
     offset_of,
     prelude::*,
     utilities::{as_byte_slice, Shader},
-    Buffer, Context, Descriptor, Image,
+    Buffer, Context, Descriptor, Image, VkThread,
 };
 
 use super::definitions::{Camera, PushTransform, SpecializationData};
@@ -15,6 +15,7 @@ pub struct Pipeline {
     pub layout: vk::PipelineLayout,
     pub pipeline_descriptor: Descriptor,
 
+    empty_image: Image,
     pub depth_image: Image,
     pub uniform_buffer: Buffer,
     pub material_buffer: Buffer,
@@ -29,8 +30,9 @@ impl Pipeline {
     pub fn build_for(
         scene: &gltf_importer::Scene,
         swapchain: &Swapchain,
-        context: Arc<Context>,
+        vulkan: &VkThread,
     ) -> Pipeline {
+        let context = vulkan.context();
         //Create buffer data
         let camera = Camera::new(800.0 / 600.0, cgmath::Point3::new(0.0, 5.0, 15.0));
         let depth_image = examples::create_depth_resources(&swapchain, context.clone());
@@ -51,7 +53,12 @@ impl Pipeline {
             context.clone(),
         );
 
-        material_buffer.upload_to_buffer(&scene.get_raw_materials()[..], 0);
+        if scene.materials.len() > 0 {
+            material_buffer.upload_to_buffer(&scene.get_raw_materials()[..], 0);
+        } else {
+            //Upload empty material for shaders
+            material_buffer.upload_to_buffer(&[MaterialRaw::default()], 0);
+        }
 
         let material_buffer_bindings: Vec<vk::DescriptorBufferInfo> = scene
             .materials
@@ -63,16 +70,34 @@ impl Pipeline {
                 range: material_buffer.size,
             })
             .collect();
+        let empty_image =  examples::create_empty_image(&vulkan);
+        let texture_data: Vec<vk::DescriptorImageInfo> = {
+            if scene.textures.len() > 0 {
+                scene
+                    .textures
+                    .iter()
+                    .map(|texture| vk::DescriptorImageInfo {
+                        sampler: texture.sampler(),
+                        image_view: texture.view(),
+                        image_layout: vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
+                    })
+                    .collect()
+            } else {
+                //Create empty placeholder texture for shader
+               
+                vec![vk::DescriptorImageInfo {
+                    sampler: empty_image.sampler(),
+                    image_view: empty_image.view(),
+                    image_layout: vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
+                }]
+            }
+        };
 
-        let texture_data: Vec<vk::DescriptorImageInfo> = scene
-            .textures
-            .iter()
-            .map(|texture| vk::DescriptorImageInfo {
-                sampler: texture.sampler(),
-                image_view: texture.view(),
-                image_layout: vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
-            })
-            .collect();
+        //Fill with empty texture when scene has no textures.
+        let texture_count: u32 = match scene.textures.len() {
+            0 => 1,
+            _ => scene.textures.len() as u32,
+        };
 
         let pipeline_descriptor = Descriptor::new(
             vec![
@@ -96,7 +121,7 @@ impl Pipeline {
                     // Textures uniform
                     binding: 2,
                     descriptor_type: vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
-                    descriptor_count: scene.textures.len() as u32,
+                    descriptor_count: texture_count,
                     stage_flags: vk::ShaderStageFlags::FRAGMENT,
                     ..Default::default()
                 },
@@ -129,7 +154,7 @@ impl Pipeline {
                     // Textures uniform
                     dst_binding: 2,
                     dst_array_element: 0,
-                    descriptor_count: scene.textures.len() as u32,
+                    descriptor_count: texture_count,
                     descriptor_type: vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
                     p_image_info: texture_data.as_ptr(),
                     ..Default::default()
@@ -313,6 +338,7 @@ impl Pipeline {
             pipeline_descriptor,
             layout: pipeline_layout,
             depth_image,
+            empty_image,
             uniform_buffer,
             material_buffer,
             uniform_transform: camera,

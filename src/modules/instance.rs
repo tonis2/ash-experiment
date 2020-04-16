@@ -1,7 +1,4 @@
-use ash::{
-    version::DeviceV1_0,
-    vk,
-};
+use ash::{version::DeviceV1_0, vk};
 
 use super::context::Context;
 use std::cmp::max;
@@ -234,7 +231,7 @@ impl VkThread {
 
         self.end_single_time_command(command_buffer);
     }
-
+    //Redo this to use apply_pipeline_barrier instead.
     pub fn transition_image_layout(
         &self,
         image: vk::Image,
@@ -326,7 +323,27 @@ impl VkThread {
         }
         self.end_single_time_command(command_buffer);
     }
-
+ 
+    pub fn apply_pipeline_barrier(
+        &self,
+        src_stage: vk::PipelineStageFlags,
+        dst_stage: vk::PipelineStageFlags,
+        barrier: vk::ImageMemoryBarrier,
+    ) {
+        let command_buffer = self.begin_single_time_command();
+        unsafe {
+            self.context.device.cmd_pipeline_barrier(
+                command_buffer,
+                src_stage,
+                dst_stage,
+                vk::DependencyFlags::empty(),
+                &[],
+                &[],
+                &[barrier],
+            );
+        }
+        self.end_single_time_command(command_buffer);
+    }
 
     pub fn generate_mipmaps(
         &self,

@@ -33,7 +33,6 @@ pub struct Pipeline {
     pub pipeline: vk::Pipeline,
     pub layout: vk::PipelineLayout,
     pub texture: Image,
-    pub sampler: vk::Sampler,
     pub uniform_buffer: Buffer,
     pub uniform_transform: UniformBufferObject,
     pub renderpass: vk::RenderPass,
@@ -180,28 +179,6 @@ impl Pipeline {
 
         let texture = examples::create_texture(&Path::new("assets/texture.jpg"), &vulkan);
 
-        let sampler_create_info = vk::SamplerCreateInfo {
-            s_type: vk::StructureType::SAMPLER_CREATE_INFO,
-            mag_filter: vk::Filter::LINEAR,
-            min_filter: vk::Filter::LINEAR,
-            mipmap_mode: vk::SamplerMipmapMode::LINEAR,
-            address_mode_u: vk::SamplerAddressMode::REPEAT,
-            address_mode_v: vk::SamplerAddressMode::REPEAT,
-            address_mode_w: vk::SamplerAddressMode::REPEAT,
-            mip_lod_bias: 0.0,
-            anisotropy_enable: vk::TRUE,
-            max_anisotropy: 16.0,
-            ..Default::default()
-        };
-
-        let sampler = unsafe {
-            vulkan
-                .context
-                .device
-                .create_sampler(&sampler_create_info, None)
-                .expect("Failed to create Sampler!")
-        };
-
         //Create uniform buffer
 
         let uniform_data = create_uniform_data(&swapchain);
@@ -253,7 +230,7 @@ impl Pipeline {
                     descriptor_count: 1,
                     descriptor_type: vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
                     p_image_info: [vk::DescriptorImageInfo {
-                        sampler: sampler,
+                        sampler: texture.sampler(),
                         image_view: texture.view(),
                         image_layout: vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
                     }]
@@ -314,7 +291,6 @@ impl Pipeline {
             pipeline: pipeline[0],
             layout: pipeline_layout,
             texture,
-            sampler,
             renderpass,
             pipeline_descriptor,
             uniform_buffer,
@@ -335,7 +311,6 @@ impl Drop for Pipeline {
             self.context
                 .device
                 .destroy_render_pass(self.renderpass, None);
-            self.context.device.destroy_sampler(self.sampler, None);
         }
     }
 }

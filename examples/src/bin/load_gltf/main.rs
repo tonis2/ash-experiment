@@ -24,9 +24,9 @@ fn main() {
     let mut queue = Queue::new(vulkan.clone());
 
     let mut model =
-        gltf_importer::Importer::load(Path::new("assets/gltf_texture.gltf")).build(&instance);
+        gltf_importer::Importer::load(Path::new("assets/gltf_test.gltf")).build(&instance);
 
-    let mut mesh_pipeline = mesh_pipeline::Pipeline::build_for(&model, &swapchain, vulkan.clone());
+    let mut mesh_pipeline = mesh_pipeline::Pipeline::build_for(&model, &swapchain, &instance);
 
     let command_buffers = instance.create_command_buffers(swapchain.image_views.len());
     let framebuffers: Vec<Framebuffer> = swapchain
@@ -53,8 +53,7 @@ fn main() {
             WindowEvent::DroppedFile(path) => {
                 println!("Loading model at {:?}", path);
                 model = gltf_importer::Importer::load(&path).build(&instance);
-                mesh_pipeline =
-                    mesh_pipeline::Pipeline::build_for(&model, &swapchain, vulkan.clone());
+                mesh_pipeline = mesh_pipeline::Pipeline::build_for(&model, &swapchain, &instance);
             }
             WindowEvent::KeyboardInput { input, .. } => match input {
                 KeyboardInput {
