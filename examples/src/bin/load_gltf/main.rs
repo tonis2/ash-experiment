@@ -29,7 +29,7 @@ fn main() {
     let mut mesh_pipeline = mesh_pipeline::Pipeline::build_for(&model, &swapchain, &instance);
 
     let command_buffers = instance.create_command_buffers(swapchain.image_views.len());
-    let framebuffers: Vec<Framebuffer> = swapchain
+    let mut framebuffers: Vec<Framebuffer> = swapchain
         .image_views
         .iter()
         .map(|image| {
@@ -54,6 +54,22 @@ fn main() {
                 println!("Loading model at {:?}", path);
                 model = gltf_importer::Importer::load(&path).build(&instance);
                 mesh_pipeline = mesh_pipeline::Pipeline::build_for(&model, &swapchain, &instance);
+                framebuffers = swapchain
+                    .image_views
+                    .iter()
+                    .map(|image| {
+                        Framebuffer::new(
+                            vk::FramebufferCreateInfo::builder()
+                                .layers(1)
+                                .render_pass(mesh_pipeline.renderpass)
+                                .attachments(&[*image, mesh_pipeline.depth_image.view()])
+                                .width(swapchain.width())
+                                .height(swapchain.height())
+                                .build(),
+                            vulkan.clone(),
+                        )
+                    })
+                    .collect();
             }
             WindowEvent::KeyboardInput { input, .. } => match input {
                 KeyboardInput {
@@ -184,6 +200,28 @@ fn main() {
                     command_buffers[image_index as usize],
                     image_index,
                 );
+            } else {
+                //Resize window
+
+                vulkan.wait_idle();
+                swapchain = Swapchain::new(vulkan.clone());
+                mesh_pipeline = mesh_pipeline::Pipeline::build_for(&model, &swapchain, &instance);
+                framebuffers = swapchain
+                    .image_views
+                    .iter()
+                    .map(|image| {
+                        Framebuffer::new(
+                            vk::FramebufferCreateInfo::builder()
+                                .layers(1)
+                                .render_pass(mesh_pipeline.renderpass)
+                                .attachments(&[*image, mesh_pipeline.depth_image.view()])
+                                .width(swapchain.width())
+                                .height(swapchain.height())
+                                .build(),
+                            vulkan.clone(),
+                        )
+                    })
+                    .collect();
             }
         }
         Event::LoopDestroyed => {}
