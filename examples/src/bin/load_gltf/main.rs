@@ -90,14 +90,16 @@ fn main() {
         },
         Event::MainEventsCleared => {
             window.request_redraw();
-            print!("FPS: {}\r", tick_counter.fps());
+            // print!("FPS: {}\r", tick_counter.fps());
             tick_counter.tick_frame();
-            mesh_pipeline
-                .camera
-                .update_position(0.0, 0.0, 0.0);
-            mesh_pipeline
-                .uniform_buffer
-                .upload_to_buffer(&[mesh_pipeline.camera], 0);
+           
+            //Camera updates
+            // mesh_pipeline
+            //     .camera
+            //     .update_position(0.0, 0.0, 0.0);
+            // mesh_pipeline
+            //     .uniform_buffer
+            //     .upload_to_buffer(&[mesh_pipeline.camera], 0);
         }
         Event::RedrawRequested(_window_id) => {
             let extent = vk::Rect2D {

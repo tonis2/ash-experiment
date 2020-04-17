@@ -135,12 +135,14 @@ impl Event {
             }
             WindowEvent::MouseWheel { delta, .. } => {
                 const PIXELS_PER_LINE: f64 = 38.0;
-
+                // println!("{:?}", delta);
                 match delta {
                     MouseScrollDelta::LineDelta(_, y) => {
                         self.mouse.scroll_diff += y;
+                        
                     }
                     MouseScrollDelta::PixelDelta(delta) => {
+                      
                         self.mouse.scroll_diff += (delta.y / PIXELS_PER_LINE) as f32
                     }
                 }
