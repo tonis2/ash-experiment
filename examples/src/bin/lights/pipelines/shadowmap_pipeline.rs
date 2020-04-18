@@ -1,7 +1,8 @@
 use super::Vertex;
-use std::{default::Default, ffi::CString, mem, path::Path, ptr, sync::Arc};
+use std::{default::Default, ffi::CString, mem, path::Path, sync::Arc};
 use vulkan::{
-    offset_of, prelude::*, utilities::Shader, Context, Descriptor, Image, Swapchain, VkThread,
+    offset_of, prelude::*, utilities::Shader, Context, Descriptor, DescriptorSet, Image, Swapchain,
+    VkThread,
 };
 
 pub struct Pipeline {
@@ -53,22 +54,12 @@ impl Pipeline {
             vk::FormatFeatureFlags::DEPTH_STENCIL_ATTACHMENT,
         );
 
-        let shadow_descriptor = Descriptor::new(
-            vec![vk::DescriptorSetLayoutBinding {
-                // transform uniform
-                binding: 0,
-                descriptor_type: vk::DescriptorType::UNIFORM_BUFFER,
-                descriptor_count: 1,
-                stage_flags: vk::ShaderStageFlags::VERTEX,
-                p_immutable_samplers: ptr::null(),
-            }],
-            vec![vk::WriteDescriptorSet {
-                // transform uniform
-                dst_binding: 0,
-                dst_array_element: 0,
-                descriptor_count: 1,
-                descriptor_type: vk::DescriptorType::UNIFORM_BUFFER,
-                p_buffer_info: [lights].as_ptr(),
+        let pipeline_descriptor = Descriptor::new(
+            vec![DescriptorSet {
+                bind_index: 0,
+                flag: vk::ShaderStageFlags::VERTEX,
+                bind_type: vk::DescriptorType::UNIFORM_BUFFER,
+                buffer_info: Some(vec![lights]),
                 ..Default::default()
             }],
             vulkan.context(),
@@ -80,7 +71,7 @@ impl Pipeline {
                 .device
                 .create_pipeline_layout(
                     &vk::PipelineLayoutCreateInfo::builder()
-                        .set_layouts(&[shadow_descriptor.layout])
+                        .set_layouts(&[pipeline_descriptor.layout])
                         .push_constant_ranges(&[pushconstant])
                         .build(),
                     None,
@@ -240,7 +231,7 @@ impl Pipeline {
             pipeline,
             image: shadow_map_image,
             layout: shadow_layout,
-            descriptor: shadow_descriptor,
+            descriptor: pipeline_descriptor,
             context,
         }
     }

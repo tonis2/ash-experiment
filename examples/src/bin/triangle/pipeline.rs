@@ -1,10 +1,7 @@
 use cgmath::{Deg, Matrix4, Point3, Vector3};
 use vulkan::{
-    modules::swapchain::Swapchain,
-    offset_of,
-    prelude::*,
-    utilities::{tools::Shader, Buffer},
-    Context, Descriptor, VkThread,
+    modules::swapchain::Swapchain, offset_of, prelude::*, Buffer, Context, Descriptor,
+    DescriptorSet, Shader, VkThread,
 };
 
 use std::default::Default;
@@ -71,37 +68,15 @@ impl Pipeline {
         );
 
         let pipeline_descriptor = Descriptor::new(
-            vec![
-                vk::DescriptorSetLayoutBinding {
-                    // transform uniform
-                    binding: 0,
-                    descriptor_type: vk::DescriptorType::UNIFORM_BUFFER,
-                    descriptor_count: 1,
-                    stage_flags: vk::ShaderStageFlags::VERTEX,
-                    p_immutable_samplers: ptr::null(),
-                },
-                vk::DescriptorSetLayoutBinding {
-                    // sampler uniform
-                    binding: 1,
-                    descriptor_type: vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
-                    descriptor_count: 1,
-                    stage_flags: vk::ShaderStageFlags::FRAGMENT,
-                    p_immutable_samplers: ptr::null(),
-                },
-            ],
-            vec![vk::WriteDescriptorSet {
-                // transform uniform
-                s_type: vk::StructureType::WRITE_DESCRIPTOR_SET,
-                dst_binding: 0,
-                dst_array_element: 0,
-                descriptor_count: 1,
-                descriptor_type: vk::DescriptorType::UNIFORM_BUFFER,
-                p_buffer_info: [vk::DescriptorBufferInfo {
+            vec![DescriptorSet {
+                bind_index: 0,
+                flag: vk::ShaderStageFlags::VERTEX,
+                bind_type: vk::DescriptorType::UNIFORM_BUFFER,
+                buffer_info: Some(vec![vk::DescriptorBufferInfo {
                     buffer: uniform_buffer.buffer,
                     offset: 0,
-                    range: std::mem::size_of_val(&uniform_data) as u64,
-                }]
-                .as_ptr(),
+                    range: uniform_buffer.size,
+                }]),
                 ..Default::default()
             }],
             vulkan.context(),

@@ -3,7 +3,7 @@ use vulkan::{
     offset_of,
     prelude::*,
     utilities::{as_byte_slice, Shader},
-    Buffer, Context, Descriptor, Image, VkThread,
+    Buffer, Context, Descriptor, DescriptorSet, Image, VkThread,
 };
 
 use super::definitions::{Camera, CameraRaw, PushTransform, SpecializationData};
@@ -100,62 +100,30 @@ impl Pipeline {
 
         let pipeline_descriptor = Descriptor::new(
             vec![
-                vk::DescriptorSetLayoutBinding {
-                    // transform uniform
-                    binding: 0,
-                    descriptor_type: vk::DescriptorType::UNIFORM_BUFFER,
-                    descriptor_count: 1,
-                    stage_flags: vk::ShaderStageFlags::VERTEX,
-                    ..Default::default()
-                },
-                vk::DescriptorSetLayoutBinding {
-                    // Material uniform
-                    binding: 1,
-                    descriptor_type: vk::DescriptorType::UNIFORM_BUFFER,
-                    descriptor_count: 1,
-                    stage_flags: vk::ShaderStageFlags::FRAGMENT,
-                    ..Default::default()
-                },
-                vk::DescriptorSetLayoutBinding {
-                    // Textures uniform
-                    binding: 2,
-                    descriptor_type: vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
-                    descriptor_count: texture_count,
-                    stage_flags: vk::ShaderStageFlags::FRAGMENT,
-                    ..Default::default()
-                },
-            ],
-            vec![
-                vk::WriteDescriptorSet {
-                    // transform uniform
-                    dst_binding: 0,
-                    dst_array_element: 0,
-                    descriptor_count: 1,
-                    descriptor_type: vk::DescriptorType::UNIFORM_BUFFER,
-                    p_buffer_info: [vk::DescriptorBufferInfo {
+                DescriptorSet {
+                    bind_index: 0,
+                    flag: vk::ShaderStageFlags::VERTEX,
+                    bind_type: vk::DescriptorType::UNIFORM_BUFFER,
+                    buffer_info: Some(vec![vk::DescriptorBufferInfo {
                         buffer: uniform_buffer.buffer,
                         offset: 0,
                         range: uniform_buffer.size,
-                    }]
-                    .as_ptr(),
+                    }]),
                     ..Default::default()
                 },
-                vk::WriteDescriptorSet {
-                    // Material uniform
-                    dst_binding: 1,
-                    dst_array_element: 0,
-                    descriptor_count: 1,
-                    descriptor_type: vk::DescriptorType::UNIFORM_BUFFER,
-                    p_buffer_info: material_buffer_bindings.as_ptr(),
+                DescriptorSet {
+                    bind_index: 1,
+                    flag: vk::ShaderStageFlags::FRAGMENT,
+                    bind_type: vk::DescriptorType::UNIFORM_BUFFER,
+                    buffer_info: Some(material_buffer_bindings),
                     ..Default::default()
                 },
-                vk::WriteDescriptorSet {
-                    // Textures uniform
-                    dst_binding: 2,
-                    dst_array_element: 0,
-                    descriptor_count: texture_count,
-                    descriptor_type: vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
-                    p_image_info: texture_data.as_ptr(),
+                DescriptorSet {
+                    bind_index: 2,
+                    flag: vk::ShaderStageFlags::FRAGMENT,
+                    bind_type: vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
+                    image_info: Some(texture_data),
+                    count: texture_count,
                     ..Default::default()
                 },
             ],

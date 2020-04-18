@@ -9,4 +9,5 @@ pub use modules::queue::Queue;
 pub use utilities::images::Image;
 
 pub use utilities::buffer::Buffer;
-pub use utilities::descriptor::Descriptor;
+pub use utilities::descriptor::{Descriptor, DescriptorSet};
+pub use utilities::tools::Shader;

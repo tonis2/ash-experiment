@@ -2,8 +2,7 @@ use vulkan::{
     modules::swapchain::Swapchain,
     offset_of,
     prelude::*,
-    utilities::{tools::load_shader, Buffer, Image},
-    Context, Descriptor, VkThread,
+    Context, Descriptor, DescriptorSet, Shader, VkThread, Buffer, Image
 };
 
 use cgmath::{Deg, Matrix4, Point3, Vector3};
@@ -134,46 +133,6 @@ impl Pipeline {
         let dynamic_state_info =
             vk::PipelineDynamicStateCreateInfo::builder().dynamic_states(&dynamic_state);
 
-        let vertex_shader = load_shader(&Path::new("src/bin/load_model/shaders/model.vert.spv"));
-        let frag_shader = load_shader(&Path::new("src/bin/load_model/shaders/model.frag.spv"));
-
-        let vertex_shader_module = unsafe {
-            vulkan
-                .device()
-                .create_shader_module(
-                    &vk::ShaderModuleCreateInfo::builder().code(&vertex_shader),
-                    None,
-                )
-                .expect("Vertex shader module error")
-        };
-
-        let fragment_shader_module = unsafe {
-            vulkan
-                .device()
-                .create_shader_module(
-                    &vk::ShaderModuleCreateInfo::builder().code(&frag_shader),
-                    None,
-                )
-                .expect("Fragment shader module error")
-        };
-
-        let shader_entry_name = CString::new("main").unwrap();
-        let shaders = &[
-            vk::PipelineShaderStageCreateInfo {
-                module: vertex_shader_module,
-                p_name: shader_entry_name.as_ptr(),
-                stage: vk::ShaderStageFlags::VERTEX,
-                ..Default::default()
-            },
-            vk::PipelineShaderStageCreateInfo {
-                s_type: vk::StructureType::PIPELINE_SHADER_STAGE_CREATE_INFO,
-                module: fragment_shader_module,
-                p_name: shader_entry_name.as_ptr(),
-                stage: vk::ShaderStageFlags::FRAGMENT,
-                ..Default::default()
-            },
-        ];
-
         //Create texture image
 
         let (texture, mip_levels) = create_texture(&Path::new("assets/chalet.jpg"), &vulkan);
@@ -193,50 +152,26 @@ impl Pipeline {
 
         let pipeline_descriptor = Descriptor::new(
             vec![
-                vk::DescriptorSetLayoutBinding {
-                    // transform uniform
-                    binding: 0,
-                    descriptor_type: vk::DescriptorType::UNIFORM_BUFFER,
-                    descriptor_count: 1,
-                    stage_flags: vk::ShaderStageFlags::VERTEX,
-                    p_immutable_samplers: ptr::null(),
-                },
-                vk::DescriptorSetLayoutBinding {
-                    // Shadow image
-                    binding: 1,
-                    descriptor_type: vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
-                    descriptor_count: 1,
-                    stage_flags: vk::ShaderStageFlags::FRAGMENT,
-                    p_immutable_samplers: ptr::null(),
-                },
-            ],
-            vec![
-                vk::WriteDescriptorSet {
-                    // transform uniform
-                    dst_binding: 0,
-                    dst_array_element: 0,
-                    descriptor_count: 1,
-                    descriptor_type: vk::DescriptorType::UNIFORM_BUFFER,
-                    p_buffer_info: [vk::DescriptorBufferInfo {
+                DescriptorSet {
+                    bind_index: 0,
+                    flag: vk::ShaderStageFlags::VERTEX,
+                    bind_type: vk::DescriptorType::UNIFORM_BUFFER,
+                    buffer_info: Some(vec![vk::DescriptorBufferInfo {
                         buffer: uniform_buffer.buffer,
                         offset: 0,
-                        range: std::mem::size_of_val(&uniform_data) as u64,
-                    }]
-                    .as_ptr(),
+                        range: uniform_buffer.size,
+                    }]),
                     ..Default::default()
                 },
-                vk::WriteDescriptorSet {
-                    // shadow uniform
-                    dst_binding: 1,
-                    dst_array_element: 0,
-                    descriptor_count: 1,
-                    descriptor_type: vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
-                    p_image_info: [vk::DescriptorImageInfo {
+                DescriptorSet {
+                    bind_index: 1,
+                    flag: vk::ShaderStageFlags::FRAGMENT,
+                    bind_type: vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
+                    image_info: Some(vec![vk::DescriptorImageInfo {
                         sampler: texture.sampler(),
                         image_view: texture.view(),
                         image_layout: vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
-                    }]
-                    .as_ptr(),
+                    }]),
                     ..Default::default()
                 },
             ],
@@ -255,41 +190,47 @@ impl Pipeline {
                 .unwrap()
         };
         let renderpass = create_render_pass(&swapchain, vulkan);
-        let graphic_pipeline_info = vk::GraphicsPipelineCreateInfo::builder()
-            .stages(shaders)
-            .vertex_input_state(&vertex_input_state_info)
-            .input_assembly_state(&vertex_input_assembly_state_info)
-            .viewport_state(&viewport_state_info)
-            .rasterization_state(&rasterization_info)
-            .multisample_state(&multisample_state_info)
-            .depth_stencil_state(&depth_state_info)
-            .color_blend_state(&color_blend_state)
-            .dynamic_state(&dynamic_state_info)
-            .layout(pipeline_layout)
-            .render_pass(renderpass);
 
+        let shader_name = CString::new("main").unwrap();
         let pipeline = unsafe {
             vulkan
                 .device()
                 .create_graphics_pipelines(
                     vk::PipelineCache::null(),
-                    &[graphic_pipeline_info.build()],
+                    &[vk::GraphicsPipelineCreateInfo::builder()
+                        .stages(&[
+                            Shader::new(
+                                &Path::new("src/bin/load_model/shaders/model.vert.spv"),
+                                vk::ShaderStageFlags::VERTEX,
+                                &shader_name,
+                                vulkan.context(),
+                            )
+                            .info(),
+                            Shader::new(
+                                &Path::new("src/bin/load_model/shaders/model.frag.spv"),
+                                vk::ShaderStageFlags::FRAGMENT,
+                                &shader_name,
+                                vulkan.context(),
+                            )
+                            .info(),
+                        ])
+                        .vertex_input_state(&vertex_input_state_info)
+                        .input_assembly_state(&vertex_input_assembly_state_info)
+                        .viewport_state(&viewport_state_info)
+                        .rasterization_state(&rasterization_info)
+                        .multisample_state(&multisample_state_info)
+                        .depth_stencil_state(&depth_state_info)
+                        .color_blend_state(&color_blend_state)
+                        .dynamic_state(&dynamic_state_info)
+                        .layout(pipeline_layout)
+                        .render_pass(renderpass)
+                        .build()],
                     None,
                 )
                 .expect("Unable to create graphics pipeline")
         };
 
         let depth_image = examples::create_depth_resources(&swapchain, vulkan.context());
-
-        //Destoy shader modules
-        unsafe {
-            vulkan
-                .device()
-                .destroy_shader_module(vertex_shader_module, None);
-            vulkan
-                .device()
-                .destroy_shader_module(fragment_shader_module, None);
-        }
 
         Pipeline {
             pipeline: pipeline[0],

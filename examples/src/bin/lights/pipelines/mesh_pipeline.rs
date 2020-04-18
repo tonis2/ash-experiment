@@ -1,6 +1,6 @@
 use vulkan::{
-    modules::swapchain::Swapchain, offset_of, prelude::*, utilities::Shader, Buffer, Context,
-    Descriptor, Image, VkThread,
+    modules::swapchain::Swapchain, offset_of, prelude::*, Buffer, Context, Descriptor,
+    DescriptorSet, Image, Shader, VkThread,
 };
 
 use super::shadowmap_pipeline;
@@ -68,62 +68,37 @@ impl Pipeline {
 
         let pipeline_descriptor = Descriptor::new(
             vec![
-                vk::DescriptorSetLayoutBinding {
-                    // transform uniform
-                    binding: 0,
-                    descriptor_type: vk::DescriptorType::UNIFORM_BUFFER,
-                    descriptor_count: 1,
-                    stage_flags: vk::ShaderStageFlags::VERTEX,
+                DescriptorSet {
+                    bind_index: 0,
+                    flag: vk::ShaderStageFlags::VERTEX,
+                    bind_type: vk::DescriptorType::UNIFORM_BUFFER,
+                    buffer_info: Some(vec![vk::DescriptorBufferInfo {
+                        buffer: uniform_buffer.buffer,
+                        offset: 0,
+                        range: uniform_buffer.size,
+                    }]),
                     ..Default::default()
                 },
-                vk::DescriptorSetLayoutBinding {
-                    // light uniform
-                    binding: 1,
-                    descriptor_type: vk::DescriptorType::UNIFORM_BUFFER,
-                    descriptor_count: 1,
-                    stage_flags: vk::ShaderStageFlags::ALL_GRAPHICS,
+                DescriptorSet {
+                    bind_index: 1,
+                    flag: vk::ShaderStageFlags::ALL_GRAPHICS,
+                    bind_type: vk::DescriptorType::UNIFORM_BUFFER,
+                    buffer_info: Some(vec![vk::DescriptorBufferInfo {
+                        buffer: light_buffer.buffer,
+                        offset: 0,
+                        range: light_buffer.size,
+                    }]),
                     ..Default::default()
                 },
-                vk::DescriptorSetLayoutBinding {
-                    // Shadow image
-                    binding: 2,
-                    descriptor_type: vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
-                    descriptor_count: 1,
-                    stage_flags: vk::ShaderStageFlags::FRAGMENT,
-                    ..Default::default()
-                },
-            ],
-            vec![
-                vk::WriteDescriptorSet {
-                    // transform uniform
-                    dst_binding: 0,
-                    dst_array_element: 0,
-                    descriptor_count: 1,
-                    descriptor_type: vk::DescriptorType::UNIFORM_BUFFER,
-                    p_buffer_info: [uniform_buffer.descriptor_info(0)].as_ptr(),
-                    ..Default::default()
-                },
-                vk::WriteDescriptorSet {
-                    // light uniform
-                    dst_binding: 1,
-                    dst_array_element: 0,
-                    descriptor_count: 1,
-                    descriptor_type: vk::DescriptorType::UNIFORM_BUFFER,
-                    p_buffer_info: [light_buffer.descriptor_info(0)].as_ptr(),
-                    ..Default::default()
-                },
-                vk::WriteDescriptorSet {
-                    // shadow uniform
-                    dst_binding: 2,
-                    dst_array_element: 0,
-                    descriptor_count: 1,
-                    descriptor_type: vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
-                    p_image_info: [vk::DescriptorImageInfo {
+                DescriptorSet {
+                    bind_index: 2,
+                    flag: vk::ShaderStageFlags::FRAGMENT,
+                    bind_type: vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
+                    image_info: Some(vec![vk::DescriptorImageInfo {
                         sampler: shadow_pipeline.image.sampler(),
                         image_view: shadow_pipeline.image.view(),
                         image_layout: vk::ImageLayout::DEPTH_STENCIL_READ_ONLY_OPTIMAL,
-                    }]
-                    .as_ptr(),
+                    }]),
                     ..Default::default()
                 },
             ],

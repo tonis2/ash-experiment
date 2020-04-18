@@ -30,7 +30,7 @@ impl Shader {
                     &vk::ShaderModuleCreateInfo::builder().code(&load_shader(path)),
                     None,
                 )
-                .expect("Vertex shader module error")
+                .expect("Shader module error")
         };
 
         Self {
