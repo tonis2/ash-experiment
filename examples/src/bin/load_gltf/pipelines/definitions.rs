@@ -1,4 +1,4 @@
-use cgmath::{Deg, InnerSpace, Matrix4, Vector3};
+use cgmath::{Deg, EuclideanSpace, InnerSpace, Matrix4, Vector3};
 
 use examples::events::Event;
 use std::mem;
@@ -66,7 +66,7 @@ impl Camera {
 
     pub fn handle_events(&mut self, events: &Event) {
         self.set_zoom(events.mouse.scroll());
-        const MOVE_AMOUNT: f32 = 0.02;
+        const MOVE_AMOUNT: f32 = 0.01;
         if events.keyboard.key_pressed("d") {
             self.position += cgmath::Vector2::new(MOVE_AMOUNT, 0.0);
         }
@@ -86,6 +86,7 @@ impl Camera {
         if events.mouse.on_right_click() {
             let mouse_pos = events.mouse.position_delta();
             self.yaw -= mouse_pos.x * MOVE_AMOUNT;
+            self.pitch -= -mouse_pos.y * MOVE_AMOUNT;
         }
     }
 }
@@ -99,12 +100,15 @@ pub struct CameraRaw {
 
 impl Camera {
     pub fn raw(&self) -> CameraRaw {
-        let camera_direction = cgmath::Vector3::new(self.yaw, -0.5, -1.0);
+        // let yaw = self.yaw.to_radians();
+        // let pitch = self.pitch.to_radians();
+        let camera_direction =
+            cgmath::Vector3::new(self.yaw, self.pitch, -1.0);
 
         CameraRaw {
             view: Matrix4::look_at_dir(
                 cgmath::Point3::new(self.position.x, self.position.y, self.zoom),
-                camera_direction.normalize(),
+                camera_direction,
                 Vector3::new(0.0, 1.0, 0.0),
             ),
             proj: {
