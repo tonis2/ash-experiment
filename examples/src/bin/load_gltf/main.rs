@@ -7,7 +7,7 @@ use vulkan::{
 use examples::gltf_importer;
 use pipelines::{definitions::PushTransform, mesh_pipeline};
 use std::{path::Path, sync::Arc};
-use winit::event::{ElementState, Event, KeyboardInput, VirtualKeyCode, WindowEvent};
+use winit::event::{Event, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop};
 
 fn main() {
@@ -52,6 +52,7 @@ fn main() {
         Event::WindowEvent { event, .. } => match event {
             WindowEvent::CloseRequested => *control_flow = ControlFlow::Exit,
             WindowEvent::DroppedFile(path) => {
+                //Drop GLTF file on running window to load new file
                 println!("Loading model at {:?}", path);
                 scene = gltf_importer::Importer::load(&path).build(&instance);
                 mesh_pipeline = mesh_pipeline::Pipeline::build_for(&scene, &swapchain, &instance);
@@ -72,34 +73,26 @@ fn main() {
                     })
                     .collect();
             }
-            WindowEvent::KeyboardInput { input, .. } => match input {
-                KeyboardInput {
-                    virtual_keycode,
-                    state,
-                    ..
-                } => match (virtual_keycode, state) {
-                    (Some(VirtualKeyCode::Escape), ElementState::Pressed) => {
-                        *control_flow = ControlFlow::Exit
-                    }
-                    _ => {}
-                },
-            },
             _ => {
                 events.handle_event(event);
+                //Camera updates
+                mesh_pipeline.camera.handle_events(&events);
+
+                events.clear();
             }
         },
         Event::MainEventsCleared => {
             window.request_redraw();
-            // print!("FPS: {}\r", tick_counter.fps());
+            // mesh_pipeline.camera.position.x += tick_counter.delta_time().sin() * 10.0;
+            // mesh_pipeline.camera.zoom += tick_counter.delta_time().cos() * 10.0;
+            // println!("{:?}", mesh_pipeline.camera.position.x);
+            mesh_pipeline.camera.handle_events(&events);
+            mesh_pipeline
+                .uniform_buffer
+                .upload_to_buffer(&[mesh_pipeline.camera.raw()], 0);
+
+            print!("FPS: {}\r", tick_counter.fps());
             tick_counter.tick_frame();
-           
-            //Camera updates
-            // mesh_pipeline
-            //     .camera
-            //     .update_position(0.0, 0.0, 0.0);
-            // mesh_pipeline
-            //     .uniform_buffer
-            //     .upload_to_buffer(&[mesh_pipeline.camera], 0);
         }
         Event::RedrawRequested(_window_id) => {
             let extent = vk::Rect2D {
@@ -213,7 +206,6 @@ fn main() {
                 );
             } else {
                 //Resize window
-
                 vulkan.wait_idle();
                 swapchain = Swapchain::new(vulkan.clone());
                 mesh_pipeline = mesh_pipeline::Pipeline::build_for(&scene, &swapchain, &instance);

@@ -1,4 +1,6 @@
-use cgmath::{Deg, Matrix4, Point3, Vector3, Vector4};
+use cgmath::{Deg, InnerSpace, Matrix4, Vector3};
+
+use examples::events::Event;
 use std::mem;
 use vulkan::{offset_of, prelude::*};
 
@@ -30,65 +32,85 @@ impl SpecializationData {
 pub struct PushTransform {
     pub transform: cgmath::Matrix4<f32>,
 }
-#[repr(C)]
+
+//From this tutorial https://learnopengl.com/Getting-started/Camera
 #[derive(Clone, Debug, Copy)]
-pub struct Light {
-    pub position: cgmath::Vector4<f32>,
-    pub projection: cgmath::Matrix4<f32>,
-    pub color: [f32; 4],
-    pub ambient: [f32; 4],
+pub struct Camera {
+    position: cgmath::Point2<f32>,
+    zoom: f32,
+    aspect: f32,
+    yaw: f32,
+    pitch: f32,
+}
+
+impl Camera {
+    pub fn new(position: cgmath::Point2<f32>, zoom: f32, aspect: f32) -> Self {
+        Self {
+            position,
+            zoom,
+            aspect,
+            yaw: 0.0,
+            pitch: 0.0,
+        }
+    }
+
+    pub fn set_zoom(&mut self, value: f32) {
+        const MIN_ZOOM: f32 = 8.0;
+        const MAX_ZOOM: f32 = 25.0;
+
+        //Min max zoom amount
+        if (self.zoom + value).abs() > MIN_ZOOM && (self.zoom + value).abs() < MAX_ZOOM {
+            self.zoom += value;
+        }
+    }
+
+    pub fn handle_events(&mut self, events: &Event) {
+        self.set_zoom(events.mouse.scroll());
+        const MOVE_AMOUNT: f32 = 0.02;
+        if events.keyboard.key_pressed("d") {
+            self.position += cgmath::Vector2::new(MOVE_AMOUNT, 0.0);
+        }
+
+        if events.keyboard.key_pressed("a") {
+            self.position += cgmath::Vector2::new(-MOVE_AMOUNT, 0.0);
+        }
+
+        if events.keyboard.key_pressed("w") {
+            self.zoom += MOVE_AMOUNT;
+        }
+
+        if events.keyboard.key_pressed("s") {
+            self.zoom -= MOVE_AMOUNT;
+        }
+
+        if events.mouse.on_right_click() {
+            let mouse_pos = events.mouse.position_delta();
+            self.yaw -= mouse_pos.x * MOVE_AMOUNT;
+        }
+    }
 }
 
 #[repr(C)]
 #[derive(Clone, Debug, Copy)]
-pub struct Camera {
-    pub position: Vector4<f32>,
+pub struct CameraRaw {
     pub view: Matrix4<f32>,
     pub proj: Matrix4<f32>,
 }
 
 impl Camera {
-    pub fn new(aspect: f32, position: Point3<f32>) -> Camera {
-        Camera {
-            position: position.to_homogeneous(),
-            view: Matrix4::look_at(
-                position,
-                Point3::new(0.0, 0.0, 0.0),
+    pub fn raw(&self) -> CameraRaw {
+        let camera_direction = cgmath::Vector3::new(self.yaw, -0.5, -1.0);
+
+        CameraRaw {
+            view: Matrix4::look_at_dir(
+                cgmath::Point3::new(self.position.x, self.position.y, self.zoom),
+                camera_direction.normalize(),
                 Vector3::new(0.0, 1.0, 0.0),
             ),
             proj: {
-                let proj = cgmath::perspective(Deg(45.0), aspect, 0.1, 30.0);
+                let proj = cgmath::perspective(Deg(45.0), self.aspect, 0.1, 70.0);
                 examples::OPENGL_TO_VULKAN_MATRIX * proj
             },
-        }
-    }
-
-    pub fn update_position(&mut self, x: f32, y: f32, z: f32) {
-        self.view = self.view * Matrix4::look_at(
-            cgmath::Point3::new(0.0, 0.0, 0.0),
-            Point3::new(0.0, 0.0, 0.0),
-            Vector3::new(0.0, 0.0, 0.0),
-        );
-    }
-}
-
-impl Light {
-    pub fn new(position: cgmath::Vector4<f32>, color: [f32; 4], ambient: [f32; 4]) -> Self {
-        let view = Matrix4::look_at(
-            cgmath::Point3::new(position.x, position.y, position.z),
-            Point3::new(0.0, 0.0, 0.0),
-            Vector3::new(0.0, 1.0, 0.0),
-        );
-
-        let projection = examples::OPENGL_TO_VULKAN_MATRIX
-            * cgmath::perspective(Deg(45.0), 1.0, 3.0, 30.0)
-            * view;
-
-        Self {
-            position,
-            projection,
-            color,
-            ambient,
         }
     }
 }

@@ -6,7 +6,7 @@ use vulkan::{
     Buffer, Context, Descriptor, Image, VkThread,
 };
 
-use super::definitions::{Camera, PushTransform, SpecializationData};
+use super::definitions::{Camera, CameraRaw, PushTransform, SpecializationData};
 use examples::gltf_importer::{self, MaterialRaw, Vertex};
 use std::{default::Default, ffi::CString, mem, path::Path, sync::Arc};
 
@@ -34,17 +34,16 @@ impl Pipeline {
     ) -> Pipeline {
         let context = vulkan.context();
         //Create buffer data
-        let camera = Camera::new(800.0 / 600.0, cgmath::Point3::new(0.0, 5.0, 15.0));
+        let camera = Camera::new(cgmath::Point2::new(0.0, 5.0), 15.0, 1.3);
         let depth_image = examples::create_depth_resources(&swapchain, context.clone());
-
         let uniform_buffer = Buffer::new_mapped_basic(
-            mem::size_of::<Camera>() as u64,
+            mem::size_of::<CameraRaw>() as u64,
             vk::BufferUsageFlags::UNIFORM_BUFFER,
             vk_mem::MemoryUsage::CpuOnly,
             context.clone(),
         );
 
-        uniform_buffer.upload_to_buffer(&[camera], 0);
+        uniform_buffer.upload_to_buffer(&[camera.raw()], 0);
 
         let material_buffer = Buffer::new_mapped_basic(
             context.get_ubo_alignment::<MaterialRaw>() as u64,
@@ -70,6 +69,8 @@ impl Pipeline {
                 range: material_buffer.size,
             })
             .collect();
+
+        //Create empty placeholder texture for shader
         let empty_image = examples::create_empty_image(&vulkan);
         let texture_data: Vec<vk::DescriptorImageInfo> = {
             if scene.textures.len() > 0 {
@@ -83,8 +84,6 @@ impl Pipeline {
                     })
                     .collect()
             } else {
-                //Create empty placeholder texture for shader
-
                 vec![vk::DescriptorImageInfo {
                     sampler: empty_image.sampler(),
                     image_view: empty_image.view(),
