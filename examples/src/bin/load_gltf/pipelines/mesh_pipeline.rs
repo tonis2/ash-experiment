@@ -50,7 +50,7 @@ impl Pipeline {
         uniform_buffer.upload_to_buffer(&[camera.raw()], 0);
 
         let material_buffer = Buffer::new_mapped_basic(
-            context.get_ubo_alignment::<MaterialRaw>() as u64,
+            scene.materials.len() as u64 * context.get_ubo_alignment::<MaterialRaw>() as u64,
             vk::BufferUsageFlags::UNIFORM_BUFFER,
             vk_mem::MemoryUsage::CpuOnly,
             context.clone(),

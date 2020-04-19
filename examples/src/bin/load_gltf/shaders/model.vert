@@ -22,7 +22,7 @@ layout (location = 4) in int material_index;
 layout (location = 0) out vec4 fragColor;
 layout (location = 1) out vec3 out_normal;
 layout (location = 2) out vec2 out_uv;
-layout (location = 3) out flat int out_material_index;
+layout (location = 3) out int out_material_index;
 
 out gl_PerVertex {
     vec4 gl_Position;

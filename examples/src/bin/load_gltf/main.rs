@@ -4,7 +4,7 @@ use vulkan::{
     Swapchain, VkThread,
 };
 
-use examples::utils::{gltf_importer, events};
+use examples::utils::{events, gltf_importer};
 use pipelines::{definitions::PushTransform, mesh_pipeline};
 use std::{path::Path, sync::Arc};
 use winit::event::{Event, WindowEvent};
@@ -55,6 +55,8 @@ fn main() {
                 //Drop GLTF file on running window to load new file
                 println!("Loading model at {:?}", path);
                 scene = gltf_importer::Importer::load(&path).build(&instance);
+                println!("{:?}", scene.meshes.len());
+                println!("{:?}", scene.materials.len());
                 mesh_pipeline = mesh_pipeline::Pipeline::build_for(&scene, &swapchain, &instance);
                 framebuffers = swapchain
                     .image_views
@@ -144,28 +146,18 @@ fn main() {
                             mesh_pipeline.pipeline,
                         );
 
+                        device.cmd_bind_descriptor_sets(
+                            command_buffer,
+                            vk::PipelineBindPoint::GRAPHICS,
+                            mesh_pipeline.layout,
+                            0,
+                            &[mesh_pipeline.pipeline_descriptor.set],
+                            &[],
+                        );
+
                         for node in &scene.nodes {
                             if let Some(mesh_index) = node.mesh_index {
                                 let mesh = scene.get_mesh(mesh_index);
-
-                                device.cmd_push_constants(
-                                    command_buffer,
-                                    mesh_pipeline.layout,
-                                    vk::ShaderStageFlags::VERTEX,
-                                    0,
-                                    as_byte_slice(&PushTransform {
-                                        transform: node.transform_matrix,
-                                    }),
-                                );
-
-                                device.cmd_bind_descriptor_sets(
-                                    command_buffer,
-                                    vk::PipelineBindPoint::GRAPHICS,
-                                    mesh_pipeline.layout,
-                                    0,
-                                    &[mesh_pipeline.pipeline_descriptor.set],
-                                    &[],
-                                );
 
                                 mesh.primitives.iter().for_each(|primitive| {
                                     device.cmd_bind_vertex_buffers(
@@ -180,15 +172,25 @@ fn main() {
                                         primitive.indice_offset as u64,
                                         vk::IndexType::UINT32,
                                     );
-                                    device.cmd_draw_indexed(
-                                        command_buffer,
-                                        scene.indices_len,
-                                        1,
-                                        0,
-                                        0,
-                                        1,
-                                    );
                                 });
+
+                                device.cmd_push_constants(
+                                    command_buffer,
+                                    mesh_pipeline.layout,
+                                    vk::ShaderStageFlags::VERTEX,
+                                    0,
+                                    as_byte_slice(&PushTransform {
+                                        transform: node.transform_matrix,
+                                    }),
+                                );
+                                device.cmd_draw_indexed(
+                                    command_buffer,
+                                    scene.indices_len,
+                                    1,
+                                    0,
+                                    0,
+                                    1,
+                                );
                             }
                         }
 
