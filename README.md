@@ -6,11 +6,27 @@ Practice rendering engine, built on top of vulkan and [ash](https://github.com/M
 Many thanks to these [vulkan examples](https://github.com/unknownue/vulkan-tutorial-rust)
 
 
-To run examples download assets running `python3 ./download_assets.py`  
-then you can run in examples folder 
-`cargo run --bin` + example name 
+
+### Usage
+----
+
+Download assets `python3 ./download_assets.py` 
 
 
-For building shaders i used `glslangValidator -V *shader glsl* -o shader.spv`
+Runing examples
 
-Tested on `windows 10` and `linux 18.04`
+```
+cargo run --bin lights
+```
+
+
+For shader building i used [glslang](https://github.com/KhronosGroup/glslang)
+example `glslangValidator -V *shader glsl* -o shader.spv`
+
+
+
+Platforms
+
+ > windows 10
+ > linux 18.04
+
