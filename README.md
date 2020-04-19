@@ -15,11 +15,13 @@ Download assets `python3 ./download_assets.py`
 
 ##### Running examples
 
-Open examples folders and run with --bin
+Open examples folders and run with --bin.
 
 ```
 cargo run --bin lights
 ```
+
+Some examples can be rotated with mouse.
 
 
 For shader building i used [glslang](https://github.com/KhronosGroup/glslang)
