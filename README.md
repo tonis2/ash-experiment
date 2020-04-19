@@ -23,6 +23,7 @@ cargo run --bin lights
 
 
 For shader building i used [glslang](https://github.com/KhronosGroup/glslang)
+
 example `glslangValidator -V *shader glsl* -o shader.spv`
 
 
