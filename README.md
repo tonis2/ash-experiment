@@ -21,8 +21,6 @@ Open examples folders and run with --bin.
 cargo run --bin lights
 ```
 
-Some examples can be rotated with mouse.
-
 
 For shader building i used [glslang](https://github.com/KhronosGroup/glslang)
 example `glslangValidator -V *shader glsl* -o shader.spv`
