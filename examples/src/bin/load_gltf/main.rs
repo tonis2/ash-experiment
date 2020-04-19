@@ -88,7 +88,7 @@ fn main() {
         Event::MainEventsCleared => {
             window.request_redraw();
 
-            // print!("FPS: {}\r", tick_counter.fps());
+            print!("FPS: {}\r", tick_counter.fps());
             tick_counter.tick_frame();
         }
         Event::RedrawRequested(_window_id) => {
