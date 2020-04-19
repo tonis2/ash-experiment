@@ -350,7 +350,6 @@ impl Importer {
 
         //Store Nodes
         for node in self.doc.nodes() {
-    
             let children_indices = node
                 .children()
                 .map(|child| child.index())
@@ -427,13 +426,12 @@ impl Importer {
                     vertices_data.extend_from_slice(&vertices);
 
                     let mut indice_offset: u64 = 0;
-                    if indices.is_some() {
-                        let indice_data = &indices.unwrap();
 
-                        indice_offset = (std::mem::size_of_val(&indice_data)
-                            - std::mem::size_of::<u64>())
-                            as u64;
-                        indices_data.extend_from_slice(indice_data);
+                    if indices.is_some() {
+                        let current_indices = &indices.unwrap();
+
+                        indice_offset = (current_indices.len() * std::mem::size_of::<u32>()) as u64;
+                        indices_data.extend_from_slice(current_indices);
                     }
 
                     Primitive {
@@ -460,12 +458,16 @@ impl Importer {
             textures,
             materials,
             indices_len: indices_data.len() as u32,
-            vertices: Arc::new(
-                vulkan.create_gpu_buffer(vk::BufferUsageFlags::VERTEX_BUFFER, &vertices_data),
-            ),
-            indices: Arc::new(
-                vulkan.create_gpu_buffer(vk::BufferUsageFlags::INDEX_BUFFER, &indices_data),
-            ),
+            vertices: Arc::new(vulkan.create_gpu_buffer(
+                vk::BufferUsageFlags::VERTEX_BUFFER,
+                &vertices_data,
+                (vertices_data.len() * std::mem::size_of::<Vertex>()) as u64,
+            )),
+            indices: Arc::new(vulkan.create_gpu_buffer(
+                vk::BufferUsageFlags::INDEX_BUFFER,
+                &indices_data,
+                (indices_data.len() * std::mem::size_of::<u32>()) as u64,
+            )),
         }
     }
 

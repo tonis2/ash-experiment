@@ -112,11 +112,12 @@ impl VkThread {
         &self,
         usage_flags: vk::BufferUsageFlags,
         data: &[T],
+        size: u64,
     ) -> Buffer {
-        let buffer_size = (data.len() * std::mem::size_of::<T>()) as ash::vk::DeviceSize;
-
+       
+ 
         let staging_buffer = Buffer::new_mapped_basic(
-            buffer_size,
+            size,
             vk::BufferUsageFlags::TRANSFER_SRC,
             vk_mem::MemoryUsage::CpuOnly,
             self.context(),
@@ -125,7 +126,7 @@ impl VkThread {
         staging_buffer.upload_to_buffer::<T>(&data, 0);
 
         let vertex_buffer = Buffer::new_mapped_basic(
-            buffer_size,
+            size,
             vk::BufferUsageFlags::TRANSFER_DST | usage_flags,
             vk_mem::MemoryUsage::GpuOnly,
             self.context(),
@@ -134,7 +135,7 @@ impl VkThread {
         let copy_regions = vec![vk::BufferCopy {
             src_offset: 0,
             dst_offset: 0,
-            size: buffer_size,
+            size: size,
         }];
 
         self.copy_buffer_to_buffer(staging_buffer, &vertex_buffer, copy_regions);

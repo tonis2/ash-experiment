@@ -139,10 +139,14 @@ impl Pipeline {
         //Create uniform buffer
 
         let uniform_data = create_uniform_data(&swapchain);
-        let uniform_buffer = vulkan.create_gpu_buffer::<UniformBufferObject>(
+ 
+
+        let uniform_buffer = vulkan.create_gpu_buffer(
             vk::BufferUsageFlags::UNIFORM_BUFFER,
             &[uniform_data],
+            std::mem::size_of::<UniformBufferObject>() as u64,
         );
+    
 
         let pipeline_descriptor = Descriptor::new(
             vec![

@@ -7,7 +7,10 @@ use vulkan::{
 };
 
 use super::definitions::{PushTransform, SpecializationData};
-use examples::utils::{gltf_importer::{Scene, MaterialRaw, Vertex}, Camera, CameraRaw};
+use examples::utils::{
+    gltf_importer::{MaterialRaw, Scene, Vertex},
+    Camera, CameraRaw,
+};
 use std::{default::Default, ffi::CString, mem, path::Path, sync::Arc};
 
 pub struct Pipeline {
@@ -27,18 +30,10 @@ pub struct Pipeline {
 
 impl Pipeline {
     //Creates a new pipeline
-    pub fn build_for(
-        scene: &Scene,
-        swapchain: &Swapchain,
-        vulkan: &VkThread,
-    ) -> Pipeline {
+    pub fn build_for(scene: &Scene, swapchain: &Swapchain, vulkan: &VkThread) -> Pipeline {
         let context = vulkan.context();
         //Create buffer data
-        let camera = Camera::new(
-            cgmath::Point3::new(0.0, 0.0, 0.0),
-            15.0,
-            1.3,
-        );
+        let camera = Camera::new(cgmath::Point3::new(0.0, 0.0, 0.0), 15.0, 1.3);
         let depth_image = examples::create_depth_resources(&swapchain, context.clone());
         let uniform_buffer = Buffer::new_mapped_basic(
             mem::size_of::<CameraRaw>() as u64,
@@ -49,19 +44,37 @@ impl Pipeline {
 
         uniform_buffer.upload_to_buffer(&[camera.raw()], 0);
 
-        let material_buffer = Buffer::new_mapped_basic(
-            scene.materials.len() as u64 * context.get_ubo_alignment::<MaterialRaw>() as u64,
-            vk::BufferUsageFlags::UNIFORM_BUFFER,
+        let buffer_size =
+            scene.materials.len() as u64 * context.get_ubo_alignment::<MaterialRaw>() as u64;
+
+        let staging_buffer = Buffer::new_mapped_basic(
+            buffer_size,
+            vk::BufferUsageFlags::TRANSFER_SRC,
             vk_mem::MemoryUsage::CpuOnly,
             context.clone(),
         );
 
         if scene.materials.len() > 0 {
-            material_buffer.upload_to_buffer(&scene.get_raw_materials()[..], 0);
+            staging_buffer.upload_to_buffer::<MaterialRaw>(&scene.get_raw_materials()[..], 0);
         } else {
             //Upload empty material for shaders
-            material_buffer.upload_to_buffer(&[MaterialRaw::default()], 0);
+            staging_buffer.upload_to_buffer::<MaterialRaw>(&[MaterialRaw::default()], 0);
         }
+
+        let material_buffer = Buffer::new_mapped_basic(
+            buffer_size,
+            vk::BufferUsageFlags::TRANSFER_DST | vk::BufferUsageFlags::UNIFORM_BUFFER,
+            vk_mem::MemoryUsage::GpuOnly,
+            context.clone(),
+        );
+
+        let copy_regions = vec![vk::BufferCopy {
+            src_offset: 0,
+            dst_offset: 0,
+            size: material_buffer.size,
+        }];
+
+        vulkan.copy_buffer_to_buffer(staging_buffer, &material_buffer, copy_regions);
 
         let material_buffer_bindings: Vec<vk::DescriptorBufferInfo> = scene
             .materials
