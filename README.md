@@ -7,13 +7,15 @@ Many thanks to these [vulkan examples](https://github.com/unknownue/vulkan-tutor
 
 
 
-### Usage
+##### Usage
 ----
 
 Download assets `python3 ./download_assets.py` 
 
 
-Runing examples
+##### Running examples
+
+Open examples folders and run with --bin.
 
 ```
 cargo run --bin lights
@@ -21,6 +23,7 @@ cargo run --bin lights
 
 
 For shader building i used [glslang](https://github.com/KhronosGroup/glslang)
+
 example `glslangValidator -V *shader glsl* -o shader.spv`
 
 
@@ -28,5 +31,6 @@ example `glslangValidator -V *shader glsl* -o shader.spv`
 Platforms
 
  > windows 10
+ 
  > linux 18.04
 
