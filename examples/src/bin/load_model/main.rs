@@ -1,9 +1,11 @@
 mod pipeline;
 
+use examples::utils;
 use vulkan::{
-    prelude::*, utilities::FPSLimiter, Context, Framebuffer, Queue, Swapchain, VkThread,
+    prelude::*, utilities::as_byte_slice, utilities::FPSLimiter, Context, Framebuffer, Queue,
+    Swapchain, VkThread,
 };
-use winit::event::{ElementState, Event, KeyboardInput, VirtualKeyCode, WindowEvent};
+use winit::event::{Event, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop};
 
 use pipeline::{Pipeline, Vertex};
@@ -51,11 +53,17 @@ fn main() {
         .collect();
 
     let mut tick_counter = FPSLimiter::new();
-
+    let mut events = utils::events::Event::new();
     let extent = vk::Rect2D {
         offset: vk::Offset2D { x: 0, y: 0 },
         extent: swapchain.extent,
     };
+
+    let model_transform = pipeline::PushTransform::new(cgmath::Decomposed {
+        scale: 2.0,
+        rot: cgmath::Rotation3::from_angle_x(cgmath::Deg(180.0)),
+        disp: cgmath::Vector3::new(0.0, 0.0, 0.0),
+    });
 
     //Let's prebuild command buffers in this example
     for (image_index, _image) in swapchain.image_views.iter().enumerate() {
@@ -110,6 +118,13 @@ fn main() {
                     &[pipeline.pipeline_descriptor.set],
                     &[],
                 );
+                device.cmd_push_constants(
+                    command_buffer,
+                    pipeline.layout,
+                    vk::ShaderStageFlags::VERTEX,
+                    0,
+                    as_byte_slice(&model_transform),
+                );
                 device.cmd_set_viewport(command_buffer, 0, &viewports);
                 device.cmd_set_scissor(command_buffer, 0, &[extent]);
                 device.cmd_bind_vertex_buffers(command_buffer, 0, &[vertex_buffer.buffer], &[0]);
@@ -128,19 +143,17 @@ fn main() {
     event_loop.run(move |event, _, control_flow| match event {
         Event::WindowEvent { event, .. } => match event {
             WindowEvent::CloseRequested => *control_flow = ControlFlow::Exit,
-            WindowEvent::KeyboardInput { input, .. } => match input {
-                KeyboardInput {
-                    virtual_keycode,
-                    state,
-                    ..
-                } => match (virtual_keycode, state) {
-                    (Some(VirtualKeyCode::Escape), ElementState::Pressed) => {
-                        *control_flow = ControlFlow::Exit
-                    }
-                    _ => {}
-                },
-            },
-            _ => {}
+            _ => {
+                events.handle_event(event);
+                if events.event_happened {
+                    //Camera updates
+                    pipeline.camera.handle_events(&events);
+                    pipeline
+                        .camera_buffer
+                        .upload_to_buffer(&[pipeline.camera.raw()], 0);
+                    events.clear();
+                }
+            }
         },
         Event::MainEventsCleared => {
             window.request_redraw();
@@ -148,16 +161,6 @@ fn main() {
             tick_counter.tick_frame();
         }
         Event::RedrawRequested(_window_id) => {
-            let delta_time = tick_counter.delta_time();
-            pipeline.uniform_transform.model = cgmath::Matrix4::from_axis_angle(
-                cgmath::Vector3::new(0.0, 0.0, 1.0),
-                cgmath::Deg(90.0) * delta_time,
-            ) * pipeline.uniform_transform.model;
-
-            pipeline
-                .uniform_buffer
-                .upload_to_buffer(&[pipeline.uniform_transform], 0);
-
             let frame = queue.load_next_frame(&swapchain);
 
             if let Ok((image_index, _is_suboptimal)) = frame {

@@ -1,14 +1,25 @@
 use vulkan::{
-    modules::swapchain::Swapchain,
-    offset_of,
-    prelude::*,
-    Context, Descriptor, DescriptorSet, Shader, VkThread, Buffer, Image
+    modules::swapchain::Swapchain, offset_of, prelude::*, Buffer, Context, Descriptor,
+    DescriptorSet, Image, Shader, VkThread,
 };
 
-use cgmath::{Deg, Matrix4, Point3, Vector3};
+use examples::utils::Camera;
 use image::GenericImageView;
-
 use std::{default::Default, ffi::CString, mem, path::Path, ptr, sync::Arc};
+
+#[repr(C)]
+#[derive(Clone, Debug, Copy)]
+pub struct PushTransform {
+    pub model: cgmath::Matrix4<f32>,
+}
+
+impl PushTransform {
+    pub fn new(transform: cgmath::Decomposed<cgmath::Vector3<f32>, cgmath::Basis3<f32>>) -> Self {
+        Self {
+            model: transform.into(),
+        }
+    }
+}
 
 #[derive(Clone, Debug, Copy)]
 pub struct Vertex {
@@ -17,21 +28,13 @@ pub struct Vertex {
     pub tex_coord: [f32; 2],
 }
 
-#[repr(C)]
-#[derive(Clone, Debug, Copy)]
-pub struct UniformBufferObject {
-    pub model: Matrix4<f32>,
-    pub view: Matrix4<f32>,
-    pub proj: Matrix4<f32>,
-}
-
 pub struct Pipeline {
     pub pipeline: vk::Pipeline,
     pub layout: vk::PipelineLayout,
     pub texture: (Image, u32),
     pub depth_image: Image,
-    pub uniform_buffer: Buffer,
-    pub uniform_transform: UniformBufferObject,
+    pub camera_buffer: Buffer,
+    pub camera: Camera,
 
     pub pipeline_descriptor: Descriptor,
     pub renderpass: vk::RenderPass,
@@ -139,16 +142,16 @@ impl Pipeline {
 
         //Create uniform buffer
 
-        let uniform_data = create_uniform_data(&swapchain);
+        let camera = Camera::new(cgmath::Point3::new(0.0, 0.0, 0.0), 5.0, 1.3);
 
-        let uniform_buffer = Buffer::new_mapped_basic(
-            std::mem::size_of_val(&uniform_data) as u64,
+        let camera_buffer = Buffer::new_mapped_basic(
+            std::mem::size_of_val(&camera.raw()) as u64,
             vk::BufferUsageFlags::UNIFORM_BUFFER,
             vk_mem::MemoryUsage::CpuOnly,
             vulkan.context(),
         );
 
-        uniform_buffer.upload_to_buffer(&[uniform_data], 0);
+        camera_buffer.upload_to_buffer(&[camera.raw()], 0);
 
         let pipeline_descriptor = Descriptor::new(
             vec![
@@ -157,9 +160,9 @@ impl Pipeline {
                     flag: vk::ShaderStageFlags::VERTEX,
                     bind_type: vk::DescriptorType::UNIFORM_BUFFER,
                     buffer_info: Some(vec![vk::DescriptorBufferInfo {
-                        buffer: uniform_buffer.buffer,
+                        buffer: camera_buffer.buffer,
                         offset: 0,
-                        range: uniform_buffer.size,
+                        range: camera_buffer.size,
                     }]),
                     ..Default::default()
                 },
@@ -180,6 +183,11 @@ impl Pipeline {
 
         let layout_create_info = vk::PipelineLayoutCreateInfo::builder()
             .set_layouts(&[pipeline_descriptor.layout])
+            .push_constant_ranges(&[vk::PushConstantRange {
+                stage_flags: vk::ShaderStageFlags::VERTEX,
+                size: mem::size_of::<PushTransform>() as u32,
+                offset: 0,
+            }])
             .build();
 
         //Create pipeline stuff
@@ -238,8 +246,8 @@ impl Pipeline {
             texture: (texture, mip_levels),
             depth_image,
             context: vulkan.context(),
-            uniform_buffer,
-            uniform_transform: uniform_data,
+            camera,
+            camera_buffer,
             renderpass,
             pipeline_descriptor,
         }
@@ -259,27 +267,6 @@ impl Drop for Pipeline {
                 .device
                 .destroy_render_pass(self.renderpass, None);
         }
-    }
-}
-
-pub fn create_uniform_data(swapchain: &Swapchain) -> UniformBufferObject {
-    UniformBufferObject {
-        model: Matrix4::from_angle_z(Deg(90.0)),
-        view: Matrix4::look_at(
-            Point3::new(2.0, 2.0, 2.0),
-            Point3::new(0.0, 0.0, 0.0),
-            Vector3::new(0.0, 0.0, 1.0),
-        ),
-        proj: {
-            let proj = cgmath::perspective(
-                Deg(45.0),
-                swapchain.extent.width as f32 / swapchain.extent.height as f32,
-                0.1,
-                10.0,
-            );
-
-            examples::OPENGL_TO_VULKAN_MATRIX * proj
-        },
     }
 }
 

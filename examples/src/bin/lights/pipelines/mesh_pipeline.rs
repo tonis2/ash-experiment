@@ -3,9 +3,9 @@ use vulkan::{
     DescriptorSet, Image, Shader, VkThread,
 };
 
-use super::shadowmap_pipeline;
-use super::{Camera, Light, PushConstantModel, Vertex};
+use super::{Light, PushConstantModel, Vertex, shadowmap_pipeline};
 use std::{default::Default, ffi::CString, mem, path::Path, sync::Arc};
+use examples::utils::{Camera, CameraRaw};
 
 pub struct Pipeline {
     pub pipeline: vk::Pipeline,
@@ -51,7 +51,7 @@ impl Pipeline {
             vulkan.context(),
         );
 
-        uniform_buffer.upload_to_buffer(&[camera], 0);
+        uniform_buffer.upload_to_buffer(&[camera.raw()], 0);
         light_buffer.upload_to_buffer(&[light_data], 0);
 
         let push_constant_range = vk::PushConstantRange::builder()

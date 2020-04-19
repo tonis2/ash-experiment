@@ -6,8 +6,8 @@ use vulkan::{
     Buffer, Context, Descriptor, DescriptorSet, Image, VkThread,
 };
 
-use super::definitions::{Camera, CameraRaw, PushTransform, SpecializationData};
-use examples::gltf_importer::{self, MaterialRaw, Vertex};
+use super::definitions::{PushTransform, SpecializationData};
+use examples::utils::{gltf_importer::{Scene, MaterialRaw, Vertex}, Camera, CameraRaw};
 use std::{default::Default, ffi::CString, mem, path::Path, sync::Arc};
 
 pub struct Pipeline {
@@ -28,13 +28,17 @@ pub struct Pipeline {
 impl Pipeline {
     //Creates a new pipeline
     pub fn build_for(
-        scene: &gltf_importer::Scene,
+        scene: &Scene,
         swapchain: &Swapchain,
         vulkan: &VkThread,
     ) -> Pipeline {
         let context = vulkan.context();
         //Create buffer data
-        let camera = Camera::new(cgmath::Point2::new(0.0, 5.0), 15.0, 1.3);
+        let camera = Camera::new(
+            cgmath::Point3::new(0.0, 0.0, 0.0),
+            15.0,
+            1.3,
+        );
         let depth_image = examples::create_depth_resources(&swapchain, context.clone());
         let uniform_buffer = Buffer::new_mapped_basic(
             mem::size_of::<CameraRaw>() as u64,

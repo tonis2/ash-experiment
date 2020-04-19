@@ -4,7 +4,7 @@ use vulkan::{
     Swapchain, VkThread,
 };
 
-use examples::gltf_importer;
+use examples::utils::{gltf_importer, events};
 use pipelines::{definitions::PushTransform, mesh_pipeline};
 use std::{path::Path, sync::Arc};
 use winit::event::{Event, WindowEvent};
@@ -47,7 +47,7 @@ fn main() {
         .collect();
 
     let mut tick_counter = FPSLimiter::new();
-    let mut events = examples::events::Event::new();
+    let mut events = events::Event::new();
     event_loop.run(move |event, _, control_flow| match event {
         Event::WindowEvent { event, .. } => match event {
             WindowEvent::CloseRequested => *control_flow = ControlFlow::Exit,
@@ -75,23 +75,20 @@ fn main() {
             }
             _ => {
                 events.handle_event(event);
-                //Camera updates
-                mesh_pipeline.camera.handle_events(&events);
-
-                events.clear();
+                if events.event_happened {
+                    //Camera updates
+                    mesh_pipeline.camera.handle_events(&events);
+                    mesh_pipeline
+                        .uniform_buffer
+                        .upload_to_buffer(&[mesh_pipeline.camera.raw()], 0);
+                    events.clear();
+                }
             }
         },
         Event::MainEventsCleared => {
             window.request_redraw();
-            // mesh_pipeline.camera.position.x += tick_counter.delta_time().sin() * 10.0;
-            // mesh_pipeline.camera.zoom += tick_counter.delta_time().cos() * 10.0;
-            // println!("{:?}", mesh_pipeline.camera.position.x);
-            mesh_pipeline.camera.handle_events(&events);
-            mesh_pipeline
-                .uniform_buffer
-                .upload_to_buffer(&[mesh_pipeline.camera.raw()], 0);
 
-            print!("FPS: {}\r", tick_counter.fps());
+            // print!("FPS: {}\r", tick_counter.fps());
             tick_counter.tick_frame();
         }
         Event::RedrawRequested(_window_id) => {

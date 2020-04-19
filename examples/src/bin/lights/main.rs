@@ -6,10 +6,11 @@ use vulkan::{
     Context, Framebuffer, Queue, Swapchain, VkThread,
 };
 
-use pipelines::{mesh_pipeline, Camera, Light, PushConstantModel, Vertex};
+use examples::utils::{events, Camera};
+use pipelines::{mesh_pipeline, Light, PushConstantModel, Vertex};
 use std::path::Path;
 use std::sync::Arc;
-use winit::event::{ElementState, Event, KeyboardInput, VirtualKeyCode, WindowEvent};
+use winit::event::{Event, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop};
 
 fn main() {
@@ -20,7 +21,7 @@ fn main() {
         .build(&event_loop)
         .expect("Failed to create window.");
 
-    let camera = Camera::new(800.0 / 600.0, cgmath::Point3::new(0.0, 8.0, 20.0));
+    let mut camera = Camera::new(cgmath::Point3::new(0.0, 0.0, 0.0), 15.0, 1.3);
 
     let light = Light::new(
         cgmath::Vector4::new(6.0, 7.0, 5.0, 1.0),
@@ -80,6 +81,7 @@ fn main() {
         instance.create_gpu_buffer(vk::BufferUsageFlags::INDEX_BUFFER, &ball_batch.indices);
 
     let mut tick_counter = FPSLimiter::new();
+    let mut events = events::Event::new();
 
     let mut scene_data = PushConstantModel::new(
         cgmath::Decomposed {
@@ -103,19 +105,15 @@ fn main() {
         Event::WindowEvent { event, .. } => match event {
             WindowEvent::CloseRequested => *control_flow = ControlFlow::Exit,
             WindowEvent::Resized(_) => {}
-            WindowEvent::KeyboardInput { input, .. } => match input {
-                KeyboardInput {
-                    virtual_keycode,
-                    state,
-                    ..
-                } => match (virtual_keycode, state) {
-                    (Some(VirtualKeyCode::Escape), ElementState::Pressed) => {
-                        *control_flow = ControlFlow::Exit
-                    }
-                    _ => {}
-                },
-            },
-            _ => {}
+            _ => {
+                events.handle_event(event);
+                if events.event_happened {
+                    //Camera updates
+                    camera.handle_events(&events);
+                    pipeline.uniform_buffer.upload_to_buffer(&[camera.raw()], 0);
+                    events.clear();
+                }
+            }
         },
         Event::MainEventsCleared => {
             window.request_redraw();

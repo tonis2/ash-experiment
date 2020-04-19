@@ -99,6 +99,7 @@ pub struct Event {
     pub keyboard: Keyboard,
     pub dpi_factor: f64,
     pub resized: bool,
+    pub event_happened: bool,
 }
 
 impl Event {
@@ -108,7 +109,12 @@ impl Event {
             keyboard: Keyboard::new(),
             dpi_factor: 1.0,
             resized: false,
+            event_happened: false,
         }
+    }
+
+    pub fn event_status(&mut self, status: bool) {
+        self.event_happened = status;
     }
 
     pub fn handle_event(&mut self, event: WindowEvent) {
@@ -117,12 +123,14 @@ impl Event {
                 if let Some(keycode) = input.virtual_keycode {
                     match input.state {
                         ElementState::Pressed => {
+                            self.event_status(true);
                             self.keyboard.keys_pressed.insert(keycode as usize);
                             // if let VirtualKeyCode::Back = keycode {
                             //     self.text.push(TextChar::Back);
                             // }
                         }
                         ElementState::Released => {
+                            self.event_status(true);
                             self.keyboard.keys_pressed.remove(&(keycode as usize));
                         }
                     }
@@ -133,9 +141,11 @@ impl Event {
                 //     self.text.push(TextChar::Char(c));
                 // }
             }
-            WindowEvent::CursorMoved { position, .. } => self
-                .mouse
-                .set_position(position.x as u32, position.y as u32),
+            WindowEvent::CursorMoved { position, .. } => {
+                self.event_status(true);
+                self.mouse
+                    .set_position(position.x as u32, position.y as u32)
+            }
             WindowEvent::MouseInput {
                 state: ElementState::Pressed,
                 button,
@@ -147,6 +157,7 @@ impl Event {
                 ..
             } => self.mouse.button_released(button),
             WindowEvent::MouseWheel { delta, .. } => {
+                self.event_status(true);
                 const PIXELS_PER_LINE: f64 = 38.0;
                 // println!("{:?}", delta);
                 match delta {
@@ -165,6 +176,7 @@ impl Event {
     pub fn clear(&mut self) {
         self.resized = false;
         self.mouse.scroll_diff = 0.0;
+        self.event_happened = false;
         self.mouse.position_delta = Vector2::new(0.0, 0.0);
     }
 }
