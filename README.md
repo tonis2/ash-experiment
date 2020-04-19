@@ -7,13 +7,15 @@ Many thanks to these [vulkan examples](https://github.com/unknownue/vulkan-tutor
 
 
 
-### Usage
+##### Usage
 ----
 
 Download assets `python3 ./download_assets.py` 
 
 
-Runing examples
+##### Running examples
+
+Open examples folders and run with --bin
 
 ```
 cargo run --bin lights
