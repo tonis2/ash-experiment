@@ -9,6 +9,9 @@ pub struct Camera {
     aspect: f32,
     yaw: f32,   //Rotation around x-axis, left-to-right
     pitch: f32, //Rotation around y-axis, top-down
+
+    pub min_zoom: f32,
+    pub max_zoom: f32,
 }
 
 impl Camera {
@@ -20,6 +23,8 @@ impl Camera {
             aspect,
             yaw: -90.0,
             pitch: 50.0,
+            min_zoom: 0.0,
+            max_zoom: 100.0
         };
         camera.calculate_eye_position();
         camera
@@ -39,11 +44,8 @@ impl Camera {
     }
 
     pub fn add_zoom(&mut self, value: f32) {
-        const MIN_ZOOM: f32 = 1.0;
-        const MAX_ZOOM: f32 = 25.0;
-
         //Min max zoom amount
-        if (self.zoom + value).abs() > MIN_ZOOM && (self.zoom + value).abs() < MAX_ZOOM {
+        if (self.zoom + value).abs() > self.min_zoom && (self.zoom + value).abs() < self.max_zoom {
             self.zoom += value;
         }
     }

@@ -41,7 +41,7 @@ impl Descriptor {
             .iter()
             .map(|set| vk::DescriptorPoolSize {
                 ty: set.bind_type,
-                descriptor_count: context.image_count,
+                descriptor_count: set.count,
             })
             .collect();
 
