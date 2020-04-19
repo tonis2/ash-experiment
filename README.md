@@ -28,5 +28,6 @@ example `glslangValidator -V *shader glsl* -o shader.spv`
 Platforms
 
  > windows 10
+ 
  > linux 18.04
 
