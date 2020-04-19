@@ -5,7 +5,7 @@ use vulkan::{
 
 use super::{Light, PushConstantModel, Vertex, shadowmap_pipeline};
 use std::{default::Default, ffi::CString, mem, path::Path, sync::Arc};
-use examples::utils::{Camera, CameraRaw};
+use examples::utils::Camera;
 
 pub struct Pipeline {
     pub pipeline: vk::Pipeline,
