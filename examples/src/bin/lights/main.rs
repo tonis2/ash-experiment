@@ -69,30 +69,18 @@ fn main() {
 
     let scene_batch = load_model(Path::new("assets/lights.obj"));
 
-    let scene_index_buffer = instance.create_gpu_buffer(
-        vk::BufferUsageFlags::INDEX_BUFFER,
-        &scene_batch.indices,
-        (scene_batch.indices.len() * std::mem::size_of::<u64>()) as u64,
-    );
-    let scene_vertex_buffer = instance.create_gpu_buffer(
-        vk::BufferUsageFlags::VERTEX_BUFFER,
-        &scene_batch.vertices,
-        (scene_batch.vertices.len() * std::mem::size_of::<Vertex>()) as u64,
-    );
+    let scene_index_buffer =
+        instance.create_gpu_buffer(vk::BufferUsageFlags::INDEX_BUFFER, &scene_batch.indices);
+    let scene_vertex_buffer =
+        instance.create_gpu_buffer(vk::BufferUsageFlags::VERTEX_BUFFER, &scene_batch.vertices);
 
     let ball_batch = load_model(Path::new("assets/ball.obj"));
 
-    let ball_index_buffer = instance.create_gpu_buffer(
-        vk::BufferUsageFlags::INDEX_BUFFER,
-        &ball_batch.indices,
-        (ball_batch.indices.len() * std::mem::size_of::<u64>()) as u64,
-    );
+    let ball_index_buffer =
+        instance.create_gpu_buffer(vk::BufferUsageFlags::INDEX_BUFFER, &ball_batch.indices);
 
-    let ball_vertex_buffer = instance.create_gpu_buffer(
-        vk::BufferUsageFlags::VERTEX_BUFFER,
-        &ball_batch.vertices,
-        (ball_batch.vertices.len() * std::mem::size_of::<Vertex>()) as u64,
-    );
+    let ball_vertex_buffer =
+        instance.create_gpu_buffer(vk::BufferUsageFlags::VERTEX_BUFFER, &ball_batch.vertices);
 
     let mut tick_counter = FPSLimiter::new();
     let mut events = events::Event::new();

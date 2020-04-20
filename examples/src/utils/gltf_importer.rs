@@ -463,12 +463,10 @@ impl Importer {
             vertices: Arc::new(vulkan.create_gpu_buffer(
                 vk::BufferUsageFlags::VERTEX_BUFFER,
                 &vertices_data,
-                (vertices_data.len() * std::mem::size_of::<Vertex>()) as u64,
             )),
             indices: Arc::new(vulkan.create_gpu_buffer(
                 vk::BufferUsageFlags::INDEX_BUFFER,
                 &indices_data,
-                (indices_data.len() * std::mem::size_of::<u32>()) as u64,
             )),
         }
     }

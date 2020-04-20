@@ -66,7 +66,6 @@ impl Pipeline {
         let uniform_buffer = vulkan.create_gpu_buffer(
             vk::BufferUsageFlags::UNIFORM_BUFFER,
             &[uniform_data],
-            std::mem::size_of::<UniformBufferObject>() as u64,
         );
 
         let pipeline_descriptor = Descriptor::new(

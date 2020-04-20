@@ -43,12 +43,10 @@ fn main() {
     let index_buffer = instance.create_gpu_buffer(
         vk::BufferUsageFlags::INDEX_BUFFER,
         &indices,
-        (indices.len() * std::mem::size_of::<u64>()) as u64,
     );
     let vertex_buffer = instance.create_gpu_buffer(
         vk::BufferUsageFlags::VERTEX_BUFFER,
         &vertices,
-        (vertices.len() * std::mem::size_of::<Vertex>()) as u64,
     );
 
     let command_buffers = instance.create_command_buffers(swapchain.image_views.len());

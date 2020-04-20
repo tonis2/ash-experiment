@@ -112,10 +112,8 @@ impl VkThread {
         &self,
         usage_flags: vk::BufferUsageFlags,
         data: &[T],
-        size: u64,
     ) -> Buffer {
-       
- 
+        let size = (data.len() * std::mem::size_of::<T>()) as u64;
         let staging_buffer = Buffer::new_mapped_basic(
             size,
             vk::BufferUsageFlags::TRANSFER_SRC,
