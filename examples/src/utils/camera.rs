@@ -22,8 +22,8 @@ impl Camera {
             aspect,
             yaw: -90.0,
             pitch: 50.0,
-            min_zoom: 0.0,
-            max_zoom: 100.0,
+            min_zoom: 0.1,
+            max_zoom: 40.0,
         };
         camera.calculate_eye_position();
         camera
@@ -141,7 +141,7 @@ impl Camera {
             position: self.eye.to_homogeneous(),
             view,
             proj: {
-                let proj = cgmath::perspective(Deg(45.0), self.aspect, 0.1, 70.0);
+                let proj = cgmath::perspective(Deg(45.0), self.aspect, self.min_zoom, self.max_zoom);
                 super::super::OPENGL_TO_VULKAN_MATRIX * proj
             },
         }
