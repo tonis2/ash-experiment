@@ -25,16 +25,16 @@ impl Camera {
             min_zoom: 0.1,
             max_zoom: 40.0,
         };
-        camera.calculate_eye_position();
+        camera.eye_offset();
         camera
     }
 
-    fn calculate_eye_position(&mut self) {
+    fn eye_offset(&mut self) {
         //Calculate the distances from camera to our focus point
 
         let horizontal_distance = self.zoom * self.pitch.to_radians().cos();
         let vertical_distance = self.zoom * self.pitch.to_radians().sin();
-        
+
         self.eye = cgmath::Point3::new(
             self.focus.x - horizontal_distance * self.yaw.to_radians().sin(),
             self.focus.y + vertical_distance,
@@ -66,23 +66,14 @@ impl Camera {
         }
     }
 
-    pub fn camera_offset(&mut self, offset: cgmath::Vector3<f32>) {
+    pub fn scene_offset(&mut self, offset: cgmath::Vector3<f32>) {
         const Y_MOVE: f32 = 0.05;
         const X_MOVE: f32 = 0.01;
-        
-        //Check has rotation done the degrees
-        fn calculate_rotation(rotation: f32, degree: f32) -> bool {
-            (rotation / degree.abs() % 2.0).floor().abs() > 0.0
-        }
 
-        if calculate_rotation(self.yaw, 180.0) {
-            self.eye.z -= offset.x * X_MOVE;
-            self.focus.z -= offset.x * X_MOVE;
-        } else {
-            self.eye.z += offset.x * X_MOVE;
-            self.focus.z += offset.x * X_MOVE;
-        }
-
+        self.eye.x -= offset.z * X_MOVE;
+        self.focus.x -= offset.z * X_MOVE;
+        self.eye.z += offset.x * X_MOVE;
+        self.focus.z += offset.x * X_MOVE;
         self.eye.y -= offset.y * Y_MOVE;
         self.focus.y -= offset.y * Y_MOVE;
     }
@@ -118,10 +109,13 @@ impl Camera {
 
         if events.mouse.on_left_click() {
             let mouse_pos = events.mouse.position_delta();
-            self.camera_offset(cgmath::Vector3::new(mouse_pos.x, mouse_pos.y, 0.0));
+            let offset_x = mouse_pos.x * self.pitch.to_radians().cos() * self.yaw.to_radians().sin();
+            let offset_z = mouse_pos.x * self.pitch.to_radians().cos() * self.yaw.to_radians().cos();
+            let offset_y = mouse_pos.y;
+            self.scene_offset(cgmath::Vector3::new(offset_x, offset_y, offset_z));
         }
 
-        self.calculate_eye_position();
+        self.eye_offset();
     }
 }
 
@@ -141,7 +135,8 @@ impl Camera {
             position: self.eye.to_homogeneous(),
             view,
             proj: {
-                let proj = cgmath::perspective(Deg(45.0), self.aspect, self.min_zoom, self.max_zoom);
+                let proj =
+                    cgmath::perspective(Deg(45.0), self.aspect, self.min_zoom, self.max_zoom);
                 super::super::OPENGL_TO_VULKAN_MATRIX * proj
             },
         }
