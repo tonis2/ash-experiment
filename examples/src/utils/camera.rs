@@ -67,15 +67,12 @@ impl Camera {
     }
 
     pub fn scene_offset(&mut self, offset: cgmath::Vector3<f32>) {
-        const Y_MOVE: f32 = 0.05;
-        const X_MOVE: f32 = 0.01;
-
-        self.eye.x -= offset.z * X_MOVE;
-        self.focus.x -= offset.z * X_MOVE;
-        self.eye.z += offset.x * X_MOVE;
-        self.focus.z += offset.x * X_MOVE;
-        self.eye.y -= offset.y * Y_MOVE;
-        self.focus.y -= offset.y * Y_MOVE;
+        self.eye.x -= offset.z;
+        self.focus.x -= offset.z;
+        self.eye.z += offset.x;
+        self.focus.z += offset.x;
+        self.eye.y -= offset.y;
+        self.focus.y -= offset.y;
     }
 
     pub fn handle_events(&mut self, events: &Event) {
@@ -108,10 +105,14 @@ impl Camera {
         }
 
         if events.mouse.on_left_click() {
+            const Y_MOVE: f32 = 0.03;
+            const X_MOVE: f32 = 0.01;
             let mouse_pos = events.mouse.position_delta();
-            let offset_x = mouse_pos.x * self.pitch.to_radians().cos() * self.yaw.to_radians().sin();
-            let offset_z = mouse_pos.x * self.pitch.to_radians().cos() * self.yaw.to_radians().cos();
-            let offset_y = mouse_pos.y;
+            let offset_x =
+                mouse_pos.x * self.pitch.to_radians().cos() * self.yaw.to_radians().sin() * X_MOVE;
+            let offset_z =
+                mouse_pos.x * self.pitch.to_radians().cos() * self.yaw.to_radians().cos() * X_MOVE;
+            let offset_y = mouse_pos.y * Y_MOVE;
             self.scene_offset(cgmath::Vector3::new(offset_x, offset_y, offset_z));
         }
 
