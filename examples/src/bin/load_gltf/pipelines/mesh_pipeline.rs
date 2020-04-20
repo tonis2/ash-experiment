@@ -227,13 +227,13 @@ impl Pipeline {
                                     vk::VertexInputAttributeDescription {
                                         binding: 0,
                                         location: 1,
-                                        format: vk::Format::R32G32_SFLOAT,
+                                        format: vk::Format::R32G32B32A32_SFLOAT,
                                         offset: offset_of!(Vertex, color) as u32,
                                     },
                                     vk::VertexInputAttributeDescription {
                                         binding: 0,
                                         location: 2,
-                                        format: vk::Format::R32G32_SFLOAT,
+                                        format: vk::Format::R32G32B32_SFLOAT,
                                         offset: offset_of!(Vertex, normal) as u32,
                                     },
                                     vk::VertexInputAttributeDescription {
@@ -245,7 +245,7 @@ impl Pipeline {
                                     vk::VertexInputAttributeDescription {
                                         binding: 0,
                                         location: 4,
-                                        format: vk::Format::R16_SINT,
+                                        format: vk::Format::R32_SINT,
                                         offset: offset_of!(Vertex, material_id) as u32,
                                     },
                                 ])

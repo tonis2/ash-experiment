@@ -409,6 +409,7 @@ impl Importer {
                     let uvs: Vec<[f32; 2]> = reader
                         .read_tex_coords(0)
                         .map_or(vec![], |uvs| uvs.into_f32().collect());
+
                     let material_id: Option<isize> =
                         primitive.material().index().map(|num| num as isize);
                     let vertices: Vec<Vertex> = reader
@@ -453,21 +454,19 @@ impl Importer {
                 primitives,
             });
         }
-
+      
         Scene {
             meshes,
             nodes,
             textures,
             materials,
             indices_len: indices_data.len() as u32,
-            vertices: Arc::new(vulkan.create_gpu_buffer(
-                vk::BufferUsageFlags::VERTEX_BUFFER,
-                &vertices_data,
-            )),
-            indices: Arc::new(vulkan.create_gpu_buffer(
-                vk::BufferUsageFlags::INDEX_BUFFER,
-                &indices_data,
-            )),
+            vertices: Arc::new(
+                vulkan.create_gpu_buffer(vk::BufferUsageFlags::VERTEX_BUFFER, &vertices_data),
+            ),
+            indices: Arc::new(
+                vulkan.create_gpu_buffer(vk::BufferUsageFlags::INDEX_BUFFER, &indices_data),
+            ),
         }
     }
 

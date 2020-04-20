@@ -42,7 +42,7 @@ void main() {
         Material mesh_material = materials[material_index];
         
         //Apply Material data to mesh
-        if (mesh_material.color_texture.index >= 0) {
+        if (mesh_material.color_texture.index != -1) {
              outColor = texture(textureSampler[mesh_material.color_texture.index], uv);
         }
     } else {

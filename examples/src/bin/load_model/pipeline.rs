@@ -67,7 +67,7 @@ impl Pipeline {
                 vk::VertexInputAttributeDescription {
                     binding: 0,
                     location: 2,
-                    format: vk::Format::R32G32_SFLOAT,
+                    format: vk::Format::R32G32B32_SFLOAT,
                     offset: offset_of!(Vertex, tex_coord) as u32,
                 },
             ])
