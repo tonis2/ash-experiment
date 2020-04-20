@@ -34,13 +34,11 @@ impl Camera {
 
         let horizontal_distance = self.zoom * self.pitch.to_radians().cos();
         let vertical_distance = self.zoom * self.pitch.to_radians().sin();
-        let offset_x: f32 = horizontal_distance * self.yaw.to_radians().sin();
-        let offset_z: f32 = horizontal_distance * self.yaw.to_radians().cos();
-
+        
         self.eye = cgmath::Point3::new(
-            self.focus.x - offset_x,
+            self.focus.x - horizontal_distance * self.yaw.to_radians().sin(),
             self.focus.y + vertical_distance,
-            self.focus.z - offset_z,
+            self.focus.z - horizontal_distance * self.yaw.to_radians().cos(),
         );
     }
 
@@ -66,6 +64,27 @@ impl Camera {
         if self.pitch < -MAX_TURN {
             self.pitch = -MAX_TURN;
         }
+    }
+
+    pub fn camera_offset(&mut self, offset: cgmath::Vector3<f32>) {
+        const Y_MOVE: f32 = 0.05;
+        const X_MOVE: f32 = 0.01;
+        
+        //Check has rotation done the degrees
+        fn calculate_rotation(rotation: f32, degree: f32) -> bool {
+            (rotation / degree.abs() % 2.0).floor().abs() > 0.0
+        }
+
+        if calculate_rotation(self.yaw, 180.0) {
+            self.eye.z -= offset.x * X_MOVE;
+            self.focus.z -= offset.x * X_MOVE;
+        } else {
+            self.eye.z += offset.x * X_MOVE;
+            self.focus.z += offset.x * X_MOVE;
+        }
+
+        self.eye.y -= offset.y * Y_MOVE;
+        self.focus.y -= offset.y * Y_MOVE;
     }
 
     pub fn handle_events(&mut self, events: &Event) {
@@ -99,24 +118,7 @@ impl Camera {
 
         if events.mouse.on_left_click() {
             let mouse_pos = events.mouse.position_delta();
-            const Y_MOVE: f32 = 0.05;
-            const X_MOVE: f32 = 0.01;
-
-            //Check what way yaw rotation direction is
-            fn calculate_rotation(rotation: f32, amount: f32) -> bool {
-                (rotation / amount.abs()).floor().abs() % 2.0 > 0.0
-            }
-
-            if calculate_rotation(self.yaw, 180.0) {
-                self.eye.z -= mouse_pos.x * X_MOVE;
-                self.focus.z -= mouse_pos.x * X_MOVE;
-            } else {
-                self.eye.z += mouse_pos.x * X_MOVE;
-                self.focus.z += mouse_pos.x * X_MOVE;
-            }
-
-            self.eye.y -= mouse_pos.y * Y_MOVE * self.yaw.sin();
-            self.focus.y -= mouse_pos.y * Y_MOVE * self.yaw.sin();
+            self.camera_offset(cgmath::Vector3::new(mouse_pos.x, mouse_pos.y, 0.0));
         }
 
         self.calculate_eye_position();
