@@ -55,8 +55,6 @@ fn main() {
                 //Drop GLTF file on running window to load new file
                 println!("Loading model at {:?}", path);
                 scene = gltf_importer::Importer::load(&path).build(&instance);
-                println!("{:?}", scene.meshes.len());
-                println!("{:?}", scene.materials.len());
                 mesh_pipeline = mesh_pipeline::Pipeline::build_for(&scene, &swapchain, &instance);
                 framebuffers = swapchain
                     .image_views
@@ -90,7 +88,7 @@ fn main() {
         Event::MainEventsCleared => {
             window.request_redraw();
 
-            print!("FPS: {}\r", tick_counter.fps());
+            // print!("FPS: {}\r", tick_counter.fps());
             tick_counter.tick_frame();
         }
         Event::RedrawRequested(_window_id) => {
@@ -172,25 +170,25 @@ fn main() {
                                         primitive.indice_offset as u64,
                                         vk::IndexType::UINT32,
                                     );
-                                });
 
-                                device.cmd_push_constants(
-                                    command_buffer,
-                                    mesh_pipeline.layout,
-                                    vk::ShaderStageFlags::VERTEX,
-                                    0,
-                                    as_byte_slice(&PushTransform {
-                                        transform: node.transform_matrix,
-                                    }),
-                                );
-                                device.cmd_draw_indexed(
-                                    command_buffer,
-                                    scene.indices_len,
-                                    1,
-                                    0,
-                                    0,
-                                    1,
-                                );
+                                    device.cmd_push_constants(
+                                        command_buffer,
+                                        mesh_pipeline.layout,
+                                        vk::ShaderStageFlags::VERTEX,
+                                        0,
+                                        as_byte_slice(&PushTransform {
+                                            transform: node.transform_matrix,
+                                        }),
+                                    );
+                                    device.cmd_draw_indexed(
+                                        command_buffer,
+                                        primitive.indices_len as u32,
+                                        1,
+                                        0,
+                                        0,
+                                        0,
+                                    );
+                                });
                             }
                         }
 

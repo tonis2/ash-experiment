@@ -44,9 +44,10 @@ pub struct Node {
 #[derive(Clone, Debug)]
 pub struct Primitive {
     pub vertex_offset: usize,
-    pub indice_offset: u64,
+    pub indice_offset: u32,
     pub material_id: Option<isize>,
     pub vertice_len: usize,
+    pub indices_len: usize,
     pub primitive_topology: vk::PrimitiveTopology,
 }
 #[allow(dead_code)]
@@ -425,12 +426,12 @@ impl Importer {
 
                     vertices_data.extend_from_slice(&vertices);
 
-                    let mut indice_offset: u64 = 0;
-
+                    let mut indice_offset: u32 = 0;
+                    let mut indices_len: usize = 0;
                     if indices.is_some() {
                         let current_indices = &indices.unwrap();
-
-                        indice_offset = (current_indices.len() * std::mem::size_of::<u32>()) as u64;
+                        indices_len = current_indices.len();
+                        indice_offset = (indices_data.len() * std::mem::size_of::<u32>()) as u32;
                         indices_data.extend_from_slice(current_indices);
                     }
 
@@ -438,6 +439,7 @@ impl Importer {
                         vertex_offset: (vertices_data.len() - vertices.len())
                             * std::mem::size_of::<Vertex>(),
                         indice_offset,
+                        indices_len,
                         material_id,
                         vertice_len: vertices.len(),
                         primitive_topology,

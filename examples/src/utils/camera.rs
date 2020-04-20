@@ -9,7 +9,6 @@ pub struct Camera {
     aspect: f32,
     yaw: f32,   //Rotation around x-axis, left-to-right
     pitch: f32, //Rotation around y-axis, top-down
-
     pub min_zoom: f32,
     pub max_zoom: f32,
 }
@@ -24,7 +23,7 @@ impl Camera {
             yaw: -90.0,
             pitch: 50.0,
             min_zoom: 0.0,
-            max_zoom: 100.0
+            max_zoom: 100.0,
         };
         camera.calculate_eye_position();
         camera
@@ -32,10 +31,12 @@ impl Camera {
 
     fn calculate_eye_position(&mut self) {
         //Calculate the distances from camera to our focus point
+
         let horizontal_distance = self.zoom * self.pitch.to_radians().cos();
         let vertical_distance = self.zoom * self.pitch.to_radians().sin();
         let offset_x: f32 = horizontal_distance * self.yaw.to_radians().sin();
         let offset_z: f32 = horizontal_distance * self.yaw.to_radians().cos();
+
         self.eye = cgmath::Point3::new(
             self.focus.x - offset_x,
             self.focus.y + vertical_distance,
@@ -95,6 +96,29 @@ impl Camera {
             self.rotate_x(mouse_pos.x);
             self.rotate_y(mouse_pos.y);
         }
+
+        if events.mouse.on_left_click() {
+            let mouse_pos = events.mouse.position_delta();
+            const Y_MOVE: f32 = 0.05;
+            const X_MOVE: f32 = 0.01;
+
+            //Check what way yaw rotation direction is
+            fn calculate_rotation(rotation: f32, amount: f32) -> bool {
+                (rotation / amount.abs()).floor().abs() % 2.0 > 0.0
+            }
+
+            if calculate_rotation(self.yaw, 180.0) {
+                self.eye.z -= mouse_pos.x * X_MOVE;
+                self.focus.z -= mouse_pos.x * X_MOVE;
+            } else {
+                self.eye.z += mouse_pos.x * X_MOVE;
+                self.focus.z += mouse_pos.x * X_MOVE;
+            }
+
+            self.eye.y -= mouse_pos.y * Y_MOVE * self.yaw.sin();
+            self.focus.y -= mouse_pos.y * Y_MOVE * self.yaw.sin();
+        }
+
         self.calculate_eye_position();
     }
 }
