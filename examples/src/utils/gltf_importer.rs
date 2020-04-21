@@ -1,7 +1,9 @@
 use gltf::{
+    khr_lights_punctual::{Kind, Light as GltfLight},
     material::{AlphaMode, Material as GltfMaterial, NormalTexture, OcclusionTexture},
     scene::Transform,
 };
+
 use std::{path::Path, sync::Arc};
 use vulkan::{prelude::*, Buffer, Image, VkThread};
 
@@ -16,6 +18,7 @@ pub struct Scene {
     pub nodes: Vec<Node>,
     pub textures: Vec<Image>,
     pub materials: Vec<Material>,
+    pub lights: Vec<Light>,
     pub vertices: Arc<Buffer>,
     pub indices: Arc<Buffer>,
     pub indices_len: u32,
@@ -25,6 +28,7 @@ pub struct Scene {
 pub struct Vertex {
     pub position: [f32; 3],
     pub color: [f32; 4],
+    pub tangents: [f32; 4],
     pub normal: [f32; 3],
     pub uv: [f32; 2],
     pub material_id: isize,
@@ -54,6 +58,13 @@ pub struct Mesh {
     pub name: Option<String>,
     pub primitives: Vec<Primitive>,
     pub index: usize,
+}
+
+pub struct Light {
+    color: [f32; 3],
+    intensity: f32,
+    range: Option<f32>,
+    light_type: Kind,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -189,16 +200,17 @@ impl<'a> From<GltfMaterial<'a>> for Material {
             _ => material.pbr_metallic_roughness().base_color_factor(),
         };
 
-        fn get_texture (texture_info: Option<gltf::texture::Info>) -> TextureInfo {
-            texture_info.map_or(TextureInfo {
-                index: -1,
-                channel: 0,
-            }, |tex_info| {
+        fn get_texture(texture_info: Option<gltf::texture::Info>) -> TextureInfo {
+            texture_info.map_or(
                 TextureInfo {
+                    index: -1,
+                    channel: 0,
+                },
+                |tex_info| TextureInfo {
                     index: tex_info.texture().index() as isize,
                     channel: tex_info.tex_coord(),
-                }
-            })
+                },
+            )
         }
 
         fn get_normals_texture(texture_info: Option<NormalTexture>) -> TextureInfo {
@@ -308,16 +320,28 @@ impl Importer {
         let mut vertices_data: Vec<Vertex> = Vec::new();
         let mut indices_data: Vec<u32> = Vec::new();
 
+
+        let lights: Vec<Light> = self.doc.lights().map_or(vec![], |lights| {
+            lights.map(|light_data| {
+                Light {
+                    color: light_data.color(),
+                    intensity: light_data.intensity(),
+                    range: light_data.range(),
+                    light_type : light_data.kind(),
+                }
+            }).collect()
+        });
+
         let mut textures: Vec<Image> = self
             .images
             .iter()
-            .map(|image| Self::create_texture_image(image, &vulkan))
+            .map(|image| create_texture_image(image, &vulkan))
             .collect();
 
         let samplers: Vec<vk::SamplerCreateInfo> = self
             .doc
             .samplers()
-            .map(|sampler| Self::build_sampler(&sampler))
+            .map(|sampler| build_sampler(&sampler))
             .collect();
 
         let materials: Vec<Material> = self
@@ -410,7 +434,9 @@ impl Importer {
                     let uvs: Vec<[f32; 2]> = reader
                         .read_tex_coords(0)
                         .map_or(vec![], |uvs| uvs.into_f32().collect());
-
+                    let tangents: Vec<[f32; 4]> = reader
+                        .read_tangents()
+                        .map_or(vec![], |tangents| tangents.collect());
                     let material_id: Option<isize> =
                         primitive.material().index().map(|num| num as isize);
                     let vertices: Vec<Vertex> = reader
@@ -423,6 +449,7 @@ impl Importer {
                             uv: *uvs.get(index).unwrap_or(&[0.0, 0.0]),
                             normal: *normals.get(index).unwrap_or(&[1.0, 1.0, 1.0]),
                             material_id: material_id.unwrap_or(-1),
+                            tangents: *tangents.get(index).unwrap_or(&[0.0, 0.0, 0.0, 0.0]),
                         })
                         .collect();
 
@@ -461,6 +488,7 @@ impl Importer {
             nodes,
             textures,
             materials,
+            lights,
             indices_len: indices_data.len() as u32,
             vertices: Arc::new(
                 vulkan.create_gpu_buffer(vk::BufferUsageFlags::VERTEX_BUFFER, &vertices_data),
@@ -469,215 +497,6 @@ impl Importer {
                 vulkan.create_gpu_buffer(vk::BufferUsageFlags::INDEX_BUFFER, &indices_data),
             ),
         }
-    }
-
-    fn build_sampler(sampler: &gltf::texture::Sampler) -> vk::SamplerCreateInfo {
-        use gltf::texture::MagFilter;
-        use gltf::texture::MinFilter;
-        use gltf::texture::WrappingMode;
-
-        fn address_mode(wrap_mode: WrappingMode) -> vk::SamplerAddressMode {
-            match wrap_mode {
-                WrappingMode::ClampToEdge => vk::SamplerAddressMode::CLAMP_TO_EDGE,
-                WrappingMode::Repeat => vk::SamplerAddressMode::REPEAT,
-                WrappingMode::MirroredRepeat => vk::SamplerAddressMode::MIRRORED_REPEAT,
-            }
-        };
-
-        fn min_filter_mimap_filter(min_filter: MinFilter) -> (vk::Filter, vk::SamplerMipmapMode) {
-            match min_filter {
-                MinFilter::Linear => (vk::Filter::LINEAR, vk::SamplerMipmapMode::LINEAR),
-                MinFilter::Nearest => (vk::Filter::NEAREST, vk::SamplerMipmapMode::NEAREST),
-                MinFilter::LinearMipmapLinear => {
-                    (vk::Filter::LINEAR, vk::SamplerMipmapMode::LINEAR)
-                }
-                MinFilter::LinearMipmapNearest => {
-                    (vk::Filter::LINEAR, vk::SamplerMipmapMode::NEAREST)
-                }
-                MinFilter::NearestMipmapNearest => {
-                    (vk::Filter::NEAREST, vk::SamplerMipmapMode::NEAREST)
-                }
-                MinFilter::NearestMipmapLinear => {
-                    (vk::Filter::NEAREST, vk::SamplerMipmapMode::LINEAR)
-                }
-            }
-        }
-
-        let (min_filter, mipmap_filter) = min_filter_mimap_filter(
-            sampler
-                .min_filter()
-                .unwrap_or(gltf::texture::MinFilter::Nearest),
-        );
-
-        let mag_filter = match sampler
-            .mag_filter()
-            .unwrap_or(gltf::texture::MagFilter::Nearest)
-        {
-            MagFilter::Nearest => vk::Filter::NEAREST,
-            MagFilter::Linear => vk::Filter::LINEAR,
-        };
-
-        vk::SamplerCreateInfo {
-            mag_filter,
-            min_filter,
-            mipmap_mode: mipmap_filter,
-            address_mode_u: address_mode(sampler.wrap_s()),
-            address_mode_v: address_mode(sampler.wrap_t()),
-            address_mode_w: vk::SamplerAddressMode::CLAMP_TO_EDGE,
-            max_lod: 1.0,
-            mip_lod_bias: 0.0,
-            anisotropy_enable: vk::TRUE,
-            max_anisotropy: 16.0,
-            ..Default::default()
-        }
-    }
-
-    fn create_texture_image(properties: &gltf::image::Data, vulkan: &VkThread) -> Image {
-        use gltf::image::Format;
-        use image::{Bgr, Bgra, ConvertBuffer, ImageBuffer, Rgb, Rgba};
-        let format = vk::Format::R8G8B8A8_UNORM;
-        type RgbaImage = ImageBuffer<Rgba<u8>, Vec<u8>>;
-        type BgraImage = ImageBuffer<Bgra<u8>, Vec<u8>>;
-        type RgbImage = ImageBuffer<Rgb<u8>, Vec<u8>>;
-        type BgrImage = ImageBuffer<Bgr<u8>, Vec<u8>>;
-
-        //Convert image format to R8G8B8A8_UNORM
-        let data = match properties.format {
-            Format::R8 | Format::R8G8 | Format::R8G8B8 => {
-                let rgba: RgbaImage = RgbImage::from_raw(
-                    properties.width,
-                    properties.height,
-                    properties.pixels.clone(),
-                )
-                .unwrap()
-                .convert();
-
-                rgba.into_raw()
-            }
-            Format::B8G8R8 => {
-                let bgra: RgbaImage = BgrImage::from_raw(
-                    properties.width,
-                    properties.height,
-                    properties.pixels.clone(),
-                )
-                .unwrap()
-                .convert();
-
-                bgra.into_raw()
-            }
-            Format::B8G8R8A8 => {
-                let bgra: RgbaImage = BgraImage::from_raw(
-                    properties.width,
-                    properties.height,
-                    properties.pixels.clone(),
-                )
-                .unwrap()
-                .convert();
-
-                bgra.into_raw()
-            }
-            Format::R8G8B8A8 => properties.pixels.clone(),
-            _ => {
-                panic!("Unsupported texture format: {:?}", properties.format);
-            }
-        };
-
-        let image_size =
-            (std::mem::size_of::<u8>() as u32 * properties.width * properties.height * 4)
-                as vk::DeviceSize;
-
-        let buffer = Buffer::new_mapped_basic(
-            image_size,
-            vk::BufferUsageFlags::TRANSFER_SRC,
-            vk_mem::MemoryUsage::CpuOnly,
-            vulkan.context(),
-        );
-
-        buffer.upload_to_buffer::<u8>(&data, 0);
-        let mut image = Image::create_image(
-            vk::ImageCreateInfo {
-                s_type: vk::StructureType::IMAGE_CREATE_INFO,
-                image_type: vk::ImageType::TYPE_2D,
-                format,
-                extent: vk::Extent3D {
-                    width: properties.width,
-                    height: properties.height,
-                    depth: 1,
-                },
-                mip_levels: 1,
-                array_layers: 1,
-                samples: vk::SampleCountFlags::TYPE_1,
-                tiling: vk::ImageTiling::OPTIMAL,
-                usage: vk::ImageUsageFlags::TRANSFER_SRC
-                    | vk::ImageUsageFlags::TRANSFER_DST
-                    | vk::ImageUsageFlags::SAMPLED,
-                sharing_mode: vk::SharingMode::EXCLUSIVE,
-                ..Default::default()
-            },
-            vk_mem::MemoryUsage::GpuOnly,
-            vulkan.context(),
-        );
-
-        vulkan.transition_image_layout(
-            image.image,
-            format,
-            vk::ImageLayout::UNDEFINED,
-            vk::ImageLayout::TRANSFER_DST_OPTIMAL,
-            1,
-        );
-
-        vulkan.copy_buffer_to_image(
-            buffer.buffer,
-            image.image,
-            vec![vk::BufferImageCopy {
-                image_subresource: vk::ImageSubresourceLayers {
-                    aspect_mask: vk::ImageAspectFlags::COLOR,
-                    mip_level: 0,
-                    base_array_layer: 0,
-                    layer_count: 1,
-                },
-                image_extent: vk::Extent3D {
-                    width: properties.width,
-                    height: properties.height,
-                    depth: 1,
-                },
-                buffer_offset: 0,
-                buffer_image_height: 0,
-                buffer_row_length: 0,
-                image_offset: vk::Offset3D { x: 0, y: 0, z: 0 },
-            }],
-        );
-
-        vulkan.transition_image_layout(
-            image.image,
-            format,
-            vk::ImageLayout::TRANSFER_DST_OPTIMAL,
-            vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
-            1,
-        );
-
-        image.attach_view(vk::ImageViewCreateInfo {
-            s_type: vk::StructureType::IMAGE_VIEW_CREATE_INFO,
-            view_type: vk::ImageViewType::TYPE_2D,
-            format,
-            image: image.image,
-            components: vk::ComponentMapping {
-                r: vk::ComponentSwizzle::IDENTITY,
-                g: vk::ComponentSwizzle::IDENTITY,
-                b: vk::ComponentSwizzle::IDENTITY,
-                a: vk::ComponentSwizzle::IDENTITY,
-            },
-            subresource_range: vk::ImageSubresourceRange {
-                aspect_mask: vk::ImageAspectFlags::COLOR,
-                base_mip_level: 0,
-                level_count: 1,
-                base_array_layer: 0,
-                layer_count: 1,
-            },
-            ..Default::default()
-        });
-
-        image
     }
 }
 
@@ -696,4 +515,214 @@ fn compute_transform_matrix(transform: &Transform) -> cgmath::Matrix4<f32> {
             translation * rotation * scale
         }
     }
+}
+
+
+fn build_sampler(sampler: &gltf::texture::Sampler) -> vk::SamplerCreateInfo {
+    use gltf::texture::MagFilter;
+    use gltf::texture::MinFilter;
+    use gltf::texture::WrappingMode;
+
+    fn address_mode(wrap_mode: WrappingMode) -> vk::SamplerAddressMode {
+        match wrap_mode {
+            WrappingMode::ClampToEdge => vk::SamplerAddressMode::CLAMP_TO_EDGE,
+            WrappingMode::Repeat => vk::SamplerAddressMode::REPEAT,
+            WrappingMode::MirroredRepeat => vk::SamplerAddressMode::MIRRORED_REPEAT,
+        }
+    };
+
+    fn min_filter_mimap_filter(min_filter: MinFilter) -> (vk::Filter, vk::SamplerMipmapMode) {
+        match min_filter {
+            MinFilter::Linear => (vk::Filter::LINEAR, vk::SamplerMipmapMode::LINEAR),
+            MinFilter::Nearest => (vk::Filter::NEAREST, vk::SamplerMipmapMode::NEAREST),
+            MinFilter::LinearMipmapLinear => {
+                (vk::Filter::LINEAR, vk::SamplerMipmapMode::LINEAR)
+            }
+            MinFilter::LinearMipmapNearest => {
+                (vk::Filter::LINEAR, vk::SamplerMipmapMode::NEAREST)
+            }
+            MinFilter::NearestMipmapNearest => {
+                (vk::Filter::NEAREST, vk::SamplerMipmapMode::NEAREST)
+            }
+            MinFilter::NearestMipmapLinear => {
+                (vk::Filter::NEAREST, vk::SamplerMipmapMode::LINEAR)
+            }
+        }
+    }
+
+    let (min_filter, mipmap_filter) = min_filter_mimap_filter(
+        sampler
+            .min_filter()
+            .unwrap_or(gltf::texture::MinFilter::Nearest),
+    );
+
+    let mag_filter = match sampler
+        .mag_filter()
+        .unwrap_or(gltf::texture::MagFilter::Nearest)
+    {
+        MagFilter::Nearest => vk::Filter::NEAREST,
+        MagFilter::Linear => vk::Filter::LINEAR,
+    };
+
+    vk::SamplerCreateInfo {
+        mag_filter,
+        min_filter,
+        mipmap_mode: mipmap_filter,
+        address_mode_u: address_mode(sampler.wrap_s()),
+        address_mode_v: address_mode(sampler.wrap_t()),
+        address_mode_w: vk::SamplerAddressMode::CLAMP_TO_EDGE,
+        max_lod: 1.0,
+        mip_lod_bias: 0.0,
+        anisotropy_enable: vk::TRUE,
+        max_anisotropy: 16.0,
+        ..Default::default()
+    }
+}
+
+fn create_texture_image(properties: &gltf::image::Data, vulkan: &VkThread) -> Image {
+    use gltf::image::Format;
+    use image::{Bgr, Bgra, ConvertBuffer, ImageBuffer, Rgb, Rgba};
+    let format = vk::Format::R8G8B8A8_UNORM;
+    type RgbaImage = ImageBuffer<Rgba<u8>, Vec<u8>>;
+    type BgraImage = ImageBuffer<Bgra<u8>, Vec<u8>>;
+    type RgbImage = ImageBuffer<Rgb<u8>, Vec<u8>>;
+    type BgrImage = ImageBuffer<Bgr<u8>, Vec<u8>>;
+
+    //Convert image format to R8G8B8A8_UNORM
+    let data = match properties.format {
+        Format::R8 | Format::R8G8 | Format::R8G8B8 => {
+            let rgba: RgbaImage = RgbImage::from_raw(
+                properties.width,
+                properties.height,
+                properties.pixels.clone(),
+            )
+            .unwrap()
+            .convert();
+
+            rgba.into_raw()
+        }
+        Format::B8G8R8 => {
+            let bgra: RgbaImage = BgrImage::from_raw(
+                properties.width,
+                properties.height,
+                properties.pixels.clone(),
+            )
+            .unwrap()
+            .convert();
+
+            bgra.into_raw()
+        }
+        Format::B8G8R8A8 => {
+            let bgra: RgbaImage = BgraImage::from_raw(
+                properties.width,
+                properties.height,
+                properties.pixels.clone(),
+            )
+            .unwrap()
+            .convert();
+
+            bgra.into_raw()
+        }
+        Format::R8G8B8A8 => properties.pixels.clone(),
+        _ => {
+            panic!("Unsupported texture format: {:?}", properties.format);
+        }
+    };
+
+    let image_size =
+        (std::mem::size_of::<u8>() as u32 * properties.width * properties.height * 4)
+            as vk::DeviceSize;
+
+    let buffer = Buffer::new_mapped_basic(
+        image_size,
+        vk::BufferUsageFlags::TRANSFER_SRC,
+        vk_mem::MemoryUsage::CpuOnly,
+        vulkan.context(),
+    );
+
+    buffer.upload_to_buffer::<u8>(&data, 0);
+    let mut image = Image::create_image(
+        vk::ImageCreateInfo {
+            s_type: vk::StructureType::IMAGE_CREATE_INFO,
+            image_type: vk::ImageType::TYPE_2D,
+            format,
+            extent: vk::Extent3D {
+                width: properties.width,
+                height: properties.height,
+                depth: 1,
+            },
+            mip_levels: 1,
+            array_layers: 1,
+            samples: vk::SampleCountFlags::TYPE_1,
+            tiling: vk::ImageTiling::OPTIMAL,
+            usage: vk::ImageUsageFlags::TRANSFER_SRC
+                | vk::ImageUsageFlags::TRANSFER_DST
+                | vk::ImageUsageFlags::SAMPLED,
+            sharing_mode: vk::SharingMode::EXCLUSIVE,
+            ..Default::default()
+        },
+        vk_mem::MemoryUsage::GpuOnly,
+        vulkan.context(),
+    );
+
+    vulkan.transition_image_layout(
+        image.image,
+        format,
+        vk::ImageLayout::UNDEFINED,
+        vk::ImageLayout::TRANSFER_DST_OPTIMAL,
+        1,
+    );
+
+    vulkan.copy_buffer_to_image(
+        buffer.buffer,
+        image.image,
+        vec![vk::BufferImageCopy {
+            image_subresource: vk::ImageSubresourceLayers {
+                aspect_mask: vk::ImageAspectFlags::COLOR,
+                mip_level: 0,
+                base_array_layer: 0,
+                layer_count: 1,
+            },
+            image_extent: vk::Extent3D {
+                width: properties.width,
+                height: properties.height,
+                depth: 1,
+            },
+            buffer_offset: 0,
+            buffer_image_height: 0,
+            buffer_row_length: 0,
+            image_offset: vk::Offset3D { x: 0, y: 0, z: 0 },
+        }],
+    );
+
+    vulkan.transition_image_layout(
+        image.image,
+        format,
+        vk::ImageLayout::TRANSFER_DST_OPTIMAL,
+        vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
+        1,
+    );
+
+    image.attach_view(vk::ImageViewCreateInfo {
+        s_type: vk::StructureType::IMAGE_VIEW_CREATE_INFO,
+        view_type: vk::ImageViewType::TYPE_2D,
+        format,
+        image: image.image,
+        components: vk::ComponentMapping {
+            r: vk::ComponentSwizzle::IDENTITY,
+            g: vk::ComponentSwizzle::IDENTITY,
+            b: vk::ComponentSwizzle::IDENTITY,
+            a: vk::ComponentSwizzle::IDENTITY,
+        },
+        subresource_range: vk::ImageSubresourceRange {
+            aspect_mask: vk::ImageAspectFlags::COLOR,
+            base_mip_level: 0,
+            level_count: 1,
+            base_array_layer: 0,
+            layer_count: 1,
+        },
+        ..Default::default()
+    });
+
+    image
 }
