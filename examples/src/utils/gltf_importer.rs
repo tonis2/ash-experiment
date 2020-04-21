@@ -1,7 +1,6 @@
 use gltf::{
     material::{AlphaMode, Material as GltfMaterial, NormalTexture, OcclusionTexture},
     scene::Transform,
-    texture,
 };
 use std::{path::Path, sync::Arc};
 use vulkan::{prelude::*, Buffer, Image, VkThread};
@@ -190,28 +189,29 @@ impl<'a> From<GltfMaterial<'a>> for Material {
             _ => material.pbr_metallic_roughness().base_color_factor(),
         };
 
-        fn get_texture(texture_info: Option<texture::Info>) -> TextureInfo {
-            texture_info
-                .map(|tex_info| TextureInfo {
+        fn get_texture (texture_info: Option<gltf::texture::Info>) -> TextureInfo {
+            texture_info.map_or(TextureInfo {
+                index: -1,
+                channel: 0,
+            }, |tex_info| {
+                TextureInfo {
                     index: tex_info.texture().index() as isize,
                     channel: tex_info.tex_coord(),
-                })
-                .unwrap_or(TextureInfo {
-                    index: -1,
-                    channel: 0,
-                })
+                }
+            })
         }
 
         fn get_normals_texture(texture_info: Option<NormalTexture>) -> TextureInfo {
-            texture_info
-                .map(|tex_info| TextureInfo {
-                    index: tex_info.texture().index() as isize,
-                    channel: tex_info.tex_coord(),
-                })
-                .unwrap_or(TextureInfo {
+            texture_info.map_or(
+                TextureInfo {
                     index: -1,
                     channel: 0,
-                })
+                },
+                |tex_info| TextureInfo {
+                    index: tex_info.texture().index() as isize,
+                    channel: tex_info.tex_coord(),
+                },
+            )
         }
 
         fn get_occlusion(texture_info: Option<OcclusionTexture>) -> (f32, TextureInfo) {
@@ -219,15 +219,16 @@ impl<'a> From<GltfMaterial<'a>> for Material {
                 .as_ref()
                 .map_or(0.0, |tex_info| tex_info.strength());
 
-            let texture = texture_info
-                .map(|tex_info| TextureInfo {
-                    index: tex_info.texture().index() as isize,
-                    channel: tex_info.tex_coord(),
-                })
-                .unwrap_or(TextureInfo {
+            let texture = texture_info.map_or(
+                TextureInfo {
                     index: -1,
                     channel: 0,
-                });
+                },
+                |tex_info| TextureInfo {
+                    index: tex_info.texture().index() as isize,
+                    channel: tex_info.tex_coord(),
+                },
+            );
 
             (strength, texture)
         }
@@ -454,7 +455,7 @@ impl Importer {
                 primitives,
             });
         }
-      
+
         Scene {
             meshes,
             nodes,

@@ -67,34 +67,29 @@ impl Camera {
     }
 
     pub fn scene_offset(&mut self, offset: cgmath::Vector3<f32>) {
-        self.eye.x -= offset.z;
-        self.focus.x -= offset.z;
-        self.eye.z += offset.x;
-        self.focus.z += offset.x;
+        let offset_x = offset.x * self.pitch.to_radians().cos() * self.yaw.to_radians().sin();
+        let offset_z = offset.x * self.pitch.to_radians().cos() * self.yaw.to_radians().cos();
+        self.eye.x -= offset_z;
+        self.focus.x -= offset_z;
+        self.eye.z += offset_x;
+        self.focus.z += offset_x;
         self.eye.y -= offset.y;
         self.focus.y -= offset.y;
     }
 
     pub fn handle_events(&mut self, events: &Event) {
-        //Rotate left, right
-        if events.keyboard.key_pressed("d") {
-            self.rotate_x(1.0);
-        }
 
-        if events.keyboard.key_pressed("a") {
-            self.rotate_x(-1.0);
-        }
 
         //Mouse scroll zoom
         self.add_zoom(-events.mouse.scroll());
 
         //Zoom in out
         if events.keyboard.key_pressed("w") {
-            self.add_zoom(1.0);
+            self.scene_offset(cgmath::Vector3::new(0.0, -0.5, 0.0));
         }
 
         if events.keyboard.key_pressed("s") {
-            self.add_zoom(-1.0);
+            self.scene_offset(cgmath::Vector3::new(0.0,  0.5, 0.0));
         }
 
         //Mouse movement
@@ -108,12 +103,11 @@ impl Camera {
             const Y_MOVE: f32 = 0.03;
             const X_MOVE: f32 = 0.01;
             let mouse_pos = events.mouse.position_delta();
-            let offset_x =
-                mouse_pos.x * self.pitch.to_radians().cos() * self.yaw.to_radians().sin() * X_MOVE;
-            let offset_z =
-                mouse_pos.x * self.pitch.to_radians().cos() * self.yaw.to_radians().cos() * X_MOVE;
-            let offset_y = mouse_pos.y * Y_MOVE;
-            self.scene_offset(cgmath::Vector3::new(offset_x, offset_y, offset_z));
+            self.scene_offset(cgmath::Vector3::new(
+                mouse_pos.x * X_MOVE,
+                mouse_pos.y * Y_MOVE,
+                mouse_pos.x * X_MOVE,
+            ));
         }
 
         self.eye_offset();
