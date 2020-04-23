@@ -22,9 +22,9 @@ fn main() {
     let instance = VkThread::new(vulkan.clone());
     let mut swapchain = Swapchain::new(vulkan.clone());
     let mut queue = Queue::new(vulkan.clone());
-    //../../glTF-Sample-Models/2.0/CesiumMilkTruck/glTF/CesiumMilTruck.gltf
+    //../../GLTF_tests/multi_texture.gltf
     let mut scene =
-        gltf_importer::Importer::load(Path::new("assets/gltf_texture.gltf")).build(&instance);
+        gltf_importer::Importer::load(Path::new("../../GLTF_tests/multi_texture.gltf")).build(&instance);
 
     let mut mesh_pipeline = mesh_pipeline::Pipeline::build_for(&scene, &swapchain, &instance);
 

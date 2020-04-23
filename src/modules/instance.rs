@@ -5,7 +5,7 @@ use std::cmp::max;
 use std::ptr;
 use std::sync::Arc;
 
-use crate::utilities::buffer::Buffer;
+use crate::utilities::Buffer;
 
 pub struct VkThread {
     pub context: Arc<Context>,

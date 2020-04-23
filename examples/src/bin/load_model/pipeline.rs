@@ -327,7 +327,7 @@ pub fn create_texture(image_path: &Path, vulkan: &VkThread) -> (Image, u32) {
     );
 
     vulkan.transition_image_layout(
-        image.image,
+        image.image(),
         vk::Format::R8G8B8A8_UNORM,
         vk::ImageLayout::UNDEFINED,
         vk::ImageLayout::TRANSFER_DST_OPTIMAL,
@@ -352,15 +352,15 @@ pub fn create_texture(image_path: &Path, vulkan: &VkThread) -> (Image, u32) {
         image_offset: vk::Offset3D { x: 0, y: 0, z: 0 },
     }];
 
-    vulkan.copy_buffer_to_image(buffer.buffer, image.image, buffer_image_regions);
+    vulkan.copy_buffer_to_image(buffer.buffer, image.image(), buffer_image_regions);
 
-    vulkan.generate_mipmaps(image.image, image_width, image_height, mip_levels);
+    vulkan.generate_mipmaps(image.image(), image_width, image_height, mip_levels);
 
     image.attach_view(vk::ImageViewCreateInfo {
         s_type: vk::StructureType::IMAGE_VIEW_CREATE_INFO,
         view_type: vk::ImageViewType::TYPE_2D,
         format: vk::Format::R8G8B8A8_UNORM,
-        image: image.image,
+        image: image.image(),
         components: vk::ComponentMapping {
             r: vk::ComponentSwizzle::IDENTITY,
             g: vk::ComponentSwizzle::IDENTITY,

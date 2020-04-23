@@ -98,7 +98,7 @@ pub fn create_texture(image_path: &Path, vulkan: &VkThread) -> Image {
         image_offset: vk::Offset3D { x: 0, y: 0, z: 0 },
     }];
 
-    vulkan.copy_buffer_to_image(buffer.buffer, image.image, buffer_image_regions);
+    vulkan.copy_buffer_to_image(buffer.buffer, image.image(), buffer_image_regions);
 
     vulkan.apply_pipeline_barrier(
         vk::PipelineStageFlags::TRANSFER,
@@ -127,7 +127,7 @@ pub fn create_texture(image_path: &Path, vulkan: &VkThread) -> Image {
         s_type: vk::StructureType::IMAGE_VIEW_CREATE_INFO,
         view_type: vk::ImageViewType::TYPE_2D,
         format: vk::Format::R8G8B8A8_UNORM,
-        image: image.image,
+        image: image.image(),
         components: vk::ComponentMapping {
             r: vk::ComponentSwizzle::IDENTITY,
             g: vk::ComponentSwizzle::IDENTITY,
@@ -197,7 +197,7 @@ pub fn create_depth_resources(swapchain: &Swapchain, context: Arc<Context>) -> I
         s_type: vk::StructureType::IMAGE_VIEW_CREATE_INFO,
         view_type: vk::ImageViewType::TYPE_2D,
         format: depth_format,
-        image: image.image,
+        image: image.image(),
         subresource_range: vk::ImageSubresourceRange {
             aspect_mask: vk::ImageAspectFlags::DEPTH,
             base_mip_level: 0,
@@ -262,7 +262,7 @@ pub fn create_empty_image(vulkan: &VkThread) -> Image {
         s_type: vk::StructureType::IMAGE_VIEW_CREATE_INFO,
         view_type: vk::ImageViewType::TYPE_2D,
         format: vk::Format::R8G8B8A8_UNORM,
-        image: image.image,
+        image: image.image(),
         components: vk::ComponentMapping {
             r: vk::ComponentSwizzle::IDENTITY,
             g: vk::ComponentSwizzle::IDENTITY,

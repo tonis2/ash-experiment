@@ -2,11 +2,11 @@ mod pipelines;
 
 use vulkan::{
     prelude::*,
-    utilities::{as_byte_slice, Batch, FPSLimiter, Mesh},
+    utilities::{as_byte_slice, FPSLimiter},
     Context, Framebuffer, Queue, Swapchain, VkThread,
 };
 
-use examples::utils::{events, Camera};
+use examples::utils::{events, Batch, Camera, Mesh};
 use pipelines::{mesh_pipeline, Light, PushConstantModel, Vertex};
 use std::path::Path;
 use std::sync::Arc;

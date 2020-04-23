@@ -1,69 +1,5 @@
-use crate::Context;
-use ash::util::read_spv;
-use ash::version::DeviceV1_0;
 use ash::vk;
-use std::{
-    default::Default,
-    ffi::{CStr, CString},
-    os::raw::c_char,
-    path::Path,
-    sync::Arc,
-};
-
-pub struct Shader {
-    pub shader_info: vk::PipelineShaderStageCreateInfo,
-    shader_module: vk::ShaderModule,
-    context: Arc<Context>,
-}
-
-impl Shader {
-    pub fn new(
-        path: &Path,
-        stage: vk::ShaderStageFlags,
-        entry_name: &CString,
-        context: Arc<Context>,
-    ) -> Self {
-        let shader_module = unsafe {
-            context
-                .device
-                .create_shader_module(
-                    &vk::ShaderModuleCreateInfo::builder().code(&load_shader(path)),
-                    None,
-                )
-                .expect("Shader module error")
-        };
-
-        Self {
-            shader_info: vk::PipelineShaderStageCreateInfo {
-                module: shader_module,
-                p_name: entry_name.as_ptr(),
-                stage: stage,
-                ..Default::default()
-            },
-            shader_module,
-            context: context,
-        }
-    }
-
-    pub fn use_specialization(mut self, info: vk::SpecializationInfo) -> Self {
-        self.shader_info.p_specialization_info = &info;
-        self
-    }
-
-    pub fn info(&self) -> vk::PipelineShaderStageCreateInfo {
-        self.shader_info
-    }
-}
-
-impl Drop for Shader {
-    fn drop(&mut self) {
-        unsafe {
-            self.context
-                .device
-                .destroy_shader_module(self.shader_module, None);
-        }
-    }
-}
+use std::{ffi::CStr, os::raw::c_char};
 
 /// Helper function to convert [c_char; SIZE] to string
 pub fn vk_to_string(raw_string_array: &[c_char]) -> String {
@@ -76,19 +12,6 @@ pub fn vk_to_string(raw_string_array: &[c_char]) -> String {
         .to_str()
         .expect("Failed to convert vulkan raw string.")
         .to_owned()
-}
-
-pub fn load_shader(shader_path: &Path) -> Vec<u32> {
-    use std::fs::File;
-    use std::io::Read;
-    let mut shader_data =
-        File::open(shader_path).expect(&format!("failed to read shader {:?}", shader_path));
-    let mut buffer = Vec::new();
-    shader_data
-        .read_to_end(&mut buffer)
-        .expect("Failed to load shader data");
-
-    read_spv(&mut shader_data).expect("Failed to read vertex shader spv file")
 }
 
 pub fn find_memorytype_index(
@@ -157,62 +80,4 @@ pub fn find_memory_type(
 /// Use with slices of number primitives.
 pub unsafe fn as_byte_slice<T: Sized>(p: &T) -> &[u8] {
     ::std::slice::from_raw_parts((p as *const T) as *const u8, ::std::mem::size_of::<T>())
-}
-
-pub trait MeshTrait<T> {
-    fn get_indices(&mut self) -> Vec<u32>;
-    fn get_vertices(&mut self) -> Vec<T>;
-}
-
-#[derive(Debug, Clone)]
-pub struct Mesh<T: Clone> {
-    pub vertices: Vec<T>,
-    pub indices: Vec<u32>,
-}
-
-impl<T: Clone> Default for Mesh<T> {
-    fn default() -> Self {
-        Self {
-            vertices: Vec::new(),
-            indices: Vec::new(),
-        }
-    }
-}
-
-impl<T: Clone> MeshTrait<T> for Mesh<T> {
-    fn get_indices(&mut self) -> Vec<u32> {
-        self.indices.clone()
-    }
-    fn get_vertices(&mut self) -> Vec<T> {
-        self.vertices.clone()
-    }
-}
-
-#[derive(Clone)]
-pub struct Batch<T: Clone> {
-    pub indices: Vec<u32>,
-    pub vertices: Vec<T>,
-}
-
-impl<T: Clone> Batch<T> {
-    pub fn new() -> Self {
-        Self {
-            indices: Vec::new(),
-            vertices: Vec::new(),
-        }
-    }
-
-    pub fn clear(&mut self) {
-        self.vertices.clear();
-        self.indices.clear();
-    }
-
-    pub fn add(&mut self, mesh: &mut Mesh<T>) {
-        for indice in mesh.get_indices() {
-            self.indices
-                .push((indice as i64 + self.vertices.len() as i64) as u32);
-        }
-
-        self.vertices.extend(mesh.get_vertices());
-    }
 }

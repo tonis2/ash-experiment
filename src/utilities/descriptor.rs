@@ -36,6 +36,7 @@ impl Default for DescriptorSet {
 }
 
 impl Descriptor {
+    //Creates new pipeline descriptor
     pub fn new(sets: Vec<DescriptorSet>, context: Arc<Context>) -> Self {
         let pool_sizes: &Vec<vk::DescriptorPoolSize> = &sets
             .iter()
@@ -53,7 +54,7 @@ impl Descriptor {
                         s_type: vk::StructureType::DESCRIPTOR_POOL_CREATE_INFO,
                         p_next: ptr::null(),
                         flags: vk::DescriptorPoolCreateFlags::empty(),
-                        max_sets: context.image_count,
+                        max_sets: context.image_count, 
                         pool_size_count: pool_sizes.len() as u32,
                         p_pool_sizes: pool_sizes.as_ptr(),
                     },
@@ -65,7 +66,6 @@ impl Descriptor {
         let bindings: Vec<vk::DescriptorSetLayoutBinding> = sets
             .iter()
             .map(|set| vk::DescriptorSetLayoutBinding {
-                // transform uniform
                 binding: set.bind_index,
                 descriptor_type: set.bind_type,
                 descriptor_count: set.count,

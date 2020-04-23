@@ -190,7 +190,6 @@ impl Pipeline {
         );
 
         shadow_map_image.attach_view(vk::ImageViewCreateInfo {
-            s_type: vk::StructureType::IMAGE_VIEW_CREATE_INFO,
             view_type: vk::ImageViewType::TYPE_2D,
             format: depth_format,
             components: vk::ComponentMapping {
@@ -206,7 +205,7 @@ impl Pipeline {
                 base_array_layer: 0,
                 layer_count: 1,
             },
-            image: shadow_map_image.image,
+            image: shadow_map_image.image(),
             ..Default::default()
         });
 

@@ -6,7 +6,7 @@ use vulkan::{
     Buffer, Context, Descriptor, DescriptorSet, Image, VkThread,
 };
 
-use super::definitions::{PushTransform, SpecializationData};
+use super::super::definitions::{PushTransform, SpecializationData};
 use examples::utils::{
     gltf_importer::{MaterialRaw, Scene, Vertex},
     Camera, CameraRaw,
@@ -29,7 +29,7 @@ pub struct Pipeline {
 }
 
 impl Pipeline {
-    //Creates a new pipeline
+    //Creates a new g_buffer
     pub fn build_for(scene: &Scene, swapchain: &Swapchain, vulkan: &VkThread) -> Pipeline {
         let context = vulkan.context();
         //Create buffer data
@@ -44,11 +44,11 @@ impl Pipeline {
 
         uniform_buffer.upload_to_buffer(&[camera.raw()], 0);
 
-        let buffer_size =
+        let material_buffer_size =
             scene.materials.len() as u64 * context.get_ubo_alignment::<MaterialRaw>() as u64;
 
         let staging_buffer = Buffer::new_mapped_basic(
-            buffer_size,
+            material_buffer_size,
             vk::BufferUsageFlags::TRANSFER_SRC,
             vk_mem::MemoryUsage::CpuOnly,
             context.clone(),
@@ -62,7 +62,7 @@ impl Pipeline {
         }
 
         let material_buffer = Buffer::new_mapped_basic(
-            buffer_size,
+            material_buffer_size,
             vk::BufferUsageFlags::TRANSFER_DST | vk::BufferUsageFlags::UNIFORM_BUFFER,
             vk_mem::MemoryUsage::GpuOnly,
             context.clone(),
@@ -185,7 +185,7 @@ impl Pipeline {
                 .build()
         };
 
-        let shader_name = CString::new("main").unwrap();
+        let shader_name = CString::new("gbuffer").unwrap();
         let renderpass = create_render_pass(&swapchain, context.clone());
         let pipeline = unsafe {
             context
@@ -355,69 +355,52 @@ impl Drop for Pipeline {
 }
 
 pub fn create_render_pass(swapchain: &Swapchain, context: Arc<Context>) -> vk::RenderPass {
-    let depth_format = context.find_depth_format(
-        &[
-            vk::Format::D32_SFLOAT,
-            vk::Format::D32_SFLOAT_S8_UINT,
-            vk::Format::D24_UNORM_S8_UINT,
-        ],
-        vk::ImageTiling::OPTIMAL,
-        vk::FormatFeatureFlags::DEPTH_STENCIL_ATTACHMENT,
-    );
-
     let subpasses = vk::SubpassDescription::builder()
-        .color_attachments(&[vk::AttachmentReference {
-            attachment: 0,
-            layout: vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL,
-        }])
-        .depth_stencil_attachment(&vk::AttachmentReference {
-            attachment: 1,
-            layout: vk::ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
-        })
-        .build();
+    .depth_stencil_attachment(&vk::AttachmentReference {
+        attachment: 0,
+        layout: vk::ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+    })
+    .build();
 
-    let renderpass_create_info = vk::RenderPassCreateInfo::builder()
-        .subpasses(&[subpasses])
-        .dependencies(&[vk::SubpassDependency {
+let renderpass_create_info = vk::RenderPassCreateInfo::builder()
+    .attachments(&[vk::AttachmentDescription {
+        flags: vk::AttachmentDescriptionFlags::empty(),
+        format: vk::Format::R32_SINT,
+        samples: vk::SampleCountFlags::TYPE_1,
+        load_op: vk::AttachmentLoadOp::CLEAR,
+        store_op: vk::AttachmentStoreOp::STORE,
+        stencil_load_op: vk::AttachmentLoadOp::DONT_CARE,
+        stencil_store_op: vk::AttachmentStoreOp::DONT_CARE,
+        initial_layout: vk::ImageLayout::UNDEFINED,
+        final_layout: vk::ImageLayout::DEPTH_READ_ONLY_STENCIL_ATTACHMENT_OPTIMAL,
+    }])
+    .subpasses(&[subpasses])
+    .dependencies(&[
+        vk::SubpassDependency {
             src_subpass: vk::SUBPASS_EXTERNAL,
             dst_subpass: 0,
-            src_stage_mask: vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT,
-            dst_stage_mask: vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT,
-            src_access_mask: vk::AccessFlags::empty(),
-            dst_access_mask: vk::AccessFlags::COLOR_ATTACHMENT_READ
-                | vk::AccessFlags::COLOR_ATTACHMENT_WRITE,
-            dependency_flags: vk::DependencyFlags::empty(),
-        }])
-        .attachments(&[
-            vk::AttachmentDescription {
-                flags: vk::AttachmentDescriptionFlags::empty(),
-                format: swapchain.format,
-                samples: vk::SampleCountFlags::TYPE_1,
-                load_op: vk::AttachmentLoadOp::CLEAR,
-                store_op: vk::AttachmentStoreOp::STORE,
-                stencil_load_op: vk::AttachmentLoadOp::DONT_CARE,
-                stencil_store_op: vk::AttachmentStoreOp::DONT_CARE,
-                initial_layout: vk::ImageLayout::UNDEFINED,
-                final_layout: vk::ImageLayout::PRESENT_SRC_KHR,
-            },
-            vk::AttachmentDescription {
-                flags: vk::AttachmentDescriptionFlags::empty(),
-                format: depth_format,
-                samples: vk::SampleCountFlags::TYPE_1,
-                load_op: vk::AttachmentLoadOp::CLEAR,
-                store_op: vk::AttachmentStoreOp::DONT_CARE,
-                stencil_load_op: vk::AttachmentLoadOp::DONT_CARE,
-                stencil_store_op: vk::AttachmentStoreOp::DONT_CARE,
-                initial_layout: vk::ImageLayout::UNDEFINED,
-                final_layout: vk::ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
-            },
-        ])
-        .build();
+            src_stage_mask: vk::PipelineStageFlags::FRAGMENT_SHADER,
+            dst_stage_mask: vk::PipelineStageFlags::EARLY_FRAGMENT_TESTS,
+            src_access_mask: vk::AccessFlags::SHADER_READ,
+            dst_access_mask: vk::AccessFlags::DEPTH_STENCIL_ATTACHMENT_WRITE,
+            dependency_flags: vk::DependencyFlags::BY_REGION,
+        },
+        vk::SubpassDependency {
+            src_subpass: 0,
+            dst_subpass: vk::SUBPASS_EXTERNAL,
+            src_stage_mask: vk::PipelineStageFlags::LATE_FRAGMENT_TESTS,
+            dst_stage_mask: vk::PipelineStageFlags::FRAGMENT_SHADER,
+            src_access_mask: vk::AccessFlags::DEPTH_STENCIL_ATTACHMENT_WRITE,
+            dst_access_mask: vk::AccessFlags::SHADER_READ,
+            dependency_flags: vk::DependencyFlags::BY_REGION,
+        },
+    ])
+    .build();
 
-    unsafe {
-        context
-            .device
-            .create_render_pass(&renderpass_create_info, None)
-            .expect("Failed to create render pass!")
-    }
+unsafe {
+    context
+        .device
+        .create_render_pass(&renderpass_create_info, None)
+        .expect("Failed to create render pass!")
+}
 }

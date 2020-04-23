@@ -666,7 +666,7 @@ fn create_texture_image(properties: &gltf::image::Data, vulkan: &VkThread) -> Im
     );
 
     vulkan.transition_image_layout(
-        image.image,
+        image.image(),
         format,
         vk::ImageLayout::UNDEFINED,
         vk::ImageLayout::TRANSFER_DST_OPTIMAL,
@@ -675,7 +675,7 @@ fn create_texture_image(properties: &gltf::image::Data, vulkan: &VkThread) -> Im
 
     vulkan.copy_buffer_to_image(
         buffer.buffer,
-        image.image,
+        image.image(),
         vec![vk::BufferImageCopy {
             image_subresource: vk::ImageSubresourceLayers {
                 aspect_mask: vk::ImageAspectFlags::COLOR,
@@ -696,7 +696,7 @@ fn create_texture_image(properties: &gltf::image::Data, vulkan: &VkThread) -> Im
     );
 
     vulkan.transition_image_layout(
-        image.image,
+        image.image(),
         format,
         vk::ImageLayout::TRANSFER_DST_OPTIMAL,
         vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
@@ -707,7 +707,7 @@ fn create_texture_image(properties: &gltf::image::Data, vulkan: &VkThread) -> Im
         s_type: vk::StructureType::IMAGE_VIEW_CREATE_INFO,
         view_type: vk::ImageViewType::TYPE_2D,
         format,
-        image: image.image,
+        image: image.image(),
         components: vk::ComponentMapping {
             r: vk::ComponentSwizzle::IDENTITY,
             g: vk::ComponentSwizzle::IDENTITY,

@@ -4,7 +4,7 @@ use ash::vk;
 use std::sync::Arc;
 
 pub struct Image {
-    pub image: vk::Image,
+    image: vk::Image,
     pub allocation: vk_mem::Allocation,
     pub allication_info: vk_mem::AllocationInfo,
     image_view: Option<vk::ImageView>,
