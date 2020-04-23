@@ -180,8 +180,6 @@ pub struct SwapchainSupport {
     pub present_modes: Vec<vk::PresentModeKHR>,
 }
 
-
-
 pub fn choose_swapchain_present_mode(
     available_present_modes: &Vec<vk::PresentModeKHR>,
 ) -> vk::PresentModeKHR {

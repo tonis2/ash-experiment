@@ -3,6 +3,7 @@ use ash::version::DeviceV1_0;
 use ash::vk;
 use std::sync::Arc;
 
+
 pub struct Pipeline {
     layout: vk::PipelineLayout,
     pipelines: Vec<vk::Pipeline>,
@@ -47,9 +48,7 @@ impl Drop for Pipeline {
     fn drop(&mut self) {
         unsafe {
             self.ctx.wait_idle();
-
             self.ctx.device.destroy_pipeline_layout(self.layout, None);
-
             for pipe in &self.pipelines {
                 self.ctx.device.destroy_pipeline(*pipe, None);
             }

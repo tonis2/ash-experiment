@@ -49,29 +49,6 @@ impl Debugger {
             reporter,
         }
     }
-
-    pub fn destroy(&self) {
-        unsafe {
-            self.report_loader
-                .destroy_debug_report_callback(self.reporter, None);
-        }
-    }
-}
-
-pub unsafe fn create_debugger(entry: &Entry, instance: &Instance) -> vk::DebugReportCallbackEXT {
-    let debug_info = vk::DebugReportCallbackCreateInfoEXT::builder()
-        .flags(
-            vk::DebugReportFlagsEXT::ERROR
-                | vk::DebugReportFlagsEXT::WARNING
-                | vk::DebugReportFlagsEXT::PERFORMANCE_WARNING,
-        )
-        .pfn_callback(Some(vulkan_debug_callback));
-
-    let debug_report_loader = DebugReport::new(entry, instance);
-
-    debug_report_loader
-        .create_debug_report_callback(&debug_info, None)
-        .unwrap()
 }
 
 pub struct ValidationInfo {
