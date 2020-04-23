@@ -1,15 +1,13 @@
 use cgmath::{Deg, Matrix4, Point3, Vector3};
-use vulkan::{
-    modules::swapchain::Swapchain, offset_of, prelude::*, Buffer, Context, Descriptor,
-    DescriptorSet, Shader, VkThread,
-};
-
 use std::default::Default;
 use std::ffi::CString;
 use std::mem;
 use std::path::Path;
-use std::ptr;
-use std::sync::Arc;
+
+use vulkan::{
+    offset_of, prelude::*, Buffer, Descriptor, DescriptorSet, Pipeline, Renderpass, Shader,
+    Swapchain, VkThread,
+};
 
 #[repr(C)]
 #[derive(Clone, Debug, Copy)]
@@ -24,20 +22,17 @@ pub struct Vertex {
     pub color: [f32; 3],
 }
 
-pub struct Pipeline {
-    pub pipeline: vk::Pipeline,
-    pub layout: vk::PipelineLayout,
+pub struct Pipe {
+    pub pipeline: Pipeline,
+    pub renderpass: Renderpass,
+    pub pipeline_descriptor: Descriptor,
     pub uniform_buffer: Buffer,
     pub uniform_transform: UniformBufferObject,
-    pub renderpass: vk::RenderPass,
-    context: Arc<Context>,
-
-    pub pipeline_descriptor: Descriptor,
 }
 
-impl Pipeline {
+impl Pipe {
     //Creates a new pipeline
-    pub fn new(swapchain: &Swapchain, vulkan: &VkThread) -> Pipeline {
+    pub fn new(swapchain: &Swapchain, vulkan: &VkThread) -> Self {
         let viewports = [vk::Viewport {
             x: 0.0,
             y: 0.0,
@@ -62,11 +57,9 @@ impl Pipeline {
         //Create uniform buffer
 
         let uniform_data = create_uniform_data(&swapchain);
-      
-        let uniform_buffer = vulkan.create_gpu_buffer(
-            vk::BufferUsageFlags::UNIFORM_BUFFER,
-            &[uniform_data],
-        );
+
+        let uniform_buffer =
+            vulkan.create_gpu_buffer(vk::BufferUsageFlags::UNIFORM_BUFFER, &[uniform_data]);
 
         let pipeline_descriptor = Descriptor::new(
             vec![DescriptorSet {
@@ -83,146 +76,145 @@ impl Pipeline {
             vulkan.context(),
         );
 
-        let layout_create_info = vk::PipelineLayoutCreateInfo::builder()
-            .set_layouts(&[pipeline_descriptor.layout])
-            .build();
+        let renderpass = Renderpass::new(
+            vk::RenderPassCreateInfo::builder()
+                .attachments(&[vk::AttachmentDescription {
+                    flags: vk::AttachmentDescriptionFlags::empty(),
+                    format: swapchain.format,
+                    samples: vk::SampleCountFlags::TYPE_1,
+                    load_op: vk::AttachmentLoadOp::CLEAR,
+                    store_op: vk::AttachmentStoreOp::STORE,
+                    stencil_load_op: vk::AttachmentLoadOp::DONT_CARE,
+                    stencil_store_op: vk::AttachmentStoreOp::DONT_CARE,
+                    initial_layout: vk::ImageLayout::UNDEFINED,
+                    final_layout: vk::ImageLayout::PRESENT_SRC_KHR,
+                }])
+                .subpasses(&[vk::SubpassDescription::builder()
+                    .pipeline_bind_point(vk::PipelineBindPoint::GRAPHICS)
+                    .color_attachments(&[vk::AttachmentReference {
+                        attachment: 0,
+                        layout: vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL,
+                    }])
+                    .build()])
+                .dependencies(&[vk::SubpassDependency {
+                    src_subpass: vk::SUBPASS_EXTERNAL,
+                    dst_subpass: 0,
+                    src_stage_mask: vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT,
+                    dst_stage_mask: vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT,
+                    src_access_mask: vk::AccessFlags::empty(),
+                    dst_access_mask: vk::AccessFlags::COLOR_ATTACHMENT_READ
+                        | vk::AccessFlags::COLOR_ATTACHMENT_WRITE,
+                    dependency_flags: vk::DependencyFlags::empty(),
+                }])
+                .build(),
+            vulkan.context(),
+        );
 
-        //Create pipeline stuff
-        let pipeline_layout = unsafe {
-            vulkan
-                .device()
-                .create_pipeline_layout(&layout_create_info, None)
-                .unwrap()
-        };
-        let renderpass = create_render_pass(&swapchain, &vulkan);
         let shader_name = CString::new("main").unwrap();
-        let pipeline = unsafe {
-            vulkan
-                .device()
-                .create_graphics_pipelines(
-                    vk::PipelineCache::null(),
-                    &[vk::GraphicsPipelineCreateInfo::builder()
-                        .stages(&[
-                            Shader::new(
-                                &Path::new("src/bin/triangle/shaders/triangle.vert.spv"),
-                                vk::ShaderStageFlags::VERTEX,
-                                &shader_name,
-                                vulkan.context(),
-                            )
-                            .info(),
-                            Shader::new(
-                                &Path::new("src/bin/triangle/shaders/triangle.frag.spv"),
-                                vk::ShaderStageFlags::FRAGMENT,
-                                &shader_name,
-                                vulkan.context(),
-                            )
-                            .info(),
+        let pipeline = Pipeline::new(
+            vk::PipelineLayoutCreateInfo::builder()
+                .set_layouts(&[pipeline_descriptor.layout])
+                .build(),
+            vk::GraphicsPipelineCreateInfo::builder()
+                .stages(&[
+                    Shader::new(
+                        &Path::new("src/bin/triangle/shaders/triangle.vert.spv"),
+                        vk::ShaderStageFlags::VERTEX,
+                        &shader_name,
+                        vulkan.context(),
+                    )
+                    .info(),
+                    Shader::new(
+                        &Path::new("src/bin/triangle/shaders/triangle.frag.spv"),
+                        vk::ShaderStageFlags::FRAGMENT,
+                        &shader_name,
+                        vulkan.context(),
+                    )
+                    .info(),
+                ])
+                .vertex_input_state(
+                    &vk::PipelineVertexInputStateCreateInfo::builder()
+                        .vertex_binding_descriptions(&[vk::VertexInputBindingDescription {
+                            binding: 0,
+                            stride: mem::size_of::<Vertex>() as u32,
+                            input_rate: vk::VertexInputRate::VERTEX,
+                        }])
+                        .vertex_attribute_descriptions(&[
+                            vk::VertexInputAttributeDescription {
+                                binding: 0,
+                                location: 0,
+                                format: vk::Format::R32G32B32_SFLOAT,
+                                offset: offset_of!(Vertex, pos) as u32,
+                            },
+                            vk::VertexInputAttributeDescription {
+                                binding: 0,
+                                location: 1,
+                                format: vk::Format::R32G32B32_SFLOAT,
+                                offset: offset_of!(Vertex, color) as u32,
+                            },
                         ])
-                        .vertex_input_state(
-                            &vk::PipelineVertexInputStateCreateInfo::builder()
-                                .vertex_binding_descriptions(&[vk::VertexInputBindingDescription {
-                                    binding: 0,
-                                    stride: mem::size_of::<Vertex>() as u32,
-                                    input_rate: vk::VertexInputRate::VERTEX,
-                                }])
-                                .vertex_attribute_descriptions(&[
-                                    vk::VertexInputAttributeDescription {
-                                        binding: 0,
-                                        location: 0,
-                                        format: vk::Format::R32G32B32_SFLOAT,
-                                        offset: offset_of!(Vertex, pos) as u32,
-                                    },
-                                    vk::VertexInputAttributeDescription {
-                                        binding: 0,
-                                        location: 1,
-                                        format: vk::Format::R32G32B32_SFLOAT,
-                                        offset: offset_of!(Vertex, color) as u32,
-                                    },
-                                ])
-                                .build(),
-                        )
-                        .input_assembly_state(&vk::PipelineInputAssemblyStateCreateInfo {
-                            topology: vk::PrimitiveTopology::TRIANGLE_LIST,
-                            ..Default::default()
-                        })
-                        .viewport_state(
-                            &vk::PipelineViewportStateCreateInfo::builder()
-                                .scissors(&scissors)
-                                .viewports(&viewports),
-                        )
-                        .rasterization_state(&vk::PipelineRasterizationStateCreateInfo {
-                            front_face: vk::FrontFace::COUNTER_CLOCKWISE,
-                            line_width: 1.0,
-                            polygon_mode: vk::PolygonMode::FILL,
-                            ..Default::default()
-                        })
-                        .multisample_state(&vk::PipelineMultisampleStateCreateInfo {
-                            rasterization_samples: vk::SampleCountFlags::TYPE_1,
-                            ..Default::default()
-                        })
-                        .depth_stencil_state(&vk::PipelineDepthStencilStateCreateInfo {
-                            depth_test_enable: 1,
-                            depth_write_enable: 1,
-                            depth_compare_op: vk::CompareOp::LESS_OR_EQUAL,
-                            front: noop_stencil_state,
-                            back: noop_stencil_state,
-                            max_depth_bounds: 1.0,
-                            ..Default::default()
-                        })
-                        .color_blend_state(
-                            &vk::PipelineColorBlendStateCreateInfo::builder()
-                                .logic_op(vk::LogicOp::CLEAR)
-                                .attachments(&[vk::PipelineColorBlendAttachmentState {
-                                    blend_enable: 0,
-                                    src_color_blend_factor: vk::BlendFactor::SRC_COLOR,
-                                    dst_color_blend_factor: vk::BlendFactor::ONE_MINUS_DST_COLOR,
-                                    color_blend_op: vk::BlendOp::ADD,
-                                    src_alpha_blend_factor: vk::BlendFactor::ZERO,
-                                    dst_alpha_blend_factor: vk::BlendFactor::ZERO,
-                                    alpha_blend_op: vk::BlendOp::ADD,
-                                    color_write_mask: vk::ColorComponentFlags::all(),
-                                }]),
-                        )
-                        .dynamic_state(
-                            &vk::PipelineDynamicStateCreateInfo::builder().dynamic_states(&[
-                                vk::DynamicState::VIEWPORT,
-                                vk::DynamicState::SCISSOR,
-                            ]),
-                        )
-                        .layout(pipeline_layout)
-                        .render_pass(renderpass)
-                        .build()],
-                    None,
+                        .build(),
                 )
-                .expect("Unable to create graphics pipeline")
-        };
+                .input_assembly_state(&vk::PipelineInputAssemblyStateCreateInfo {
+                    topology: vk::PrimitiveTopology::TRIANGLE_LIST,
+                    ..Default::default()
+                })
+                .viewport_state(
+                    &vk::PipelineViewportStateCreateInfo::builder()
+                        .scissors(&scissors)
+                        .viewports(&viewports),
+                )
+                .rasterization_state(&vk::PipelineRasterizationStateCreateInfo {
+                    front_face: vk::FrontFace::COUNTER_CLOCKWISE,
+                    line_width: 1.0,
+                    polygon_mode: vk::PolygonMode::FILL,
+                    ..Default::default()
+                })
+                .multisample_state(&vk::PipelineMultisampleStateCreateInfo {
+                    rasterization_samples: vk::SampleCountFlags::TYPE_1,
+                    ..Default::default()
+                })
+                .depth_stencil_state(&vk::PipelineDepthStencilStateCreateInfo {
+                    depth_test_enable: 1,
+                    depth_write_enable: 1,
+                    depth_compare_op: vk::CompareOp::LESS_OR_EQUAL,
+                    front: noop_stencil_state,
+                    back: noop_stencil_state,
+                    max_depth_bounds: 1.0,
+                    ..Default::default()
+                })
+                .color_blend_state(
+                    &vk::PipelineColorBlendStateCreateInfo::builder()
+                        .logic_op(vk::LogicOp::CLEAR)
+                        .attachments(&[vk::PipelineColorBlendAttachmentState {
+                            blend_enable: 0,
+                            src_color_blend_factor: vk::BlendFactor::SRC_COLOR,
+                            dst_color_blend_factor: vk::BlendFactor::ONE_MINUS_DST_COLOR,
+                            color_blend_op: vk::BlendOp::ADD,
+                            src_alpha_blend_factor: vk::BlendFactor::ZERO,
+                            dst_alpha_blend_factor: vk::BlendFactor::ZERO,
+                            alpha_blend_op: vk::BlendOp::ADD,
+                            color_write_mask: vk::ColorComponentFlags::all(),
+                        }]),
+                )
+                .dynamic_state(
+                    &vk::PipelineDynamicStateCreateInfo::builder()
+                        .dynamic_states(&[vk::DynamicState::VIEWPORT, vk::DynamicState::SCISSOR]),
+                )
+                .render_pass(renderpass.pass()),
+            vulkan.context(),
+        );
 
-        Pipeline {
-            pipeline: pipeline[0],
-            layout: pipeline_layout,
+        Self {
+            pipeline,
             renderpass,
             pipeline_descriptor,
             uniform_buffer,
             uniform_transform: uniform_data,
-            context: vulkan.context(),
         }
     }
 }
 
-impl Drop for Pipeline {
-    fn drop(&mut self) {
-        unsafe {
-            self.context.wait_idle();
-            self.context.device.destroy_pipeline(self.pipeline, None);
-            self.context
-                .device
-                .destroy_pipeline_layout(self.layout, None);
-            self.context
-                .device
-                .destroy_render_pass(self.renderpass, None);
-        }
-    }
-}
 pub fn create_uniform_data(swapchain: &Swapchain) -> UniformBufferObject {
     UniformBufferObject {
         view: Matrix4::look_at(
@@ -239,67 +231,5 @@ pub fn create_uniform_data(swapchain: &Swapchain) -> UniformBufferObject {
             );
             examples::OPENGL_TO_VULKAN_MATRIX * proj
         },
-    }
-}
-
-pub fn create_render_pass(swapchain: &Swapchain, vulkan: &VkThread) -> vk::RenderPass {
-    let color_attachment = vk::AttachmentDescription {
-        flags: vk::AttachmentDescriptionFlags::empty(),
-        format: swapchain.format,
-        samples: vk::SampleCountFlags::TYPE_1,
-        load_op: vk::AttachmentLoadOp::CLEAR,
-        store_op: vk::AttachmentStoreOp::STORE,
-        stencil_load_op: vk::AttachmentLoadOp::DONT_CARE,
-        stencil_store_op: vk::AttachmentStoreOp::DONT_CARE,
-        initial_layout: vk::ImageLayout::UNDEFINED,
-        final_layout: vk::ImageLayout::PRESENT_SRC_KHR,
-    };
-
-    let subpasses = [vk::SubpassDescription {
-        color_attachment_count: 1,
-        p_color_attachments: &vk::AttachmentReference {
-            attachment: 0,
-            layout: vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL,
-        },
-        p_depth_stencil_attachment: ptr::null(),
-        flags: vk::SubpassDescriptionFlags::empty(),
-        pipeline_bind_point: vk::PipelineBindPoint::GRAPHICS,
-        input_attachment_count: 0,
-        p_input_attachments: ptr::null(),
-        p_resolve_attachments: ptr::null(),
-        preserve_attachment_count: 0,
-        p_preserve_attachments: ptr::null(),
-    }];
-
-    let render_pass_attachments = [color_attachment];
-
-    let subpass_dependencies = [vk::SubpassDependency {
-        src_subpass: vk::SUBPASS_EXTERNAL,
-        dst_subpass: 0,
-        src_stage_mask: vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT,
-        dst_stage_mask: vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT,
-        src_access_mask: vk::AccessFlags::empty(),
-        dst_access_mask: vk::AccessFlags::COLOR_ATTACHMENT_READ
-            | vk::AccessFlags::COLOR_ATTACHMENT_WRITE,
-        dependency_flags: vk::DependencyFlags::empty(),
-    }];
-
-    let renderpass_create_info = vk::RenderPassCreateInfo {
-        s_type: vk::StructureType::RENDER_PASS_CREATE_INFO,
-        flags: vk::RenderPassCreateFlags::empty(),
-        p_next: ptr::null(),
-        attachment_count: render_pass_attachments.len() as u32,
-        p_attachments: render_pass_attachments.as_ptr(),
-        subpass_count: subpasses.len() as u32,
-        p_subpasses: subpasses.as_ptr(),
-        dependency_count: subpass_dependencies.len() as u32,
-        p_dependencies: subpass_dependencies.as_ptr(),
-    };
-
-    unsafe {
-        vulkan
-            .device()
-            .create_render_pass(&renderpass_create_info, None)
-            .expect("Failed to create render pass!")
     }
 }

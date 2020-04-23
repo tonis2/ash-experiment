@@ -180,31 +180,7 @@ pub struct SwapchainSupport {
     pub present_modes: Vec<vk::PresentModeKHR>,
 }
 
-impl SwapchainSupport {
-    pub fn query_swapchain_support(
-        physical_device: vk::PhysicalDevice,
-        surface_loader: &Surface,
-        surface: vk::SurfaceKHR,
-    ) -> SwapchainSupport {
-        unsafe {
-            let capabilities = surface_loader
-                .get_physical_device_surface_capabilities(physical_device, surface)
-                .expect("Failed to query for surface capabilities.");
-            let formats = surface_loader
-                .get_physical_device_surface_formats(physical_device, surface)
-                .expect("Failed to query for surface formats.");
-            let present_modes = surface_loader
-                .get_physical_device_surface_present_modes(physical_device, surface)
-                .expect("Failed to query for surface present mode.");
 
-            SwapchainSupport {
-                capabilities,
-                formats,
-                present_modes,
-            }
-        }
-    }
-}
 
 pub fn choose_swapchain_present_mode(
     available_present_modes: &Vec<vk::PresentModeKHR>,

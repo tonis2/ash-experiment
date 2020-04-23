@@ -1,5 +1,5 @@
 use vulkan::{
-    modules::swapchain::Swapchain, offset_of, prelude::*, Buffer, Context, Descriptor,
+    Swapchain, offset_of, prelude::*, Buffer, Context, Descriptor,
     DescriptorSet, Image, Shader, VkThread,
 };
 

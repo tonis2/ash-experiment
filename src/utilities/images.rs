@@ -36,7 +36,6 @@ impl Image {
             context: context.clone(),
         }
     }
-    
 
     pub fn attach_view(&mut self, image_info: vk::ImageViewCreateInfo) {
         self.image_view = Some(unsafe {
@@ -91,11 +90,6 @@ impl Image {
                 .expect("Failed to create Image View!")
         }
     }
-
-    // pub fn create_empty_image(context: Arc<Context>) -> Image {
-    
-    //     image
-    // }
 }
 
 impl Drop for Image {

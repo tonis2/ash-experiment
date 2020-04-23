@@ -1,6 +1,6 @@
 use cgmath::{Deg, Matrix4, Point3, Vector3};
 use vulkan::{
-    modules::swapchain::Swapchain, offset_of, prelude::*, Buffer, Context, Descriptor,
+    Swapchain, offset_of, prelude::*, Buffer, Context, Descriptor,
     DescriptorSet, Image, Shader, VkThread,
 };
 

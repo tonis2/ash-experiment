@@ -1,5 +1,5 @@
 use vulkan::{
-    modules::swapchain::Swapchain,
+    Swapchain,
     offset_of,
     prelude::*,
     utilities::{as_byte_slice, Shader},

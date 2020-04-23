@@ -38,16 +38,10 @@ fn main() {
 
     let mut swapchain = Swapchain::new(vulkan.clone());
 
-    let mut pipeline = pipeline::Pipeline::new(&swapchain, &instance);
+    let mut pipeline = pipeline::Pipe::new(&swapchain, &instance);
 
-    let index_buffer = instance.create_gpu_buffer(
-        vk::BufferUsageFlags::INDEX_BUFFER,
-        &indices,
-    );
-    let vertex_buffer = instance.create_gpu_buffer(
-        vk::BufferUsageFlags::VERTEX_BUFFER,
-        &vertices,
-    );
+    let index_buffer = instance.create_gpu_buffer(vk::BufferUsageFlags::INDEX_BUFFER, &indices);
+    let vertex_buffer = instance.create_gpu_buffer(vk::BufferUsageFlags::VERTEX_BUFFER, &vertices);
 
     let command_buffers = instance.create_command_buffers(swapchain.image_views.len());
     let mut tick_counter = FPSLimiter::new();
@@ -59,7 +53,7 @@ fn main() {
             Framebuffer::new(
                 vk::FramebufferCreateInfo::builder()
                     .layers(1)
-                    .render_pass(pipeline.renderpass)
+                    .render_pass(pipeline.renderpass.pass())
                     .attachments(&[*image])
                     .width(swapchain.width())
                     .height(swapchain.height())
@@ -112,7 +106,7 @@ fn main() {
             if let Ok((image_index, _is_suboptimal)) = frame {
                 let render_pass_info = vk::RenderPassBeginInfo::builder()
                     .framebuffer(framebuffers[image_index as usize].buffer())
-                    .render_pass(pipeline.renderpass)
+                    .render_pass(pipeline.renderpass.pass())
                     .clear_values(&[vk::ClearValue {
                         color: vk::ClearColorValue {
                             float32: [0.0, 0.0, 0.0, 1.0],
@@ -132,7 +126,7 @@ fn main() {
                         device.cmd_bind_pipeline(
                             command_buffer,
                             vk::PipelineBindPoint::GRAPHICS,
-                            pipeline.pipeline,
+                            pipeline.pipeline.default(),
                         );
                         device.cmd_set_viewport(command_buffer, 0, &viewports);
                         device.cmd_set_scissor(command_buffer, 0, &[extent]);
@@ -170,7 +164,7 @@ fn main() {
                         Framebuffer::new(
                             vk::FramebufferCreateInfo::builder()
                                 .layers(1)
-                                .render_pass(pipeline.renderpass)
+                                .render_pass(pipeline.renderpass.pass())
                                 .attachments(&[*image])
                                 .width(swapchain.width())
                                 .height(swapchain.height())
@@ -179,7 +173,7 @@ fn main() {
                         )
                     })
                     .collect();
-                pipeline = pipeline::Pipeline::new(&swapchain, &instance);
+                pipeline = pipeline::Pipe::new(&swapchain, &instance);
             }
         }
         Event::LoopDestroyed => {}

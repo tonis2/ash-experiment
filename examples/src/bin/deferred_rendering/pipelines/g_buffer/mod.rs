@@ -1,4 +1,3 @@
-mod framebuffers;
 mod pipeline;
 
 use examples::utils::{
@@ -7,11 +6,12 @@ use examples::utils::{
 };
 use std::sync::Arc;
 use vulkan::{
-    modules::swapchain::Swapchain,
+    Swapchain,
     offset_of,
     prelude::*,
     utilities::{as_byte_slice, Shader},
     Buffer, Context, Descriptor, DescriptorSet, Image, VkThread,
+    Pipeline, 
 };
 
 pub struct GBuffer {
