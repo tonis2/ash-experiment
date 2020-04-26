@@ -34,10 +34,12 @@ layout (location = 0) in vec4 fragColor;
 layout (location = 1) in vec4 tangents;
 layout (location = 2) in vec3 normal;
 layout (location = 3) in vec2 uv;
-layout (location = 4) in flat int material_index;
+layout (location = 4) in vec4 world_position;
+layout (location = 5) in flat int material_index;
 
 layout (location = 0) out vec4 outColor;
-
+layout (location = 1) out vec4 outNormal;
+layout (location = 2) out vec4 outPosition;
 
 void main() {
     if (MATERIALS_AMOUNT > 0) {
@@ -47,11 +49,9 @@ void main() {
         if (mesh_material.color_texture.index != -1) {
              outColor = texture(textureSampler[mesh_material.color_texture.index], uv);
         }
-
-        if (mesh_material.normals_texture.index != -1) {
-             outColor = texture(textureSampler[mesh_material.color_texture.index], uv);
-        }
     } else {
         outColor = fragColor;
-    } 
+    }
+
+    outPosition = vec4(inWorldPos, 1.0); 
 }

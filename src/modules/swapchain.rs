@@ -1,7 +1,7 @@
 use super::context::Context;
 use std::sync::Arc;
 
-use ash::{extensions::khr::Surface, version::DeviceV1_0, vk};
+use ash::{version::DeviceV1_0, vk};
 
 use super::device::query_swapchain_support;
 

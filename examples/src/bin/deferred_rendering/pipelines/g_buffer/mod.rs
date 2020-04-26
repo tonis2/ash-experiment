@@ -4,7 +4,8 @@ use vulkan::{
     offset_of,
     prelude::*,
     utilities::{as_byte_slice, Shader},
-    Buffer, Descriptor, DescriptorSet, Image, Pipeline, Renderpass, Swapchain, VkThread,
+    Buffer, Descriptor, DescriptorSet, Framebuffer, Image, Pipeline, Renderpass, Swapchain,
+    VkThread,
 };
 
 use super::definitions::{PushTransform, SpecializationData};
@@ -12,7 +13,7 @@ use examples::utils::{
     gltf_importer::{MaterialRaw, Scene, Vertex},
     Camera, CameraRaw,
 };
-use std::{default::Default, ffi::CString, mem, path::Path, sync::Arc};
+use std::{default::Default, ffi::CString, mem, path::Path};
 
 pub struct Gbuffer {
     pub pipeline_descriptor: Descriptor,
@@ -28,6 +29,7 @@ pub struct Gbuffer {
     pub material_buffer: Buffer,
     pub camera: Camera,
     pub renderpass: Renderpass,
+    pub framebuffers: Vec<Framebuffer>,
     pub pipeline: Pipeline,
 }
 
@@ -190,39 +192,106 @@ impl Gbuffer {
                 .build()
         };
 
-        let renderpass = Renderpass::new(
-            vk::RenderPassCreateInfo::builder()
-                .attachments(&[vk::AttachmentDescription {
+        //RENDERPASS
+
+        let images: Vec<&Image> = vec![&color, &normal, &position, &depth];
+        let mut attachments: Vec<vk::AttachmentDescription> = Vec::new();
+        let mut attachment_references: Vec<vk::AttachmentReference> = Vec::new();
+
+        images.iter().enumerate().for_each(|(index, img)| {
+            if index < 3 {
+                attachments.push(vk::AttachmentDescription {
                     flags: vk::AttachmentDescriptionFlags::empty(),
-                    format: swapchain.format,
+                    format: img.format,
                     samples: vk::SampleCountFlags::TYPE_1,
                     load_op: vk::AttachmentLoadOp::CLEAR,
                     store_op: vk::AttachmentStoreOp::STORE,
                     stencil_load_op: vk::AttachmentLoadOp::DONT_CARE,
                     stencil_store_op: vk::AttachmentStoreOp::DONT_CARE,
                     initial_layout: vk::ImageLayout::UNDEFINED,
-                    final_layout: vk::ImageLayout::PRESENT_SRC_KHR,
-                }])
+                    final_layout: vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
+                });
+                attachment_references.push(vk::AttachmentReference {
+                    attachment: index as u32,
+                    layout: vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL,
+                });
+            } else {
+                //Depth
+                attachments.push(vk::AttachmentDescription {
+                    flags: vk::AttachmentDescriptionFlags::empty(),
+                    format: img.format,
+                    samples: vk::SampleCountFlags::TYPE_1,
+                    load_op: vk::AttachmentLoadOp::CLEAR,
+                    store_op: vk::AttachmentStoreOp::STORE,
+                    stencil_load_op: vk::AttachmentLoadOp::DONT_CARE,
+                    stencil_store_op: vk::AttachmentStoreOp::DONT_CARE,
+                    initial_layout: vk::ImageLayout::UNDEFINED,
+                    final_layout: vk::ImageLayout::DEPTH_READ_ONLY_STENCIL_ATTACHMENT_OPTIMAL,
+                });
+                attachment_references.push(vk::AttachmentReference {
+                    attachment: index as u32,
+                    layout: vk::ImageLayout::DEPTH_READ_ONLY_STENCIL_ATTACHMENT_OPTIMAL,
+                });
+            }
+        });
+
+        let renderpass = Renderpass::new(
+            vk::RenderPassCreateInfo::builder()
+                .attachments(&attachments)
                 .subpasses(&[vk::SubpassDescription::builder()
                     .pipeline_bind_point(vk::PipelineBindPoint::GRAPHICS)
-                    .color_attachments(&[vk::AttachmentReference {
-                        attachment: 0,
-                        layout: vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL,
-                    }])
+                    .color_attachments(&attachment_references[0..3])
+                    .depth_stencil_attachment(&attachment_references[3..4][0])
                     .build()])
-                .dependencies(&[vk::SubpassDependency {
-                    src_subpass: vk::SUBPASS_EXTERNAL,
-                    dst_subpass: 0,
-                    src_stage_mask: vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT,
-                    dst_stage_mask: vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT,
-                    src_access_mask: vk::AccessFlags::empty(),
-                    dst_access_mask: vk::AccessFlags::COLOR_ATTACHMENT_READ
-                        | vk::AccessFlags::COLOR_ATTACHMENT_WRITE,
-                    dependency_flags: vk::DependencyFlags::empty(),
-                }])
+                .dependencies(&[
+                    vk::SubpassDependency {
+                        src_subpass: vk::SUBPASS_EXTERNAL,
+                        dst_subpass: 0,
+                        src_stage_mask: vk::PipelineStageFlags::BOTTOM_OF_PIPE,
+                        dst_stage_mask: vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT,
+                        src_access_mask: vk::AccessFlags::MEMORY_READ,
+                        dst_access_mask: vk::AccessFlags::COLOR_ATTACHMENT_READ
+                            | vk::AccessFlags::COLOR_ATTACHMENT_WRITE,
+                        dependency_flags: vk::DependencyFlags::BY_REGION,
+                    },
+                    vk::SubpassDependency {
+                        src_subpass: 0,
+                        dst_subpass: vk::SUBPASS_EXTERNAL,
+                        src_stage_mask: vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT,
+                        dst_stage_mask: vk::PipelineStageFlags::BOTTOM_OF_PIPE,
+                        src_access_mask: vk::AccessFlags::COLOR_ATTACHMENT_READ
+                            | vk::AccessFlags::COLOR_ATTACHMENT_WRITE,
+                        dst_access_mask: vk::AccessFlags::MEMORY_READ,
+                        dependency_flags: vk::DependencyFlags::BY_REGION,
+                    },
+                ])
                 .build(),
             vulkan.context(),
         );
+
+        //FRAMEBUFFERS
+        let framebuffers: Vec<Framebuffer> = swapchain
+            .image_views
+            .iter()
+            .map(|image| {
+                Framebuffer::new(
+                    vk::FramebufferCreateInfo::builder()
+                        .layers(1)
+                        .render_pass(renderpass.pass())
+                        .attachments(&[
+                            *image,
+                            color.view(),
+                            normal.view(),
+                            position.view(),
+                            depth.view(),
+                        ])
+                        .width(swapchain.width())
+                        .height(swapchain.height())
+                        .build(),
+                    vulkan.context(),
+                )
+            })
+            .collect();
 
         let shader_name = CString::new("gbuffer").unwrap();
 
@@ -373,6 +442,7 @@ impl Gbuffer {
             material_buffer,
             camera,
             renderpass,
+            framebuffers,
         }
     }
 }

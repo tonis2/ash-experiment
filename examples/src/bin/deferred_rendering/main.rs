@@ -22,13 +22,17 @@ fn main() {
     let instance = VkThread::new(vulkan.clone());
     let mut swapchain = Swapchain::new(vulkan.clone());
     let mut queue = Queue::new(vulkan.clone());
+
     //../../GLTF_tests/multi_texture.gltf
     let mut scene = gltf_importer::Importer::load(Path::new("../../GLTF_tests/multi_texture.gltf"))
         .build(&instance);
 
+    let g_buffer = pipelines::Gbuffer::build(&scene, &swapchain, &instance);
     let command_buffers = instance.create_command_buffers(swapchain.image_views.len());
     let mut tick_counter = FPSLimiter::new();
     let mut events = events::Event::new();
+
+    //Event loop
     event_loop.run(move |event, _, control_flow| match event {
         Event::WindowEvent { event, .. } => match event {
             WindowEvent::CloseRequested => *control_flow = ControlFlow::Exit,
@@ -41,7 +45,6 @@ fn main() {
                 events.handle_event(event);
                 if events.event_happened {
                     //Camera updates
-
                     events.clear();
                 }
             }
@@ -68,6 +71,35 @@ fn main() {
             }];
 
             if let Ok((image_index, _s)) = queue.load_next_frame(&mut swapchain) {
+                let g_pass = vk::RenderPassBeginInfo::builder()
+                    .framebuffer(g_buffer.framebuffers[image_index as usize].buffer())
+                    .render_pass(g_buffer.renderpass.pass())
+                    .render_area(extent)
+                    .clear_values(&[
+                        vk::ClearValue {
+                            color: vk::ClearColorValue {
+                                float32: [0.0, 0.0, 0.0, 0.0],
+                            },
+                        },
+                        vk::ClearValue {
+                            color: vk::ClearColorValue {
+                                float32: [0.0, 0.0, 0.0, 0.0],
+                            },
+                        },
+                        vk::ClearValue {
+                            color: vk::ClearColorValue {
+                                float32: [0.0, 0.0, 0.0, 0.0],
+                            },
+                        },
+                        vk::ClearValue {
+                            // clear value for depth buffer
+                            depth_stencil: vk::ClearDepthStencilValue {
+                                depth: 1.0,
+                                stencil: 0,
+                            },
+                        },
+                    ])
+                    .build();
             } else {
                 //Resize window
                 vulkan.wait_idle();

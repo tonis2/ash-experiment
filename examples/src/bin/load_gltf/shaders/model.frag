@@ -48,9 +48,7 @@ void main() {
              outColor = texture(textureSampler[mesh_material.color_texture.index], uv);
         }
 
-        if (mesh_material.normals_texture.index != -1) {
-             outColor = texture(textureSampler[mesh_material.color_texture.index], uv);
-        }
+
     } else {
         outColor = fragColor;
     } 

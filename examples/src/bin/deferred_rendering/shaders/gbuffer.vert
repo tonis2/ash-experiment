@@ -24,7 +24,9 @@ layout (location = 0) out vec4 fragColor;
 layout (location = 1) out vec4 out_tangents;
 layout (location = 2) out vec3 out_normal;
 layout (location = 3) out vec2 out_uv;
-layout (location = 4) out int out_material_index;
+layout (location = 4) out vec3 out_position;
+layout (location = 5) out int out_material_index;
+
 
 out gl_PerVertex {
     vec4 gl_Position;
@@ -32,6 +34,7 @@ out gl_PerVertex {
 
 void main() {
     gl_Position = camera.proj * camera.view * constant.model_transform * vec4(inPosition, 1.0);
+    out_position = constant.model_transform * inPosition;
     fragColor = inColor;
     out_normal = normal;
     out_uv = uv;

@@ -1,3 +1,4 @@
 pub mod definitions;
-pub mod g_buffer;
+mod g_buffer;
 
+pub use g_buffer::Gbuffer;
