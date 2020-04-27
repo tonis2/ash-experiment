@@ -284,3 +284,38 @@ pub fn create_empty_image(vulkan: &VkThread) -> Image {
 pub const OPENGL_TO_VULKAN_MATRIX: cgmath::Matrix4<f32> = cgmath::Matrix4::new(
     1.0, 0.0, 0.0, 0.0, 0.0, -1.0, 0.0, 0.0, 0.0, 0.0, 0.5, 0.0, 0.0, 0.0, 0.5, 1.0,
 );
+
+
+#[repr(C)]
+#[derive(Clone, Debug, Copy)]
+pub struct Quad {
+    pub position: [f32; 3],
+    pub uv: [f32; 2],
+}
+
+impl Quad {
+    pub fn create_quad() -> Vec<Quad> {
+        vec![
+            Quad {
+                position: [-1.0, -1.0, 0.0],
+                uv: [1.0, 1.0],
+            },
+            Quad {
+                position: [-1.0, 1.0, 0.0],
+                uv: [0.0, 1.0],
+            },
+            Quad {
+                position: [1.0, 1.0, 0.0],
+                uv: [0.0, 0.0],
+            },
+            Quad {
+                position: [1.0, -1.0, 0.0],
+                uv: [1.0, 0.0],
+            },
+        ]
+    }
+
+    pub fn indices() -> Vec<u8> {
+        vec![0, 1, 2, 2, 3, 0]
+    }
+}

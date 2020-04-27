@@ -1,16 +1,6 @@
-use std::sync::Arc;
-use vulkan::{
-    prelude::*,
-     Context, Image,
- 
-};
+use vulkan::{prelude::*, Image, VkThread};
 
-pub fn create_image(
-    format: vk::Format,
-    width: u32,
-    height: u32,
-    context: Arc<Context>,
-) -> Image {
+pub fn create_image(format: vk::Format, width: u32, height: u32, vulkan: &VkThread) -> Image {
     let mut image = Image::create_image(
         vk::ImageCreateInfo {
             s_type: vk::StructureType::IMAGE_CREATE_INFO,
@@ -30,7 +20,7 @@ pub fn create_image(
             ..Default::default()
         },
         vk_mem::MemoryUsage::GpuOnly,
-        context.clone(),
+        vulkan.context(),
     );
 
     image.attach_view(vk::ImageViewCreateInfo {
@@ -52,5 +42,29 @@ pub fn create_image(
         image: image.image(),
         ..Default::default()
     });
+
+    vulkan.apply_pipeline_barrier(
+        vk::PipelineStageFlags::ALL_GRAPHICS,
+        vk::PipelineStageFlags::FRAGMENT_SHADER,
+        vk::ImageMemoryBarrier {
+            s_type: vk::StructureType::IMAGE_MEMORY_BARRIER,
+            src_access_mask: vk::AccessFlags::empty(),
+            dst_access_mask: vk::AccessFlags::SHADER_READ,
+            old_layout: vk::ImageLayout::UNDEFINED,
+            new_layout: vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL,
+            src_queue_family_index: vk::QUEUE_FAMILY_IGNORED,
+            dst_queue_family_index: vk::QUEUE_FAMILY_IGNORED,
+            image: image.image(),
+            subresource_range: vk::ImageSubresourceRange {
+                aspect_mask: vk::ImageAspectFlags::COLOR,
+                base_mip_level: 0,
+                level_count: 1,
+                base_array_layer: 0,
+                layer_count: 1,
+            },
+            ..Default::default()
+        },
+    );
+
     image
 }

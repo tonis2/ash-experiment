@@ -31,10 +31,10 @@ layout (binding = 1) uniform MaterialData {
 layout (binding = 2) uniform sampler2D textureSampler[TEXTURE_AMOUNT > 0 ? TEXTURE_AMOUNT : 1];
 
 layout (location = 0) in vec4 fragColor;
-layout (location = 1) in vec4 tangents;
-layout (location = 2) in vec3 normal;
+layout (location = 1) in vec3 in_tangent;
+layout (location = 2) in vec3 in_normal;
 layout (location = 3) in vec2 uv;
-layout (location = 4) in vec4 world_position;
+layout (location = 4) in vec3 model_postion;
 layout (location = 5) in flat int material_index;
 
 layout (location = 0) out vec4 outColor;
@@ -49,9 +49,27 @@ void main() {
         if (mesh_material.color_texture.index != -1) {
              outColor = texture(textureSampler[mesh_material.color_texture.index], uv);
         }
+
+        //Normal texture
+        if (mesh_material.normals_texture.index != -1) {
+                vec3 normal_texture = texture(textureSampler[mesh_material.color_texture.index], uv).xyz;
+
+             // Calculate normal in tangent space
+                vec3 Normal = normalize(in_normal);
+                Normal.y = -Normal.y;
+                vec3 Tangent = normalize(in_tangent);
+                vec3 Bittanget = cross(Normal, Tangent);
+                mat3 TBN = mat3(Tangent, Bittanget, Normal);
+                vec3 tnorm = TBN * normalize(normal_texture * 2.0 - vec3(1.0));
+                outNormal = vec4(tnorm, 1.0);
+        } else {
+            outNormal = vec4(0.0, 0.0, 0.0, 0.0);
+        }
+
     } else {
         outColor = fragColor;
+        outNormal = vec4(0.0, 0.0, 0.0, 0.0);
     }
 
-    outPosition = vec4(inWorldPos, 1.0); 
+    outPosition = vec4(model_postion, 1.0); 
 }

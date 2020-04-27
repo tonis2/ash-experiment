@@ -42,6 +42,10 @@ impl Pipeline {
     pub fn get_pipeline(&self, index: u32) -> vk::Pipeline {
         self.pipelines[index as usize]
     }
+
+    pub fn layout(&self) -> vk::PipelineLayout {
+        self.layout
+    }
 }
 
 impl Drop for Pipeline {

@@ -23,7 +23,7 @@ pub struct Scene {
     pub indices: Arc<Buffer>,
     pub indices_len: u32,
 }
-
+#[repr(C)]
 #[derive(Clone, Debug, Copy)]
 pub struct Vertex {
     pub position: [f32; 3],
@@ -320,16 +320,15 @@ impl Importer {
         let mut vertices_data: Vec<Vertex> = Vec::new();
         let mut indices_data: Vec<u32> = Vec::new();
 
-
         let lights: Vec<Light> = self.doc.lights().map_or(vec![], |lights| {
-            lights.map(|light_data| {
-                Light {
+            lights
+                .map(|light_data| Light {
                     color: light_data.color(),
                     intensity: light_data.intensity(),
                     range: light_data.range(),
-                    light_type : light_data.kind(),
-                }
-            }).collect()
+                    light_type: light_data.kind(),
+                })
+                .collect()
         });
 
         let mut textures: Vec<Image> = self
@@ -517,7 +516,6 @@ fn compute_transform_matrix(transform: &Transform) -> cgmath::Matrix4<f32> {
     }
 }
 
-
 fn build_sampler(sampler: &gltf::texture::Sampler) -> vk::SamplerCreateInfo {
     use gltf::texture::MagFilter;
     use gltf::texture::MinFilter;
@@ -535,18 +533,12 @@ fn build_sampler(sampler: &gltf::texture::Sampler) -> vk::SamplerCreateInfo {
         match min_filter {
             MinFilter::Linear => (vk::Filter::LINEAR, vk::SamplerMipmapMode::LINEAR),
             MinFilter::Nearest => (vk::Filter::NEAREST, vk::SamplerMipmapMode::NEAREST),
-            MinFilter::LinearMipmapLinear => {
-                (vk::Filter::LINEAR, vk::SamplerMipmapMode::LINEAR)
-            }
-            MinFilter::LinearMipmapNearest => {
-                (vk::Filter::LINEAR, vk::SamplerMipmapMode::NEAREST)
-            }
+            MinFilter::LinearMipmapLinear => (vk::Filter::LINEAR, vk::SamplerMipmapMode::LINEAR),
+            MinFilter::LinearMipmapNearest => (vk::Filter::LINEAR, vk::SamplerMipmapMode::NEAREST),
             MinFilter::NearestMipmapNearest => {
                 (vk::Filter::NEAREST, vk::SamplerMipmapMode::NEAREST)
             }
-            MinFilter::NearestMipmapLinear => {
-                (vk::Filter::NEAREST, vk::SamplerMipmapMode::LINEAR)
-            }
+            MinFilter::NearestMipmapLinear => (vk::Filter::NEAREST, vk::SamplerMipmapMode::LINEAR),
         }
     }
 
@@ -629,9 +621,8 @@ fn create_texture_image(properties: &gltf::image::Data, vulkan: &VkThread) -> Im
         }
     };
 
-    let image_size =
-        (std::mem::size_of::<u8>() as u32 * properties.width * properties.height * 4)
-            as vk::DeviceSize;
+    let image_size = (std::mem::size_of::<u8>() as u32 * properties.width * properties.height * 4)
+        as vk::DeviceSize;
 
     let buffer = Buffer::new_mapped_basic(
         image_size,

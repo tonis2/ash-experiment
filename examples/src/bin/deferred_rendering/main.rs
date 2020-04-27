@@ -1,11 +1,12 @@
 mod pipelines;
 use vulkan::{
-    prelude::*, utilities::as_byte_slice, utilities::FPSLimiter, Context, Framebuffer, Queue,
-    Swapchain, VkThread,
+    prelude::*, utilities::as_byte_slice, utilities::FPSLimiter, Context, Queue, Swapchain,
+    VkThread,
 };
 
 use examples::utils::{events, gltf_importer};
 
+use pipelines::PushTransform;
 use std::{path::Path, sync::Arc};
 use winit::event::{Event, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop};
@@ -21,13 +22,14 @@ fn main() {
     let vulkan = Arc::new(Context::new(&window, "gltf", true));
     let instance = VkThread::new(vulkan.clone());
     let mut swapchain = Swapchain::new(vulkan.clone());
-    let mut queue = Queue::new(vulkan.clone());
+    let queue = Queue::new(vulkan.clone());
 
     //../../GLTF_tests/multi_texture.gltf
     let mut scene = gltf_importer::Importer::load(Path::new("../../GLTF_tests/multi_texture.gltf"))
         .build(&instance);
 
     let g_buffer = pipelines::Gbuffer::build(&scene, &swapchain, &instance);
+    let deferred_pipe = pipelines::Deferred::build(&g_buffer.get_buffer_images(), &swapchain, &instance);
     let command_buffers = instance.create_command_buffers(swapchain.image_views.len());
     let mut tick_counter = FPSLimiter::new();
     let mut events = events::Event::new();
@@ -100,6 +102,79 @@ fn main() {
                         },
                     ])
                     .build();
+
+                instance.build_command(
+                    command_buffers[image_index as usize],
+                    |command_buffer, device| unsafe {
+                        device.cmd_set_viewport(command_buffer, 0, &viewports);
+                        device.cmd_set_scissor(command_buffer, 0, &[extent]);
+                        device.cmd_begin_render_pass(
+                            command_buffer,
+                            &g_pass,
+                            vk::SubpassContents::INLINE,
+                        );
+                        device.cmd_bind_pipeline(
+                            command_buffer,
+                            vk::PipelineBindPoint::GRAPHICS,
+                            g_buffer.pipeline.default(),
+                        );
+
+                        device.cmd_bind_descriptor_sets(
+                            command_buffer,
+                            vk::PipelineBindPoint::GRAPHICS,
+                            g_buffer.pipeline.layout(),
+                            0,
+                            &[g_buffer.pipeline_descriptor.set],
+                            &[],
+                        );
+
+                        for node in &scene.nodes {
+                            if let Some(mesh_index) = node.mesh_index {
+                                let mesh = scene.get_mesh(mesh_index);
+
+                                mesh.primitives.iter().for_each(|primitive| {
+                                    device.cmd_bind_vertex_buffers(
+                                        command_buffer,
+                                        0,
+                                        &[scene.vertices.clone().buffer],
+                                        &[primitive.vertex_offset as u64],
+                                    );
+                                    device.cmd_bind_index_buffer(
+                                        command_buffer,
+                                        scene.indices.clone().buffer,
+                                        primitive.indice_offset as u64,
+                                        vk::IndexType::UINT32,
+                                    );
+
+                                    device.cmd_push_constants(
+                                        command_buffer,
+                                        g_buffer.pipeline.layout(),
+                                        vk::ShaderStageFlags::VERTEX,
+                                        0,
+                                        as_byte_slice(&PushTransform {
+                                            transform: node.transform_matrix,
+                                        }),
+                                    );
+                                    device.cmd_draw_indexed(
+                                        command_buffer,
+                                        primitive.indices_len as u32,
+                                        1,
+                                        0,
+                                        0,
+                                        0,
+                                    );
+                                });
+                            }
+                        }
+                        device.cmd_end_render_pass(command_buffer);
+                    },
+                );
+
+            // queue.render_frame(
+            //     &mut swapchain,
+            //     command_buffers[image_index as usize],
+            //     image_index,
+            // );
             } else {
                 //Resize window
                 vulkan.wait_idle();

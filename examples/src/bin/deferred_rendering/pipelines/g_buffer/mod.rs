@@ -1,5 +1,6 @@
 mod helpers;
 
+use std::{default::Default, ffi::CString, mem, path::Path};
 use vulkan::{
     offset_of,
     prelude::*,
@@ -13,7 +14,6 @@ use examples::utils::{
     gltf_importer::{MaterialRaw, Scene, Vertex},
     Camera, CameraRaw,
 };
-use std::{default::Default, ffi::CString, mem, path::Path};
 
 pub struct Gbuffer {
     pub pipeline_descriptor: Descriptor,
@@ -27,6 +27,7 @@ pub struct Gbuffer {
 
     pub uniform_buffer: Buffer,
     pub material_buffer: Buffer,
+
     pub camera: Camera,
     pub renderpass: Renderpass,
     pub framebuffers: Vec<Framebuffer>,
@@ -97,23 +98,15 @@ impl Gbuffer {
 
         let (width, height) = (swapchain.extent.width, swapchain.extent.height);
 
-        let color =
-            helpers::create_image(vk::Format::R8G8B8A8_UNORM, width, height, context.clone());
-        let normal = helpers::create_image(
-            vk::Format::R16G16B16A16_SFLOAT,
-            width,
-            height,
-            context.clone(),
-        );
-        let position = helpers::create_image(
-            vk::Format::R16G16B16A16_SFLOAT,
-            width,
-            height,
-            context.clone(),
-        );
+        //Create the textures that G_Buffer saves to
+        let color = helpers::create_image(vk::Format::R8G8B8A8_UNORM, width, height, &vulkan);
+        let normal = helpers::create_image(vk::Format::R16G16B16A16_SFLOAT, width, height, &vulkan);
+        let position =
+            helpers::create_image(vk::Format::R16G16B16A16_SFLOAT, width, height, &vulkan);
         let depth = examples::create_depth_resources(&swapchain, context.clone());
-        let empty_image = examples::create_empty_image(&vulkan);
 
+        //Empty texture, so shader wont crash when there is 0 materials
+        let empty_image = examples::create_empty_image(&vulkan);
         let texture_data: Vec<vk::DescriptorImageInfo> = {
             if scene.textures.len() > 0 {
                 scene
@@ -193,10 +186,10 @@ impl Gbuffer {
         };
 
         //RENDERPASS
-
         let images: Vec<&Image> = vec![&color, &normal, &position, &depth];
         let mut attachments: Vec<vk::AttachmentDescription> = Vec::new();
         let mut attachment_references: Vec<vk::AttachmentReference> = Vec::new();
+        let mut blend_attachments: Vec<vk::PipelineColorBlendAttachmentState> = Vec::new();
 
         images.iter().enumerate().for_each(|(index, img)| {
             if index < 3 {
@@ -209,11 +202,21 @@ impl Gbuffer {
                     stencil_load_op: vk::AttachmentLoadOp::DONT_CARE,
                     stencil_store_op: vk::AttachmentStoreOp::DONT_CARE,
                     initial_layout: vk::ImageLayout::UNDEFINED,
-                    final_layout: vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
+                    final_layout: vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL,
                 });
                 attachment_references.push(vk::AttachmentReference {
                     attachment: index as u32,
                     layout: vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL,
+                });
+                blend_attachments.push(vk::PipelineColorBlendAttachmentState {
+                    blend_enable: 0,
+                    src_color_blend_factor: vk::BlendFactor::SRC_COLOR,
+                    dst_color_blend_factor: vk::BlendFactor::ONE_MINUS_DST_COLOR,
+                    color_blend_op: vk::BlendOp::ADD,
+                    src_alpha_blend_factor: vk::BlendFactor::ZERO,
+                    dst_alpha_blend_factor: vk::BlendFactor::ZERO,
+                    alpha_blend_op: vk::BlendOp::ADD,
+                    color_write_mask: vk::ColorComponentFlags::all(),
                 });
             } else {
                 //Depth
@@ -247,8 +250,8 @@ impl Gbuffer {
                     vk::SubpassDependency {
                         src_subpass: vk::SUBPASS_EXTERNAL,
                         dst_subpass: 0,
-                        src_stage_mask: vk::PipelineStageFlags::BOTTOM_OF_PIPE,
-                        dst_stage_mask: vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT,
+                        src_stage_mask: vk::PipelineStageFlags::ALL_GRAPHICS,
+                        dst_stage_mask: vk::PipelineStageFlags::ALL_GRAPHICS,
                         src_access_mask: vk::AccessFlags::MEMORY_READ,
                         dst_access_mask: vk::AccessFlags::COLOR_ATTACHMENT_READ
                             | vk::AccessFlags::COLOR_ATTACHMENT_WRITE,
@@ -257,8 +260,8 @@ impl Gbuffer {
                     vk::SubpassDependency {
                         src_subpass: 0,
                         dst_subpass: vk::SUBPASS_EXTERNAL,
-                        src_stage_mask: vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT,
-                        dst_stage_mask: vk::PipelineStageFlags::BOTTOM_OF_PIPE,
+                        src_stage_mask: vk::PipelineStageFlags::ALL_GRAPHICS,
+                        dst_stage_mask: vk::PipelineStageFlags::ALL_GRAPHICS,
                         src_access_mask: vk::AccessFlags::COLOR_ATTACHMENT_READ
                             | vk::AccessFlags::COLOR_ATTACHMENT_WRITE,
                         dst_access_mask: vk::AccessFlags::MEMORY_READ,
@@ -273,18 +276,12 @@ impl Gbuffer {
         let framebuffers: Vec<Framebuffer> = swapchain
             .image_views
             .iter()
-            .map(|image| {
+            .map(|_image| {
                 Framebuffer::new(
                     vk::FramebufferCreateInfo::builder()
                         .layers(1)
                         .render_pass(renderpass.pass())
-                        .attachments(&[
-                            *image,
-                            color.view(),
-                            normal.view(),
-                            position.view(),
-                            depth.view(),
-                        ])
+                        .attachments(&[color.view(), normal.view(), position.view(), depth.view()])
                         .width(swapchain.width())
                         .height(swapchain.height())
                         .build(),
@@ -292,8 +289,6 @@ impl Gbuffer {
                 )
             })
             .collect();
-
-        let shader_name = CString::new("gbuffer").unwrap();
 
         let attributes = [
             vk::VertexInputAttributeDescription {
@@ -348,21 +343,27 @@ impl Gbuffer {
             extent: swapchain.extent,
         }];
 
+        let shader_name = CString::new("main").unwrap();
         let pipeline = Pipeline::new(
             vk::PipelineLayoutCreateInfo::builder()
                 .set_layouts(&[pipeline_descriptor.layout])
+                .push_constant_ranges(&[vk::PushConstantRange {
+                    stage_flags: vk::ShaderStageFlags::VERTEX,
+                    size: mem::size_of::<PushTransform>() as u32,
+                    offset: 0,
+                }])
                 .build(),
             vk::GraphicsPipelineCreateInfo::builder()
                 .stages(&[
                     Shader::new(
-                        &Path::new("src/bin/load_gltf/shaders/model.vert.spv"),
+                        &Path::new("src/bin/deferred_rendering/shaders/gbuffer.vert.spv"),
                         vk::ShaderStageFlags::VERTEX,
                         &shader_name,
                         context.clone(),
                     )
                     .info(),
                     Shader::new(
-                        &Path::new("src/bin/load_gltf/shaders/model.frag.spv"),
+                        &Path::new("src/bin/deferred_rendering/shaders/gbuffer.frag.spv"),
                         vk::ShaderStageFlags::FRAGMENT,
                         &shader_name,
                         context.clone(),
@@ -411,16 +412,7 @@ impl Gbuffer {
                 .color_blend_state(
                     &vk::PipelineColorBlendStateCreateInfo::builder()
                         .logic_op(vk::LogicOp::CLEAR)
-                        .attachments(&[vk::PipelineColorBlendAttachmentState {
-                            blend_enable: 0,
-                            src_color_blend_factor: vk::BlendFactor::SRC_COLOR,
-                            dst_color_blend_factor: vk::BlendFactor::ONE_MINUS_DST_COLOR,
-                            color_blend_op: vk::BlendOp::ADD,
-                            src_alpha_blend_factor: vk::BlendFactor::ZERO,
-                            dst_alpha_blend_factor: vk::BlendFactor::ZERO,
-                            alpha_blend_op: vk::BlendOp::ADD,
-                            color_write_mask: vk::ColorComponentFlags::all(),
-                        }]),
+                        .attachments(&blend_attachments),
                 )
                 .dynamic_state(
                     &vk::PipelineDynamicStateCreateInfo::builder()
@@ -444,5 +436,9 @@ impl Gbuffer {
             renderpass,
             framebuffers,
         }
+    }
+
+    pub fn get_buffer_images(&self) -> Vec<&Image> {
+        vec![&self.color, &self.position, &self.normal]
     }
 }
