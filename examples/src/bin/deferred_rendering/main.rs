@@ -22,14 +22,16 @@ fn main() {
     let vulkan = Arc::new(Context::new(&window, "gltf", true));
     let instance = VkThread::new(vulkan.clone());
     let mut swapchain = Swapchain::new(vulkan.clone());
-    let queue = Queue::new(vulkan.clone());
+    let mut queue = Queue::new(vulkan.clone());
 
     //../../GLTF_tests/multi_texture.gltf
     let mut scene = gltf_importer::Importer::load(Path::new("../../GLTF_tests/multi_texture.gltf"))
         .build(&instance);
 
     let g_buffer = pipelines::Gbuffer::build(&scene, &swapchain, &instance);
-    let deferred_pipe = pipelines::Deferred::build(&g_buffer.get_buffer_images(), &swapchain, &instance);
+    let deferred_pipe =
+        pipelines::Deferred::build(&g_buffer.get_buffer_images(), &swapchain, &instance);
+
     let command_buffers = instance.create_command_buffers(swapchain.image_views.len());
     let mut tick_counter = FPSLimiter::new();
     let mut events = events::Event::new();
@@ -103,16 +105,31 @@ fn main() {
                     ])
                     .build();
 
+                let deferred_pass = vk::RenderPassBeginInfo::builder()
+                    .framebuffer(deferred_pipe.framebuffers[image_index as usize].buffer())
+                    .render_pass(deferred_pipe.renderpass.pass())
+                    .render_area(extent)
+                    .clear_values(&[vk::ClearValue {
+                        color: vk::ClearColorValue {
+                            float32: [0.0, 0.0, 0.0, 0.0],
+                        },
+                    }])
+                    .build();
+
                 instance.build_command(
                     command_buffers[image_index as usize],
                     |command_buffer, device| unsafe {
                         device.cmd_set_viewport(command_buffer, 0, &viewports);
+
                         device.cmd_set_scissor(command_buffer, 0, &[extent]);
+
+                        //Build gbuffer data
                         device.cmd_begin_render_pass(
                             command_buffer,
                             &g_pass,
                             vk::SubpassContents::INLINE,
                         );
+
                         device.cmd_bind_pipeline(
                             command_buffer,
                             vk::PipelineBindPoint::GRAPHICS,
@@ -166,15 +183,53 @@ fn main() {
                                 });
                             }
                         }
+
+                        device.cmd_end_render_pass(command_buffer);
+
+                        //Draw quad as final render
+                        device.cmd_begin_render_pass(
+                            command_buffer,
+                            &deferred_pass,
+                            vk::SubpassContents::INLINE,
+                        );
+
+                        device.cmd_bind_pipeline(
+                            command_buffer,
+                            vk::PipelineBindPoint::GRAPHICS,
+                            deferred_pipe.pipeline.default(),
+                        );
+
+                        device.cmd_bind_descriptor_sets(
+                            command_buffer,
+                            vk::PipelineBindPoint::GRAPHICS,
+                            deferred_pipe.pipeline.layout(),
+                            0,
+                            &[deferred_pipe.pipeline_descriptor.set],
+                            &[],
+                        );
+                        device.cmd_bind_vertex_buffers(
+                            command_buffer,
+                            0,
+                            &[deferred_pipe.quad_vertex.buffer],
+                            &[0],
+                        );
+                        device.cmd_bind_index_buffer(
+                            command_buffer,
+                            deferred_pipe.quad_index.buffer,
+                            0,
+                            vk::IndexType::UINT32,
+                        );
+
+                        device.cmd_draw_indexed(command_buffer, 6 as u32, 1, 0, 0, 0);
                         device.cmd_end_render_pass(command_buffer);
                     },
                 );
 
-            // queue.render_frame(
-            //     &mut swapchain,
-            //     command_buffers[image_index as usize],
-            //     image_index,
-            // );
+                queue.render_frame(
+                    &mut swapchain,
+                    command_buffers[image_index as usize],
+                    image_index,
+                );
             } else {
                 //Resize window
                 vulkan.wait_idle();

@@ -285,7 +285,6 @@ pub const OPENGL_TO_VULKAN_MATRIX: cgmath::Matrix4<f32> = cgmath::Matrix4::new(
     1.0, 0.0, 0.0, 0.0, 0.0, -1.0, 0.0, 0.0, 0.0, 0.0, 0.5, 0.0, 0.0, 0.0, 0.5, 1.0,
 );
 
-
 #[repr(C)]
 #[derive(Clone, Debug, Copy)]
 pub struct Quad {
@@ -294,8 +293,8 @@ pub struct Quad {
 }
 
 impl Quad {
-    pub fn create_quad() -> Vec<Quad> {
-        vec![
+    pub fn vertex_buffer(vulkan: &VkThread) -> Buffer {
+        let vertices = vec![
             Quad {
                 position: [-1.0, -1.0, 0.0],
                 uv: [1.0, 1.0],
@@ -312,10 +311,12 @@ impl Quad {
                 position: [1.0, -1.0, 0.0],
                 uv: [1.0, 0.0],
             },
-        ]
+        ];
+
+        vulkan.create_gpu_buffer(vk::BufferUsageFlags::VERTEX_BUFFER, &vertices)
     }
 
-    pub fn indices() -> Vec<u8> {
-        vec![0, 1, 2, 2, 3, 0]
+    pub fn index_buffer(vulkan: &VkThread) -> Buffer {
+        vulkan.create_gpu_buffer(vk::BufferUsageFlags::INDEX_BUFFER, &vec![0, 1, 2, 2, 3, 0])
     }
 }

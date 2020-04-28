@@ -1,21 +1,19 @@
 use vulkan::{
-    offset_of,
-    prelude::*,
-    utilities::Shader,
-    Buffer, Descriptor, DescriptorSet, Framebuffer, Image, Pipeline, Renderpass, Swapchain,
-    VkThread,
+    offset_of, prelude::*, utilities::Shader, Buffer, Descriptor, DescriptorSet, Framebuffer,
+    Image, Pipeline, Renderpass, Swapchain, VkThread,
 };
 
 use std::{default::Default, ffi::CString, mem, path::Path};
 
 use examples::Quad;
 
-
 pub struct Deferred {
     pub pipeline_descriptor: Descriptor,
     pub framebuffers: Vec<Framebuffer>,
     pub pipeline: Pipeline,
     pub renderpass: Renderpass,
+    pub quad_vertex: Buffer,
+    pub quad_index: Buffer,
 }
 
 impl Deferred {
@@ -25,16 +23,18 @@ impl Deferred {
             images
                 .iter()
                 .enumerate()
-                .map(|(index, image)| DescriptorSet {
-                    bind_index: index as u32,
-                    flag: vk::ShaderStageFlags::FRAGMENT,
-                    bind_type: vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
-                    image_info: Some(vec![vk::DescriptorImageInfo {
-                        sampler: image.sampler(),
-                        image_view: image.view(),
-                        image_layout: vk::ImageLayout::DEPTH_STENCIL_READ_ONLY_OPTIMAL,
-                    }]),
-                    ..Default::default()
+                .map(|(index, image)| {
+                    DescriptorSet {
+                        bind_index: index as u32,
+                        flag: vk::ShaderStageFlags::FRAGMENT,
+                        bind_type: vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
+                        image_info: Some(vec![vk::DescriptorImageInfo {
+                            sampler: image.sampler(),
+                            image_view: image.view(),
+                            image_layout: vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
+                        }]),
+                        ..Default::default()
+                    }
                 })
                 .collect(),
             vulkan.context(),
@@ -54,7 +54,7 @@ impl Deferred {
                 layout: vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL,
             }])
             .build();
-            
+
         let viewports = [vk::Viewport {
             x: 0.0,
             y: 0.0,
@@ -112,21 +112,21 @@ impl Deferred {
                 )
             })
             .collect();
-         
-            let attributes = [
-                vk::VertexInputAttributeDescription {
-                    binding: 0,
-                    location: 0,
-                    format: vk::Format::R32G32B32_SFLOAT,
-                    offset: offset_of!(Quad, position) as u32,
-                },
-                vk::VertexInputAttributeDescription {
-                    binding: 0,
-                    location: 1,
-                    format: vk::Format::R32G32_SFLOAT,
-                    offset: offset_of!(Quad, uv) as u32,
-                },
-            ];    
+
+        let attributes = [
+            vk::VertexInputAttributeDescription {
+                binding: 0,
+                location: 0,
+                format: vk::Format::R32G32B32_SFLOAT,
+                offset: offset_of!(Quad, position) as u32,
+            },
+            vk::VertexInputAttributeDescription {
+                binding: 0,
+                location: 1,
+                format: vk::Format::R32G32_SFLOAT,
+                offset: offset_of!(Quad, uv) as u32,
+            },
+        ];
         let shader_name = CString::new("main").unwrap();
         let pipeline = Pipeline::new(
             vk::PipelineLayoutCreateInfo::builder()
@@ -212,7 +212,9 @@ impl Deferred {
             pipeline_descriptor,
             renderpass,
             framebuffers,
-            pipeline
+            pipeline,
+            quad_vertex: Quad::vertex_buffer(&vulkan),
+            quad_index: Quad::index_buffer(&vulkan),
         }
     }
 }

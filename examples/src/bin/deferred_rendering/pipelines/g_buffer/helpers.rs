@@ -43,15 +43,30 @@ pub fn create_image(format: vk::Format, width: u32, height: u32, vulkan: &VkThre
         ..Default::default()
     });
 
+    image.attach_sampler(vk::SamplerCreateInfo {
+        s_type: vk::StructureType::SAMPLER_CREATE_INFO,
+        mag_filter: vk::Filter::LINEAR,
+        min_filter: vk::Filter::LINEAR,
+        mipmap_mode: vk::SamplerMipmapMode::LINEAR,
+        address_mode_u: vk::SamplerAddressMode::REPEAT,
+        address_mode_v: vk::SamplerAddressMode::REPEAT,
+        address_mode_w: vk::SamplerAddressMode::REPEAT,
+        max_lod: 1.0,
+        mip_lod_bias: 0.0,
+        anisotropy_enable: vk::TRUE,
+        max_anisotropy: 16.0,
+        ..Default::default()
+    });
+
     vulkan.apply_pipeline_barrier(
-        vk::PipelineStageFlags::ALL_GRAPHICS,
+        vk::PipelineStageFlags::BOTTOM_OF_PIPE,
         vk::PipelineStageFlags::FRAGMENT_SHADER,
         vk::ImageMemoryBarrier {
             s_type: vk::StructureType::IMAGE_MEMORY_BARRIER,
             src_access_mask: vk::AccessFlags::empty(),
             dst_access_mask: vk::AccessFlags::SHADER_READ,
             old_layout: vk::ImageLayout::UNDEFINED,
-            new_layout: vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL,
+            new_layout: vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
             src_queue_family_index: vk::QUEUE_FAMILY_IGNORED,
             dst_queue_family_index: vk::QUEUE_FAMILY_IGNORED,
             image: image.image(),

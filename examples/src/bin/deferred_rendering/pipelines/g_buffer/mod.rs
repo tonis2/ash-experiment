@@ -202,7 +202,7 @@ impl Gbuffer {
                     stencil_load_op: vk::AttachmentLoadOp::DONT_CARE,
                     stencil_store_op: vk::AttachmentStoreOp::DONT_CARE,
                     initial_layout: vk::ImageLayout::UNDEFINED,
-                    final_layout: vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL,
+                    final_layout: vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
                 });
                 attachment_references.push(vk::AttachmentReference {
                     attachment: index as u32,
@@ -229,11 +229,11 @@ impl Gbuffer {
                     stencil_load_op: vk::AttachmentLoadOp::DONT_CARE,
                     stencil_store_op: vk::AttachmentStoreOp::DONT_CARE,
                     initial_layout: vk::ImageLayout::UNDEFINED,
-                    final_layout: vk::ImageLayout::DEPTH_READ_ONLY_STENCIL_ATTACHMENT_OPTIMAL,
+                    final_layout: vk::ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
                 });
                 attachment_references.push(vk::AttachmentReference {
                     attachment: index as u32,
-                    layout: vk::ImageLayout::DEPTH_READ_ONLY_STENCIL_ATTACHMENT_OPTIMAL,
+                    layout: vk::ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
                 });
             }
         });
