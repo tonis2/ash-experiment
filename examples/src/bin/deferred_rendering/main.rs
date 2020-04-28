@@ -25,7 +25,7 @@ fn main() {
     let mut queue = Queue::new(vulkan.clone());
 
     //../../GLTF_tests/multi_texture.gltf
-    let mut scene = gltf_importer::Importer::load(Path::new("../../GLTF_tests/multi_texture.gltf"))
+    let mut scene = gltf_importer::Importer::load(Path::new("assets/multi_texture.gltf"))
         .build(&instance);
 
     let g_buffer = pipelines::Gbuffer::build(&scene, &swapchain, &instance);
@@ -56,7 +56,7 @@ fn main() {
         Event::MainEventsCleared => {
             window.request_redraw();
 
-            // print!("FPS: {}\r", tick_counter.fps());
+            print!("FPS: {}\r", tick_counter.fps());
             tick_counter.tick_frame();
         }
         Event::RedrawRequested(_window_id) => {
@@ -207,20 +207,9 @@ fn main() {
                             &[deferred_pipe.pipeline_descriptor.set],
                             &[],
                         );
-                        device.cmd_bind_vertex_buffers(
-                            command_buffer,
-                            0,
-                            &[deferred_pipe.quad_vertex.buffer],
-                            &[0],
-                        );
-                        device.cmd_bind_index_buffer(
-                            command_buffer,
-                            deferred_pipe.quad_index.buffer,
-                            0,
-                            vk::IndexType::UINT32,
-                        );
+   
 
-                        device.cmd_draw_indexed(command_buffer, 6 as u32, 1, 0, 0, 0);
+                        device.cmd_draw_indexed(command_buffer, 6, 1, 0, 0, 0);
                         device.cmd_end_render_pass(command_buffer);
                     },
                 );

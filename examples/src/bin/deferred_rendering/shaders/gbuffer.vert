@@ -32,9 +32,9 @@ out gl_PerVertex {
 void main() {
     gl_Position = camera.proj * camera.view * constant.model_transform * vec4(inPosition, 1.0);
 
-    vec3 world_position = (constant.model_transform * vec4(inPosition, 1.0)).xyz;
-    world_position.y = -world_position.y;
-    out_position = world_position;
+    vec3 model_world_pos = (constant.model_transform * vec4(inPosition, 1.0)).xyz;
+    model_world_pos.y = -model_world_pos.y;
+    out_position = model_world_pos;
 
     mat3 mNormal = transpose(inverse(mat3(constant.model_transform)));
 	out_normal = mNormal * normalize(normal);	
