@@ -44,6 +44,7 @@ layout (location = 2) out vec4 outPosition;
 void main() {
     if (MATERIALS_AMOUNT > 0) {
         Material mesh_material = materials[material_index];
+
         
         //Apply Material data to mesh
         if (mesh_material.color_texture.index != -1) {
@@ -54,21 +55,20 @@ void main() {
         if (mesh_material.normals_texture.index != -1) {
                 vec3 normal_texture = texture(textureSampler[mesh_material.color_texture.index], uv).xyz;
 
-             // Calculate normal in tangent space
                 vec3 Normal = normalize(in_normal);
                 Normal.y = -Normal.y;
                 vec3 Tangent = normalize(in_tangent);
                 vec3 Bittanget = cross(Normal, Tangent);
                 mat3 TBN = mat3(Tangent, Bittanget, Normal);
-                vec3 tnorm = TBN * normalize(normal_texture * 2.0 - vec3(1.0));
-                outNormal = vec4(tnorm, 1.0);
+             // Calculate normal in tangent space
+                outNormal = vec4(TBN * normalize(normal_texture * 2.0 - vec3(1.0)), 1.0);
         } else {
-            outNormal = vec4(0.0, 0.0, 0.0, 0.0);
+            outNormal = vec4(normalize(in_normal), 0.0);
         }
 
     } else {
         outColor = fragColor;
-        outNormal = vec4(0.0, 0.0, 0.0, 0.0);
+        outNormal = vec4(normalize(in_normal), 0.0);
     }
 
     outPosition = vec4(model_postion, 1.0); 

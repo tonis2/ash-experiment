@@ -1,8 +1,8 @@
 #version 450
 
-layout (binding = 0) uniform sampler2D samplerposition;
-layout (binding = 1) uniform sampler2D samplerNormal;
-layout (binding = 2) uniform sampler2D samplerColor;
+layout (binding = 0) uniform sampler2D samplerColor;
+layout (binding = 1) uniform sampler2D samplerposition;
+layout (binding = 2) uniform sampler2D samplerNormal;
 
 layout (location = 0) in vec2 inUV;
 layout (location = 0) out vec4 outFragcolor;
@@ -28,10 +28,10 @@ void main()
 	vec4 albedo = texture(samplerColor, inUV);
 	
 	#define lightCount 6
-	#define ambient 0.0
+	#define ambient 0.8
 	
 	// Ambient part
-	vec3 fragcolor  = albedo.rgb * ambient;
+	vec3 fragcolor = albedo.rgb * ambient;
 	
 	// for(int i = 0; i < lightCount; ++i)
 	// {

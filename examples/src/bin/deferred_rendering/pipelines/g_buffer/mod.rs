@@ -39,7 +39,8 @@ impl Gbuffer {
     pub fn build(scene: &Scene, swapchain: &Swapchain, vulkan: &VkThread) -> Gbuffer {
         let context = vulkan.context();
         //Create buffer data
-        let camera = Camera::new(cgmath::Point3::new(0.0, 0.0, 0.0), 15.0, 1.3);
+        let mut camera = Camera::new(cgmath::Point3::new(0.0, 0.0, 0.0), 15.0, 1.3);
+        camera.max_zoom = 20.0;
 
         let uniform_buffer = Buffer::new_mapped_basic(
             mem::size_of::<CameraRaw>() as u64,
