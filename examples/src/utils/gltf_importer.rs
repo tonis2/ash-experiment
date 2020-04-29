@@ -1,5 +1,5 @@
 use gltf::{
-    khr_lights_punctual::{Kind, Light as GltfLight},
+    khr_lights_punctual::Kind,
     material::{AlphaMode, Material as GltfMaterial, NormalTexture, OcclusionTexture},
     scene::Transform,
 };
@@ -38,6 +38,7 @@ pub struct Vertex {
 pub struct Node {
     pub index: usize,
     pub mesh_index: Option<usize>,
+    pub light_index: Option<usize>,
     pub parent: Option<usize>,
     pub children: Vec<usize>,
     pub translation: Transform,
@@ -60,11 +61,16 @@ pub struct Mesh {
     pub index: usize,
 }
 
+#[repr(C)]
+#[derive(Clone, Copy, Debug)]
 pub struct Light {
-    color: [f32; 3],
-    intensity: f32,
-    range: Option<f32>,
-    light_type: Kind,
+    pub position: [f32; 4],
+    pub color: [f32; 3],
+    pub intensity: f32,
+    pub range: f32,
+    pub light_type: u32,
+    pub inner_cone_angle: f32,
+    pub outer_cone_angle: f32,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -142,6 +148,14 @@ impl Scene {
             .map(|material| material.raw())
             .collect()
     }
+
+    pub fn get_lights(&self) -> Option<&Vec<Light>> {
+        if self.lights.len() > 0 {
+            Some(&self.lights)
+        } else {
+            None
+        }
+    }
 }
 
 impl Material {
@@ -171,6 +185,20 @@ impl Default for TextureInfo {
         TextureInfo {
             index: -1,
             channel: 0,
+        }
+    }
+}
+
+impl Default for Light {
+    fn default() -> Self {
+        Light {
+            position: [0.0, 0.0, 0.0, 0.0],
+            color: [1.0, 1.0, 1.0],
+            intensity: 0.0,
+            range: 0.0,
+            light_type: 0,
+            inner_cone_angle: 0.0,
+            outer_cone_angle: 0.0,
         }
     }
 }
@@ -314,19 +342,39 @@ impl Importer {
         }
     }
     //Parse and build gltf content
+
     pub fn build(&self, vulkan: &VkThread) -> Scene {
         let mut meshes: Vec<Mesh> = Vec::new();
         let mut nodes = Vec::new();
         let mut vertices_data: Vec<Vertex> = Vec::new();
         let mut indices_data: Vec<u32> = Vec::new();
 
-        let lights: Vec<Light> = self.doc.lights().map_or(vec![], |lights| {
+        let mut lights: Vec<Light> = self.doc.lights().map_or(vec![], |lights| {
             lights
-                .map(|light_data| Light {
-                    color: light_data.color(),
-                    intensity: light_data.intensity(),
-                    range: light_data.range(),
-                    light_type: light_data.kind(),
+                .map(|light_data| {
+                    let mut light = Light {
+                        position: [0.0, 0.0, 0.0, 0.0],
+                        color: light_data.color(),
+                        intensity: light_data.intensity(),
+                        range: light_data.range().unwrap_or(0.0),
+                        light_type: 0,
+                        inner_cone_angle: 0.0,
+                        outer_cone_angle: 0.0,
+                    };
+
+                    match light_data.kind() {
+                        Kind::Directional => light.light_type = 0,
+                        Kind::Point => light.light_type = 1,
+                        Kind::Spot {
+                            inner_cone_angle,
+                            outer_cone_angle,
+                        } => {
+                            light.inner_cone_angle = inner_cone_angle;
+                            light.outer_cone_angle = outer_cone_angle;
+                            light.light_type = 2;
+                        }
+                    };
+                    light
                 })
                 .collect()
         });
@@ -395,9 +443,20 @@ impl Importer {
                 }
             }
 
+            //Add transform to light
+            if let Some(light) = node.light() {
+                lights[light.index()].position = [
+                    transform_matrix.w.x,
+                    transform_matrix.w.y,
+                    transform_matrix.w.z,
+                    0.0,
+                ];
+            }
+
             nodes.push(Node {
                 index: node.index(),
                 mesh_index: node.mesh().map(|mesh| mesh.index()),
+                light_index: node.light().map(|light| light.index()),
                 parent: parent,
                 children: children_indices,
                 translation: local_transform,

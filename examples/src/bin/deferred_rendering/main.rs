@@ -15,7 +15,7 @@ fn main() {
     let event_loop = EventLoop::new();
     let window = winit::window::WindowBuilder::new()
         .with_title("test")
-        .with_inner_size(winit::dpi::LogicalSize::new(800.0, 600.0))
+        .with_inner_size(winit::dpi::LogicalSize::new(900.0, 600.0))
         .build(&event_loop)
         .expect("Failed to create window.");
 
@@ -25,12 +25,12 @@ fn main() {
     let mut queue = Queue::new(vulkan.clone());
 
     //../../GLTF_tests/multi_texture.gltf
-    let mut scene = gltf_importer::Importer::load(Path::new("assets/multi_texture.gltf"))
-        .build(&instance);
+    let mut scene =
+        gltf_importer::Importer::load(Path::new("assets/multi_texture.gltf")).build(&instance);
 
-    let g_buffer = pipelines::Gbuffer::build(&scene, &swapchain, &instance);
+    let mut g_buffer = pipelines::Gbuffer::build(&scene, &swapchain, &instance);
     let deferred_pipe =
-        pipelines::Deferred::build(&g_buffer.get_buffer_images(), &swapchain, &instance);
+        pipelines::Deferred::build(&g_buffer.get_buffer_images(), &scene, &swapchain, &instance);
 
     let command_buffers = instance.create_command_buffers(swapchain.image_views.len());
     let mut tick_counter = FPSLimiter::new();
@@ -49,6 +49,10 @@ fn main() {
                 events.handle_event(event);
                 if events.event_happened {
                     //Camera updates
+                    g_buffer.camera.handle_events(&events);
+                    g_buffer
+                        .uniform_buffer
+                        .upload_to_buffer(&[g_buffer.camera.raw()], 0);
                     events.clear();
                 }
             }
@@ -186,7 +190,7 @@ fn main() {
 
                         device.cmd_end_render_pass(command_buffer);
 
-                        //Draw quad as final render
+                        //Draw final render on a quad
                         device.cmd_begin_render_pass(
                             command_buffer,
                             &deferred_pass,
@@ -207,8 +211,6 @@ fn main() {
                             &[deferred_pipe.pipeline_descriptor.set],
                             &[],
                         );
-   
-
                         device.cmd_draw_indexed(command_buffer, 6, 1, 0, 0, 0);
                         device.cmd_end_render_pass(command_buffer);
                     },

@@ -177,6 +177,7 @@ impl Gbuffer {
         let specialization_data = SpecializationData {
             materials_amount: scene.materials.len() as u32,
             textures_amount: scene.textures.len() as u32,
+            lights_amount: scene.lights.len() as u32,
         };
 
         let specialization_info = unsafe {

@@ -1,39 +1,84 @@
 use vulkan::{
-    prelude::*, utilities::Shader, Descriptor, DescriptorSet, Framebuffer, Image, Pipeline,
-    Renderpass, Swapchain, VkThread,
+    prelude::*, utilities::as_byte_slice, Buffer, Descriptor, DescriptorSet, Framebuffer, Image,
+    Pipeline, Renderpass, Shader, Swapchain, VkThread,
 };
 
 use std::{default::Default, ffi::CString, path::Path};
+
+use super::definitions::SpecializationData;
+use examples::utils::gltf_importer::{Light, Scene};
+use std::mem;
 
 pub struct Deferred {
     pub pipeline_descriptor: Descriptor,
     pub framebuffers: Vec<Framebuffer>,
     pub pipeline: Pipeline,
     pub renderpass: Renderpass,
+    pub light_buffer: Buffer,
 }
 
 impl Deferred {
-    pub fn build(images: &Vec<&Image>, swapchain: &Swapchain, vulkan: &VkThread) -> Self {
-        //Create descriptors for the gbuffer images
-        let pipeline_descriptor = Descriptor::new(
-            images
-                .iter()
-                .enumerate()
-                .map(|(index, image)| DescriptorSet {
-                    bind_index: index as u32,
-                    flag: vk::ShaderStageFlags::FRAGMENT,
-                    bind_type: vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
-                    image_info: Some(vec![vk::DescriptorImageInfo {
-                        sampler: image.sampler(),
-                        image_view: image.view(),
-                        image_layout: vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
-                    }]),
-                    ..Default::default()
-                })
-                .collect(),
-            vulkan.context(),
+    pub fn build(
+        images: &Vec<&Image>,
+        scene: &Scene,
+        swapchain: &Swapchain,
+        vulkan: &VkThread,
+    ) -> Self {
+        //Light buffer stuff
+
+        let light_buffer = vulkan.create_gpu_buffer(
+            vk::BufferUsageFlags::UNIFORM_BUFFER,
+            &scene
+                .get_lights()
+                .map_or(vec![Light::default()], |lights| lights.clone()),
         );
 
+        let light_buffer_bindings: Vec<vk::DescriptorBufferInfo> = scene.get_lights().map_or(
+            vec![vk::DescriptorBufferInfo {
+                buffer: light_buffer.buffer,
+                offset: 0,
+                range: light_buffer.size,
+            }],
+            |lights| {
+                lights
+                    .iter()
+                    .enumerate()
+                    .map(|(index, _material)| vk::DescriptorBufferInfo {
+                        buffer: light_buffer.buffer,
+                        offset: (index * mem::size_of::<Light>() as usize) as u64,
+                        range: light_buffer.size,
+                    })
+                    .collect()
+            },
+        );
+
+        //Create descriptors for the gbuffer images
+        let mut descriptors: Vec<DescriptorSet> = images
+            .iter()
+            .enumerate()
+            .map(|(index, image)| DescriptorSet {
+                bind_index: index as u32,
+                flag: vk::ShaderStageFlags::FRAGMENT,
+                bind_type: vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
+                image_info: Some(vec![vk::DescriptorImageInfo {
+                    sampler: image.sampler(),
+                    image_view: image.view(),
+                    image_layout: vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
+                }]),
+                ..Default::default()
+            })
+            .collect();
+
+        //Light descriptor
+        descriptors.push(DescriptorSet {
+            bind_index: images.len() as u32,
+            flag: vk::ShaderStageFlags::FRAGMENT,
+            bind_type: vk::DescriptorType::UNIFORM_BUFFER,
+            buffer_info: Some(light_buffer_bindings),
+            ..Default::default()
+        });
+
+        let pipeline_descriptor = Descriptor::new(descriptors, vulkan.context());
         let noop_stencil_state = vk::StencilOpState {
             fail_op: vk::StencilOp::KEEP,
             pass_op: vk::StencilOp::KEEP,
@@ -41,13 +86,6 @@ impl Deferred {
             compare_op: vk::CompareOp::ALWAYS,
             ..Default::default()
         };
-
-        let subpasses = vk::SubpassDescription::builder()
-            .color_attachments(&[vk::AttachmentReference {
-                attachment: 0,
-                layout: vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL,
-            }])
-            .build();
 
         let viewports = [vk::Viewport {
             x: 0.0,
@@ -64,7 +102,12 @@ impl Deferred {
         }];
         let renderpass = Renderpass::new(
             vk::RenderPassCreateInfo::builder()
-                .subpasses(&[subpasses])
+                .subpasses(&[vk::SubpassDescription::builder()
+                    .color_attachments(&[vk::AttachmentReference {
+                        attachment: 0,
+                        layout: vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL,
+                    }])
+                    .build()])
                 .dependencies(&[vk::SubpassDependency {
                     src_subpass: vk::SUBPASS_EXTERNAL,
                     dst_subpass: 0,
@@ -107,6 +150,20 @@ impl Deferred {
             })
             .collect();
 
+        //Shader specialization constants
+        let specialization_data = SpecializationData {
+            materials_amount: scene.materials.len() as u32,
+            textures_amount: scene.textures.len() as u32,
+            lights_amount: scene.lights.len() as u32,
+        };
+
+        let specialization_info = unsafe {
+            vk::SpecializationInfo::builder()
+                .map_entries(&specialization_data.specialization_map_entries())
+                .data(as_byte_slice(&specialization_data))
+                .build()
+        };
+
         let shader_name = CString::new("main").unwrap();
         let pipeline = Pipeline::new(
             vk::PipelineLayoutCreateInfo::builder()
@@ -127,6 +184,7 @@ impl Deferred {
                         &shader_name,
                         vulkan.context(),
                     )
+                    .use_specialization(specialization_info)
                     .info(),
                 ])
                 .vertex_input_state(
@@ -189,6 +247,7 @@ impl Deferred {
             renderpass,
             framebuffers,
             pipeline,
+            light_buffer,
         }
     }
 }
