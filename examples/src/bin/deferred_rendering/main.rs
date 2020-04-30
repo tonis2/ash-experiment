@@ -29,7 +29,7 @@ fn main() {
         gltf_importer::Importer::load(Path::new("assets/multi_texture.gltf")).build(&instance);
 
     let mut g_buffer = pipelines::Gbuffer::build(&scene, &swapchain, &instance);
-    let deferred_pipe =
+    let mut deferred_pipe =
         pipelines::Deferred::build(&g_buffer.get_buffer_images(), &scene, &swapchain, &instance);
 
     let command_buffers = instance.create_command_buffers(swapchain.image_views.len());
@@ -44,6 +44,8 @@ fn main() {
                 //Drop GLTF file on running window to load new file
                 println!("Loading model at {:?}", path);
                 scene = gltf_importer::Importer::load(&path).build(&instance);
+                g_buffer = pipelines::Gbuffer::build(&scene, &swapchain, &instance);
+                deferred_pipe = pipelines::Deferred::build(&g_buffer.get_buffer_images(), &scene, &swapchain, &instance);
             }
             _ => {
                 events.handle_event(event);
