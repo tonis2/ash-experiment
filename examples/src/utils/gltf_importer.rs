@@ -142,11 +142,17 @@ impl Scene {
         &self.meshes[index]
     }
 
-    pub fn get_raw_materials(&self) -> Vec<MaterialRaw> {
-        self.materials
-            .iter()
-            .map(|material| material.raw())
-            .collect()
+    pub fn get_materials(&self) -> Option<Vec<MaterialRaw>> {
+        if self.materials.len() > 0 {
+            Some(
+                self.materials
+                    .iter()
+                    .map(|material| material.raw())
+                    .collect(),
+            )
+        } else {
+            None
+        }
     }
 
     pub fn get_lights(&self) -> Option<&Vec<Light>> {

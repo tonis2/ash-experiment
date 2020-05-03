@@ -50,48 +50,32 @@ impl Gbuffer {
 
         uniform_buffer.upload_to_buffer(&[camera.raw()], 0);
 
-        let material_buffer_size =
-            scene.materials.len() as u64 * context.get_ubo_alignment::<MaterialRaw>() as u64;
-
-        let staging_buffer = Buffer::new_mapped_basic(
-            material_buffer_size,
-            vk::BufferUsageFlags::TRANSFER_SRC,
-            vk_mem::MemoryUsage::CpuOnly,
-            context.clone(),
+        //Create material buffers
+        let material_buffer = vulkan.create_gpu_buffer(
+            vk::BufferUsageFlags::UNIFORM_BUFFER,
+            &scene
+                .get_materials()
+                .map_or(vec![MaterialRaw::default()], |material| material),
         );
 
-        if scene.materials.len() > 0 {
-            staging_buffer.upload_to_buffer::<MaterialRaw>(&scene.get_raw_materials()[..], 0);
-        } else {
-            //Upload empty material for shaders
-            staging_buffer.upload_to_buffer::<MaterialRaw>(&[MaterialRaw::default()], 0);
-        }
-
-        let material_buffer = Buffer::new_mapped_basic(
-            material_buffer_size,
-            vk::BufferUsageFlags::TRANSFER_DST | vk::BufferUsageFlags::UNIFORM_BUFFER,
-            vk_mem::MemoryUsage::GpuOnly,
-            context.clone(),
-        );
-
-        let copy_regions = vec![vk::BufferCopy {
-            src_offset: 0,
-            dst_offset: 0,
-            size: material_buffer.size,
-        }];
-
-        vulkan.copy_buffer_to_buffer(staging_buffer, &material_buffer, copy_regions);
-
-        let material_buffer_bindings: Vec<vk::DescriptorBufferInfo> = scene
-            .materials
-            .iter()
-            .enumerate()
-            .map(|(index, _material)| vk::DescriptorBufferInfo {
+        let material_bindings: Vec<vk::DescriptorBufferInfo> = scene.get_materials().map_or(
+            vec![vk::DescriptorBufferInfo {
                 buffer: material_buffer.buffer,
-                offset: (index * mem::size_of::<MaterialRaw>() as usize) as u64,
+                offset: 0,
                 range: material_buffer.size,
-            })
-            .collect();
+            }],
+            |materials| {
+                materials
+                    .iter()
+                    .enumerate()
+                    .map(|(index, _material)| vk::DescriptorBufferInfo {
+                        buffer: material_buffer.buffer,
+                        offset: (index * mem::size_of::<MaterialRaw>() as usize) as u64,
+                        range: material_buffer.size,
+                    })
+                    .collect()
+            },
+        );
 
         //Create empty placeholder texture for shader
         let context = vulkan.context();
@@ -150,7 +134,7 @@ impl Gbuffer {
                     bind_index: 1,
                     flag: vk::ShaderStageFlags::FRAGMENT,
                     bind_type: vk::DescriptorType::UNIFORM_BUFFER,
-                    buffer_info: Some(material_buffer_bindings),
+                    buffer_info: Some(material_bindings),
                     ..Default::default()
                 },
                 DescriptorSet {
