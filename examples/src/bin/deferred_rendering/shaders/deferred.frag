@@ -14,7 +14,7 @@ struct Light {
 layout (binding = 0) uniform sampler2D samplerColor;
 layout (binding = 1) uniform sampler2D samplerposition;
 layout (binding = 2) uniform sampler2D samplerNormal;
-layout (binding = 3) uniform LightBuffer {
+layout (std140, binding = 3) uniform LightBuffer {
     Light lights[LIGHT_COUNT > 0 ? LIGHT_COUNT : 1];
 };
 

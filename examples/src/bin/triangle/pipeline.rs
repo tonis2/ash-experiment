@@ -208,7 +208,8 @@ impl Pipe {
                         .dynamic_states(&[vk::DynamicState::VIEWPORT, vk::DynamicState::SCISSOR]),
                 )
                 .render_pass(renderpass.pass())
-                .layout(pipeline.layout(0)),
+                .layout(pipeline.layout(0))
+                .build(),
         );
 
         let framebuffers: Vec<Framebuffer> = swapchain

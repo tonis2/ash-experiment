@@ -244,7 +244,8 @@ impl Deferred {
                         .dynamic_states(&[vk::DynamicState::VIEWPORT, vk::DynamicState::SCISSOR]),
                 )
                 .render_pass(renderpass.pass())
-                .layout(pipeline.layout(0)),
+                .layout(pipeline.layout(0))
+                .build()
         );
         Self {
             pipeline_descriptor,

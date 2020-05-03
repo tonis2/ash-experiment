@@ -50,7 +50,7 @@ impl Shader {
     }
 
     pub fn info(&self) -> vk::PipelineShaderStageCreateInfo {
-        self.shader_info
+        self.shader_info.clone()
     }
 }
 

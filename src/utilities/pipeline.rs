@@ -27,11 +27,11 @@ impl Pipeline {
         });
     }
 
-    pub fn add_pipeline(&mut self, info: vk::GraphicsPipelineCreateInfoBuilder) {
+    pub fn add_pipeline(&mut self, info: vk::GraphicsPipelineCreateInfo) {
         let pipeline = unsafe {
             self.ctx
                 .device
-                .create_graphics_pipelines(vk::PipelineCache::null(), &[info.build()], None)
+                .create_graphics_pipelines(vk::PipelineCache::null(), &[info], None)
                 .expect("Unable to create graphics pipeline")
         };
         self.pipelines.push(pipeline[0]);
