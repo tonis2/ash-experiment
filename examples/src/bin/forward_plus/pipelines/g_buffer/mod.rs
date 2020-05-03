@@ -346,6 +346,7 @@ impl Gbuffer {
 
         let shader_name = CString::new("main").unwrap();
         let mut pipeline = Pipeline::new(vulkan.context());
+
         pipeline.add_layout(
             vk::PipelineLayoutCreateInfo::builder()
                 .set_layouts(&[pipeline_descriptor.layout])
@@ -426,7 +427,6 @@ impl Gbuffer {
                 .render_pass(renderpass.pass())
                 .layout(pipeline.layout(0)),
         );
-
         Self {
             pipeline,
             pipeline_descriptor,

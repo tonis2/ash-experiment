@@ -45,7 +45,12 @@ fn main() {
                 println!("Loading model at {:?}", path);
                 scene = gltf_importer::Importer::load(&path).build(&instance);
                 g_buffer = pipelines::Gbuffer::build(&scene, &swapchain, &instance);
-                deferred_pipe = pipelines::Deferred::build(&g_buffer.get_buffer_images(), &scene, &swapchain, &instance);
+                deferred_pipe = pipelines::Deferred::build(
+                    &g_buffer.get_buffer_images(),
+                    &scene,
+                    &swapchain,
+                    &instance,
+                );
             }
             _ => {
                 events.handle_event(event);

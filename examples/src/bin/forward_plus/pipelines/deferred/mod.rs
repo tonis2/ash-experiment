@@ -172,6 +172,7 @@ impl Deferred {
                 .set_layouts(&[pipeline_descriptor.layout])
                 .build(),
         );
+
         pipeline.add_pipeline(
             vk::GraphicsPipelineCreateInfo::builder()
                 .stages(&[
@@ -246,6 +247,7 @@ impl Deferred {
                 .render_pass(renderpass.pass())
                 .layout(pipeline.layout(0)),
         );
+
         Self {
             pipeline_descriptor,
             renderpass,

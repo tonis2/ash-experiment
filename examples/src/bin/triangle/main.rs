@@ -1,6 +1,6 @@
 mod pipeline;
 
-use vulkan::{prelude::*, utilities::FPSLimiter, Context, Framebuffer, Queue, Swapchain, VkThread};
+use vulkan::{prelude::*, utilities::FPSLimiter, Context, Queue, Swapchain, VkThread};
 use winit::event::{ElementState, Event, KeyboardInput, VirtualKeyCode, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop};
 
@@ -46,22 +46,7 @@ fn main() {
     let command_buffers = instance.create_command_buffers(swapchain.image_views.len());
     let mut tick_counter = FPSLimiter::new();
 
-    let mut framebuffers: Vec<Framebuffer> = swapchain
-        .image_views
-        .iter()
-        .map(|image| {
-            Framebuffer::new(
-                vk::FramebufferCreateInfo::builder()
-                    .layers(1)
-                    .render_pass(pipeline.renderpass.pass())
-                    .attachments(&[*image])
-                    .width(swapchain.width())
-                    .height(swapchain.height())
-                    .build(),
-                vulkan.clone(),
-            )
-        })
-        .collect();
+
 
     event_loop.run(move |event, _, control_flow| match event {
         Event::WindowEvent { event, .. } => match event {
@@ -105,7 +90,7 @@ fn main() {
 
             if let Ok((image_index, _is_suboptimal)) = frame {
                 let render_pass_info = vk::RenderPassBeginInfo::builder()
-                    .framebuffer(framebuffers[image_index as usize].buffer())
+                    .framebuffer(pipeline.framebuffers[image_index as usize].buffer())
                     .render_pass(pipeline.renderpass.pass())
                     .clear_values(&[vk::ClearValue {
                         color: vk::ClearColorValue {
@@ -157,22 +142,6 @@ fn main() {
 
                 vulkan.wait_idle();
                 swapchain = Swapchain::new(vulkan.clone());
-                framebuffers = swapchain
-                    .image_views
-                    .iter()
-                    .map(|image| {
-                        Framebuffer::new(
-                            vk::FramebufferCreateInfo::builder()
-                                .layers(1)
-                                .render_pass(pipeline.renderpass.pass())
-                                .attachments(&[*image])
-                                .width(swapchain.width())
-                                .height(swapchain.height())
-                                .build(),
-                            vulkan.clone(),
-                        )
-                    })
-                    .collect();
                 pipeline = pipeline::Pipe::new(&swapchain, &instance);
             }
         }

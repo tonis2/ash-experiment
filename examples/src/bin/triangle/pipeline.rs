@@ -5,8 +5,8 @@ use std::mem;
 use std::path::Path;
 
 use vulkan::{
-    offset_of, prelude::*, Buffer, Descriptor, DescriptorSet, Pipeline, Renderpass, Shader,
-    Swapchain, VkThread,
+    offset_of, prelude::*, Buffer, Descriptor, DescriptorSet, Framebuffer, Pipeline, Renderpass,
+    Shader, Swapchain, VkThread,
 };
 
 #[repr(C)]
@@ -28,6 +28,7 @@ pub struct Pipe {
     pub pipeline_descriptor: Descriptor,
     pub uniform_buffer: Buffer,
     pub uniform_transform: UniformBufferObject,
+    pub framebuffers: Vec<Framebuffer>,
 }
 
 impl Pipe {
@@ -111,10 +112,15 @@ impl Pipe {
         );
 
         let shader_name = CString::new("main").unwrap();
-        let pipeline = Pipeline::new(
+        let mut pipeline = Pipeline::new(vulkan.context());
+
+        pipeline.add_layout(
             vk::PipelineLayoutCreateInfo::builder()
                 .set_layouts(&[pipeline_descriptor.layout])
                 .build(),
+        );
+
+        pipeline.add_pipeline(
             vk::GraphicsPipelineCreateInfo::builder()
                 .stages(&[
                     Shader::new(
@@ -201,9 +207,26 @@ impl Pipe {
                     &vk::PipelineDynamicStateCreateInfo::builder()
                         .dynamic_states(&[vk::DynamicState::VIEWPORT, vk::DynamicState::SCISSOR]),
                 )
-                .render_pass(renderpass.pass()),
-            vulkan.context(),
+                .render_pass(renderpass.pass())
+                .layout(pipeline.layout(0)),
         );
+
+        let framebuffers: Vec<Framebuffer> = swapchain
+            .image_views
+            .iter()
+            .map(|image| {
+                Framebuffer::new(
+                    vk::FramebufferCreateInfo::builder()
+                        .layers(1)
+                        .render_pass(renderpass.pass())
+                        .attachments(&[*image])
+                        .width(swapchain.width())
+                        .height(swapchain.height())
+                        .build(),
+                    vulkan.context(),
+                )
+            })
+            .collect();
 
         Self {
             pipeline,
@@ -211,6 +234,7 @@ impl Pipe {
             pipeline_descriptor,
             uniform_buffer,
             uniform_transform: uniform_data,
+            framebuffers,
         }
     }
 }
