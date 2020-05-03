@@ -119,6 +119,7 @@ pub fn new(scene: &Scene, swapchain: &Swapchain, vulkan: &VkThread) {
             }]
         }
     };
+
     //Fill with empty texture when scene has no textures.
     let texture_count: u32 = match scene.textures.len() {
         0 => 1,
@@ -152,10 +153,58 @@ pub fn new(scene: &Scene, swapchain: &Swapchain, vulkan: &VkThread) {
         },
     );
 
-    let mut pipelines = Pipeline::new(vulkan.context());
+    //Attributes
 
-    //Create depth pass stuff
-    let depth_image = examples::create_depth_resources(&swapchain, vulkan.context());
+    //Forward renderer
+    let forward_attributes = [
+        vk::VertexInputAttributeDescription {
+            binding: 0,
+            location: 0,
+            format: vk::Format::R32G32B32_SFLOAT,
+            offset: offset_of!(Vertex, position) as u32,
+        },
+        vk::VertexInputAttributeDescription {
+            binding: 0,
+            location: 1,
+            format: vk::Format::R32G32B32A32_SFLOAT,
+            offset: offset_of!(Vertex, color) as u32,
+        },
+        vk::VertexInputAttributeDescription {
+            binding: 0,
+            location: 2,
+            format: vk::Format::R32G32B32A32_SFLOAT,
+            offset: offset_of!(Vertex, tangents) as u32,
+        },
+        vk::VertexInputAttributeDescription {
+            binding: 0,
+            location: 3,
+            format: vk::Format::R32G32B32_SFLOAT,
+            offset: offset_of!(Vertex, normal) as u32,
+        },
+        vk::VertexInputAttributeDescription {
+            binding: 0,
+            location: 4,
+            format: vk::Format::R32G32_SFLOAT,
+            offset: offset_of!(Vertex, uv) as u32,
+        },
+        vk::VertexInputAttributeDescription {
+            binding: 0,
+            location: 5,
+            format: vk::Format::R32_SINT,
+            offset: offset_of!(Vertex, material_id) as u32,
+        },
+    ];
+
+    //Depth attributes
+    let depth_attributes = [vk::VertexInputAttributeDescription {
+        binding: 0,
+        location: 0,
+        format: vk::Format::R32G32B32_SFLOAT,
+        offset: offset_of!(Vertex, position) as u32,
+    }];
+
+    //Descriptors
+
     let depth_descriptor = Descriptor::new(
         vec![DescriptorSet {
             bind_index: 0,
@@ -171,19 +220,75 @@ pub fn new(scene: &Scene, swapchain: &Swapchain, vulkan: &VkThread) {
         vulkan.context(),
     );
 
-    //Depth layout
-    pipelines.add_layout(
-        vk::PipelineLayoutCreateInfo::builder()
-            .set_layouts(&[depth_descriptor.layout])
-            .push_constant_ranges(&[vk::PushConstantRange {
-                stage_flags: vk::ShaderStageFlags::VERTEX,
-                size: mem::size_of::<PushTransform>() as u32,
-                offset: 0,
-            }])
-            .build(),
+    let forward_descriptor = Descriptor::new(
+        vec![
+            DescriptorSet {
+                bind_index: 0,
+                flag: vk::ShaderStageFlags::VERTEX,
+                bind_type: vk::DescriptorType::UNIFORM_BUFFER,
+                buffer_info: Some(vec![vk::DescriptorBufferInfo {
+                    buffer: camera_buffer.buffer,
+                    offset: 0,
+                    range: camera_buffer.size,
+                }]),
+                ..Default::default()
+            },
+            DescriptorSet {
+                bind_index: 1,
+                flag: vk::ShaderStageFlags::FRAGMENT,
+                bind_type: vk::DescriptorType::UNIFORM_BUFFER,
+                buffer_info: Some(material_bindings),
+                ..Default::default()
+            },
+            DescriptorSet {
+                bind_index: 2,
+                flag: vk::ShaderStageFlags::FRAGMENT,
+                bind_type: vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
+                image_info: Some(texture_data),
+                count: texture_count,
+                ..Default::default()
+            },
+        ],
+        vulkan.context(),
     );
 
-    let depth_renderpass = Renderpass::new(
+    //Renderpasses
+
+    let forward_pass = Renderpass::new(
+        vk::RenderPassCreateInfo::builder()
+            .subpasses(&[vk::SubpassDescription::builder()
+                .color_attachments(&[vk::AttachmentReference {
+                    attachment: 0,
+                    layout: vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL,
+                }])
+                .build()])
+            .dependencies(&[vk::SubpassDependency {
+                src_subpass: vk::SUBPASS_EXTERNAL,
+                dst_subpass: 0,
+                src_stage_mask: vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT,
+                dst_stage_mask: vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT,
+                src_access_mask: vk::AccessFlags::empty(),
+                dst_access_mask: vk::AccessFlags::COLOR_ATTACHMENT_READ
+                    | vk::AccessFlags::COLOR_ATTACHMENT_WRITE,
+                dependency_flags: vk::DependencyFlags::empty(),
+            }])
+            .attachments(&[vk::AttachmentDescription {
+                flags: vk::AttachmentDescriptionFlags::empty(),
+                format: swapchain.format,
+                samples: vk::SampleCountFlags::TYPE_1,
+                load_op: vk::AttachmentLoadOp::CLEAR,
+                store_op: vk::AttachmentStoreOp::STORE,
+                stencil_load_op: vk::AttachmentLoadOp::DONT_CARE,
+                stencil_store_op: vk::AttachmentStoreOp::DONT_CARE,
+                initial_layout: vk::ImageLayout::UNDEFINED,
+                final_layout: vk::ImageLayout::PRESENT_SRC_KHR,
+            }])
+            .build(),
+        vulkan.context(),
+    );
+
+    let depth_image = examples::create_depth_resources(&swapchain, vulkan.context());
+    let depth_pass = Renderpass::new(
         vk::RenderPassCreateInfo::builder()
             .attachments(&[vk::AttachmentDescription {
                 flags: vk::AttachmentDescriptionFlags::empty(),
@@ -226,23 +331,77 @@ pub fn new(scene: &Scene, swapchain: &Swapchain, vulkan: &VkThread) {
         vulkan.context(),
     );
 
-    let depth_attributes = [vk::VertexInputAttributeDescription {
-        binding: 0,
-        location: 0,
-        format: vk::Format::R32G32B32_SFLOAT,
-        offset: offset_of!(Vertex, position) as u32,
-    }];
-
+    //Shaders
     let shader_name = CString::new("main").unwrap();
+    let depth_shader = Shader::new(
+        &Path::new("src/bin/forward_plus/shaders/depth.vert.spv"),
+        vk::ShaderStageFlags::VERTEX,
+        &shader_name,
+        vulkan.context(),
+    );
 
-    let mut pipeline_description = vk::GraphicsPipelineCreateInfo::builder()
-        .stages(&[Shader::new(
-            &Path::new("src/bin/forward_plus/shaders/depth.vert.spv"),
+    let specialization_data = SpecializationData {
+        materials_amount: scene.materials.len() as u32,
+        textures_amount: scene.textures.len() as u32,
+        lights_amount: scene.lights.len() as u32,
+    };
+
+    let specialization_info = unsafe {
+        vk::SpecializationInfo::builder()
+            .map_entries(&specialization_data.specialization_map_entries())
+            .data(as_byte_slice(&specialization_data))
+            .build()
+    };
+
+    let forward_shader = vec![
+        Shader::new(
+            &Path::new("src/bin/forward_plus/shaders/forward.vert.spv"),
             vk::ShaderStageFlags::VERTEX,
             &shader_name,
             vulkan.context(),
         )
-        .info()])
+        .info(),
+        Shader::new(
+            &Path::new("src/bin/forward_plus/shaders/forward.frag.spv"),
+            vk::ShaderStageFlags::FRAGMENT,
+            &shader_name,
+            vulkan.context(),
+        )
+        .use_specialization(specialization_info)
+        .info(),
+    ];
+
+    //Create pipelines
+
+    let mut pipelines = Pipeline::new(vulkan.context());
+
+    //Depth layout
+    pipelines.add_layout(
+        vk::PipelineLayoutCreateInfo::builder()
+            .set_layouts(&[depth_descriptor.layout])
+            .push_constant_ranges(&[vk::PushConstantRange {
+                stage_flags: vk::ShaderStageFlags::VERTEX,
+                size: mem::size_of::<PushTransform>() as u32,
+                offset: 0,
+            }])
+            .build(),
+    );
+
+    //Forward layout
+    pipelines.add_layout(
+        vk::PipelineLayoutCreateInfo::builder()
+            .set_layouts(&[forward_descriptor.layout])
+            .push_constant_ranges(&[vk::PushConstantRange {
+                stage_flags: vk::ShaderStageFlags::VERTEX,
+                size: mem::size_of::<PushTransform>() as u32,
+                offset: 0,
+            }])
+            .build(),
+    );
+
+    //Pipeline base
+    let mut pipeline_description = vk::GraphicsPipelineCreateInfo::builder()
+        .stages(&[depth_shader.info()])
         .vertex_input_state(
             &vk::PipelineVertexInputStateCreateInfo::builder()
                 .vertex_binding_descriptions(&[vk::VertexInputBindingDescription {
@@ -300,162 +459,15 @@ pub fn new(scene: &Scene, swapchain: &Swapchain, vulkan: &VkThread) {
                 .dynamic_states(&[vk::DynamicState::VIEWPORT, vk::DynamicState::SCISSOR]),
         )
         .layout(pipelines.layout(0))
-        .render_pass(depth_renderpass.pass())
+        .render_pass(depth_pass.pass())
         .build();
 
     //Build depth pipeline
     pipelines.add_pipeline(pipeline_description);
 
-    //Forward renderer stuff
-    let forward_attributes = [
-        vk::VertexInputAttributeDescription {
-            binding: 0,
-            location: 0,
-            format: vk::Format::R32G32B32_SFLOAT,
-            offset: offset_of!(Vertex, position) as u32,
-        },
-        vk::VertexInputAttributeDescription {
-            binding: 0,
-            location: 1,
-            format: vk::Format::R32G32B32A32_SFLOAT,
-            offset: offset_of!(Vertex, color) as u32,
-        },
-        vk::VertexInputAttributeDescription {
-            binding: 0,
-            location: 2,
-            format: vk::Format::R32G32B32A32_SFLOAT,
-            offset: offset_of!(Vertex, tangents) as u32,
-        },
-        vk::VertexInputAttributeDescription {
-            binding: 0,
-            location: 3,
-            format: vk::Format::R32G32B32_SFLOAT,
-            offset: offset_of!(Vertex, normal) as u32,
-        },
-        vk::VertexInputAttributeDescription {
-            binding: 0,
-            location: 4,
-            format: vk::Format::R32G32_SFLOAT,
-            offset: offset_of!(Vertex, uv) as u32,
-        },
-        vk::VertexInputAttributeDescription {
-            binding: 0,
-            location: 5,
-            format: vk::Format::R32_SINT,
-            offset: offset_of!(Vertex, material_id) as u32,
-        },
-    ];
-
-    let forward_descriptor = Descriptor::new(
-        vec![
-            DescriptorSet {
-                bind_index: 0,
-                flag: vk::ShaderStageFlags::VERTEX,
-                bind_type: vk::DescriptorType::UNIFORM_BUFFER,
-                buffer_info: Some(vec![vk::DescriptorBufferInfo {
-                    buffer: camera_buffer.buffer,
-                    offset: 0,
-                    range: camera_buffer.size,
-                }]),
-                ..Default::default()
-            },
-            DescriptorSet {
-                bind_index: 1,
-                flag: vk::ShaderStageFlags::FRAGMENT,
-                bind_type: vk::DescriptorType::UNIFORM_BUFFER,
-                buffer_info: Some(material_bindings),
-                ..Default::default()
-            },
-            DescriptorSet {
-                bind_index: 2,
-                flag: vk::ShaderStageFlags::FRAGMENT,
-                bind_type: vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
-                image_info: Some(texture_data),
-                count: texture_count,
-                ..Default::default()
-            },
-        ],
-        vulkan.context(),
-    );
-
-    let forward_pass = Renderpass::new(
-        vk::RenderPassCreateInfo::builder()
-            .subpasses(&[vk::SubpassDescription::builder()
-                .color_attachments(&[vk::AttachmentReference {
-                    attachment: 0,
-                    layout: vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL,
-                }])
-                .build()])
-            .dependencies(&[vk::SubpassDependency {
-                src_subpass: vk::SUBPASS_EXTERNAL,
-                dst_subpass: 0,
-                src_stage_mask: vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT,
-                dst_stage_mask: vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT,
-                src_access_mask: vk::AccessFlags::empty(),
-                dst_access_mask: vk::AccessFlags::COLOR_ATTACHMENT_READ
-                    | vk::AccessFlags::COLOR_ATTACHMENT_WRITE,
-                dependency_flags: vk::DependencyFlags::empty(),
-            }])
-            .attachments(&[vk::AttachmentDescription {
-                flags: vk::AttachmentDescriptionFlags::empty(),
-                format: swapchain.format,
-                samples: vk::SampleCountFlags::TYPE_1,
-                load_op: vk::AttachmentLoadOp::CLEAR,
-                store_op: vk::AttachmentStoreOp::STORE,
-                stencil_load_op: vk::AttachmentLoadOp::DONT_CARE,
-                stencil_store_op: vk::AttachmentStoreOp::DONT_CARE,
-                initial_layout: vk::ImageLayout::UNDEFINED,
-                final_layout: vk::ImageLayout::PRESENT_SRC_KHR,
-            }])
-            .build(),
-        vulkan.context(),
-    );
-
-    pipelines.add_layout(
-        vk::PipelineLayoutCreateInfo::builder()
-            .set_layouts(&[forward_descriptor.layout])
-            .push_constant_ranges(&[vk::PushConstantRange {
-                stage_flags: vk::ShaderStageFlags::VERTEX,
-                size: mem::size_of::<PushTransform>() as u32,
-                offset: 0,
-            }])
-            .build(),
-    );
-
-    let specialization_data = SpecializationData {
-        materials_amount: scene.materials.len() as u32,
-        textures_amount: scene.textures.len() as u32,
-        lights_amount: scene.lights.len() as u32,
-    };
-
-    let specialization_info = unsafe {
-        vk::SpecializationInfo::builder()
-            .map_entries(&specialization_data.specialization_map_entries())
-            .data(as_byte_slice(&specialization_data))
-            .build()
-    };
-
-    let depth_shader = vec![
-        Shader::new(
-            &Path::new("src/bin/forward_plus/shaders/forward.vert.spv"),
-            vk::ShaderStageFlags::VERTEX,
-            &shader_name,
-            vulkan.context(),
-        )
-        .info(),
-        Shader::new(
-            &Path::new("src/bin/forward_plus/shaders/forward.frag.spv"),
-            vk::ShaderStageFlags::FRAGMENT,
-            &shader_name,
-            vulkan.context(),
-        )
-        .use_specialization(specialization_info)
-        .info(),
-    ];
-
     //Create forward pipeline
-    pipeline_description.p_stages = depth_shader.as_ptr();
-    pipeline_description.stage_count = depth_shader.len() as u32;
+    pipeline_description.p_stages = forward_shader.as_ptr();
+    pipeline_description.stage_count = forward_shader.len() as u32;
     pipeline_description.p_vertex_input_state = &vk::PipelineVertexInputStateCreateInfo::builder()
         .vertex_binding_descriptions(&[vk::VertexInputBindingDescription {
             binding: 0,
@@ -466,6 +478,5 @@ pub fn new(scene: &Scene, swapchain: &Swapchain, vulkan: &VkThread) {
         .build();
     pipeline_description.layout = pipelines.layout(1);
     pipeline_description.render_pass = forward_pass.pass();
-
     pipelines.add_pipeline(pipeline_description);
 }
