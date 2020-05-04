@@ -1,6 +1,6 @@
 mod pipelines;
 use vulkan::{
-    prelude::*, utilities::as_byte_slice, utilities::FPSLimiter, Context, Queue, Swapchain,
+    prelude::*, utilities::as_byte_slice, utilities::FPSLimiter, Context, Queue, Swapchain, PipelineType, 
     VkThread,
 };
 
@@ -19,7 +19,7 @@ fn main() {
         .expect("Failed to create window.");
 
     let vulkan = Arc::new(Context::new(&window, "gltf", true));
-    let instance = VkThread::new(vulkan.clone());
+    let instance = VkThread::new(PipelineType::Draw, vulkan.clone());
     let mut swapchain = Swapchain::new(vulkan.clone());
     let mut queue = Queue::new(vulkan.clone());
     //../../GLTF_tests/multi_texture.gltf

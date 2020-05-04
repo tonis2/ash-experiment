@@ -1,7 +1,7 @@
 mod pipelines;
 use vulkan::{
-    prelude::*, utilities::as_byte_slice, utilities::FPSLimiter, Context, Queue, Swapchain,
-    VkThread,
+    prelude::*, utilities::as_byte_slice, utilities::FPSLimiter, Context, PipelineType, Queue,
+    Swapchain, VkThread,
 };
 
 use examples::utils::{events, gltf_importer};
@@ -20,19 +20,26 @@ fn main() {
         .expect("Failed to create window.");
 
     let vulkan = Arc::new(Context::new(&window, "gltf", true));
-    let instance = VkThread::new(vulkan.clone());
+
+    let draw_instance = VkThread::new(PipelineType::Draw, vulkan.clone());
+  
+
     let mut swapchain = Swapchain::new(vulkan.clone());
     let mut queue = Queue::new(vulkan.clone());
 
     //../../GLTF_tests/multi_texture.gltf
     let mut scene =
-        gltf_importer::Importer::load(Path::new("assets/multi_texture.gltf")).build(&instance);
+        gltf_importer::Importer::load(Path::new("assets/multi_texture.gltf")).build(&draw_instance);
 
-    let mut g_buffer = pipelines::Gbuffer::build(&scene, &swapchain, &instance);
-    let mut deferred_pipe =
-        pipelines::Deferred::build(&g_buffer.get_buffer_images(), &scene, &swapchain, &instance);
+    let mut g_buffer = pipelines::Gbuffer::build(&scene, &swapchain, &draw_instance);
+    let mut deferred_pipe = pipelines::Deferred::build(
+        &g_buffer.get_buffer_images(),
+        &scene,
+        &swapchain,
+        &draw_instance,
+    );
 
-    let command_buffers = instance.create_command_buffers(swapchain.image_views.len());
+    let command_buffers = draw_instance.create_command_buffers(swapchain.image_views.len());
     let mut tick_counter = FPSLimiter::new();
     let mut events = events::Event::new();
 
@@ -43,9 +50,14 @@ fn main() {
             WindowEvent::DroppedFile(path) => {
                 //Drop GLTF file on running window to load new file
                 println!("Loading model at {:?}", path);
-                scene = gltf_importer::Importer::load(&path).build(&instance);
-                g_buffer = pipelines::Gbuffer::build(&scene, &swapchain, &instance);
-                deferred_pipe = pipelines::Deferred::build(&g_buffer.get_buffer_images(), &scene, &swapchain, &instance);
+                scene = gltf_importer::Importer::load(&path).build(&draw_instance);
+                g_buffer = pipelines::Gbuffer::build(&scene, &swapchain, &draw_instance);
+                deferred_pipe = pipelines::Deferred::build(
+                    &g_buffer.get_buffer_images(),
+                    &scene,
+                    &swapchain,
+                    &draw_instance,
+                );
             }
             _ => {
                 events.handle_event(event);
@@ -122,7 +134,7 @@ fn main() {
                     }])
                     .build();
 
-                instance.build_command(
+                draw_instance.build_command(
                     command_buffers[image_index as usize],
                     |command_buffer, device| unsafe {
                         device.cmd_set_viewport(command_buffer, 0, &viewports);

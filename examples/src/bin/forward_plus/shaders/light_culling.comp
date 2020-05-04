@@ -6,8 +6,8 @@
 
 const int TILE_SIZE = 16;
 layout (constant_id = 0) const uint LIGHT_COUNT = 0U;
-layout (constant_id = 1) const ivec2 TILE_NUMS = vec2(0, 0);
-layout (constant_id = 2) const ivec2 VIEWPORT_SIZE = vec2(0, 0);
+layout (constant_id = 1) const uint TILE_NUMS = 0U;
+ivec2 VIEWPORT_SIZE = ivec2(800, 600);
 
 struct Light {
     vec3 position;
@@ -19,6 +19,13 @@ struct Light {
 	float outer_cone_angle;
 };
 
+layout (binding = 2) uniform Camera {
+    vec4 position;
+    mat4 view;
+    mat4 proj;
+} camera;
+
+
 #define MAX_POINT_LIGHT_PER_TILE 1023
 struct LightVisiblity
 {
@@ -26,7 +33,7 @@ struct LightVisiblity
 	uint lightindices[MAX_POINT_LIGHT_PER_TILE];
 };
 
-layout(std430, set = 0, binding = 0) uniform TileLightVisiblities
+layout(std140, set = 0, binding = 0) buffer writeonly TileLightVisiblities
 {
     LightVisiblity light_visiblities[];
 };
@@ -35,11 +42,6 @@ layout (std140, binding = 1) uniform LightBuffer {
     Light lights[LIGHT_COUNT > 0 ? LIGHT_COUNT : 1];
 };
 
-layout (binding = 2) uniform Camera {
-    vec4 position;
-    mat4 view;
-    mat4 proj;
-} camera;
 
 layout(set = 0, binding = 3) uniform sampler2D depth_sampler;
 
@@ -65,9 +67,9 @@ shared float max_depth;
 ViewFrustum createFrustum(ivec2 tile_id)
 {
 
-	mat4 inv_projview = inverse(camera.projview);
+	mat4 inv_projview = inverse(camera.proj);
 
-	vec2 ndc_size_per_tile = 2.0 * vec2(TILE_SIZE, TILE_SIZE) / push_constants.viewport_size;
+	vec2 ndc_size_per_tile = 2.0 * vec2(TILE_SIZE, TILE_SIZE) / VIEWPORT_SIZE;
 
 	vec2 ndc_pts[4];  // corners of tile in ndc
 	ndc_pts[0] = ndc_upper_left + tile_id * ndc_size_per_tile;  // upper left
@@ -91,7 +93,7 @@ ViewFrustum createFrustum(ivec2 tile_id)
 	{
 		//Cax+Cby+Ccz+Cd = 0, planes[i] = (Ca, Cb, Cc, Cd)
 		// temp_normal: normal without normalization
-		temp_normal = cross(frustum.points[i] - camera.cam_pos, frustum.points[i + 1] - camera.cam_pos);
+		temp_normal = cross(frustum.points[i] - camera.position.xyz, frustum.points[i + 1] - camera.position.xyz);
 		temp_normal = normalize(temp_normal);
 		frustum.planes[i] = vec4(temp_normal, - dot(temp_normal, frustum.points[i]));
 	}
@@ -111,14 +113,14 @@ ViewFrustum createFrustum(ivec2 tile_id)
 	return frustum;
 }
 
-bool isCollided(PointLight light, ViewFrustum frustum)
+bool isCollided(Light light, ViewFrustum frustum)
 {
 	bool result = true;
 
     // Step1: sphere-plane test
 	for (int i = 0; i < 6; i++)
 	{
-		if (dot(light.pos, frustum.planes[i].xyz) + frustum.planes[i].w  < - light.radius )
+		if (dot(light.position.xyz, frustum.planes[i].xyz) + frustum.planes[i].w  < - light.range)
 		{
 			result = false;
 			break;
@@ -131,8 +133,8 @@ bool isCollided(PointLight light, ViewFrustum frustum)
     }
 
     // Step2: bbox corner test (to reduce false positive)
-    vec3 light_bbox_max = light.pos + vec3(light.radius);
-    vec3 light_bbox_min = light.pos - vec3(light.radius);
+    vec3 light_bbox_max = light.position.xyz + vec3(light.range);
+    vec3 light_bbox_min = light.position.xyz - vec3(light.range);
     int probe;
     probe=0; for( int i=0; i<8; i++ ) probe += ((frustum.points[i].x > light_bbox_max.x)?1:0); if( probe==8 ) return false;
     probe=0; for( int i=0; i<8; i++ ) probe += ((frustum.points[i].x < light_bbox_min.x)?1:0); if( probe==8 ) return false;
@@ -147,7 +149,7 @@ bool isCollided(PointLight light, ViewFrustum frustum)
 void main()
 {
 	ivec2 tile_id = ivec2(gl_WorkGroupID.xy);
-	uint tile_index = tile_id.y * push_constants.tile_nums.x + tile_id.x;
+	uint tile_index = tile_id.y * TILE_NUMS + tile_id.x;
 
 	// TODO: depth culling???
 
@@ -160,7 +162,7 @@ void main()
 		{
 			for (int x = 0; x < TILE_SIZE; x++)
 			{
-				vec2 sample_loc = (vec2(TILE_SIZE, TILE_SIZE) * tile_id + vec2(x, y) ) / push_constants.viewport_size;
+				vec2 sample_loc = (vec2(TILE_SIZE, TILE_SIZE) * tile_id + vec2(x, y) ) / VIEWPORT_SIZE;
 				float pre_depth = texture(depth_sampler, sample_loc).x;
 				min_depth = min(min_depth, pre_depth);
 				max_depth = max(max_depth, pre_depth); //TODO: parallize this
@@ -178,9 +180,9 @@ void main()
 
 	barrier();
 
-	for (uint i = gl_LocalInvocationIndex; i < light_num && light_count_for_tile < MAX_POINT_LIGHT_PER_TILE; i += gl_WorkGroupSize.x)
+	for (uint i = gl_LocalInvocationIndex; i < LIGHT_COUNT && light_count_for_tile < MAX_POINT_LIGHT_PER_TILE; i += gl_WorkGroupSize.x)
 	{
-		if (isCollided(pointlights[i], frustum))
+		if (isCollided(lights[i], frustum))
 		{
 			uint slot = atomicAdd(light_count_for_tile, 1);
 			if (slot >= MAX_POINT_LIGHT_PER_TILE) {break;}

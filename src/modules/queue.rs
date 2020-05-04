@@ -13,7 +13,7 @@ pub struct QueueFamilyIndices {
     pub compute_family: Option<u32>,
 }
 
-//Queue contains all the functionality neccesary to get and render to frames
+//Queue contains all the functionality neccesary to get frame and draw onto it
 pub struct Queue {
     pub image_available_semaphores: Vec<vk::Semaphore>,
     pub render_finished_semaphores: Vec<vk::Semaphore>,

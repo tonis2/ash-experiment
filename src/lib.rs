@@ -8,4 +8,4 @@ pub use modules::context::Context;
 pub use modules::queue::Queue;
 pub use utilities::{Image, Buffer, Descriptor, DescriptorSet, Shader, Renderpass, Pipeline };
 
-
+pub use constants::PipelineType;

@@ -5,7 +5,7 @@ layout (location = 0) in vec3 pos;
 layout (binding = 0) uniform Camera {
     vec4 position;
     mat4 view;
-    mat4 proj;
+    mat4 projection;
 } camera;
 
 
@@ -15,5 +15,5 @@ layout(push_constant) uniform Constant {
  
 void main()
 {
-	   gl_Position = camera.projection * constants.model_transform * vec4(pos, 1.0);
+	   gl_Position = camera.projection * constant.model_transform * vec4(pos, 1.0);
 }

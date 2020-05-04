@@ -37,6 +37,16 @@ impl Pipeline {
         self.pipelines.push(pipeline[0]);
     }
 
+    pub fn add_compute(&mut self, info: vk::ComputePipelineCreateInfo) {
+        let pipeline = unsafe {
+            self.ctx
+                .device
+                .create_compute_pipelines(vk::PipelineCache::null(), &[info], None)
+                .expect("Unable to create graphics pipeline")
+        };
+        self.pipelines.push(pipeline[0]);
+    }
+
     pub fn default(&self) -> vk::Pipeline {
         self.pipelines[0]
     }

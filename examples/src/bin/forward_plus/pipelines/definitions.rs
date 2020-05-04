@@ -43,13 +43,12 @@ impl ForwardConstants {
 #[allow(dead_code)]
 pub struct ComputeConstants {
     pub lights_amount: u32,
-    pub tile_numns: cgmath::Vector2<i32>,
-    pub viewport_size: cgmath::Vector2<i32>,
+    pub tile_numns: i32,
 }
 
 #[allow(dead_code)]
 impl ComputeConstants {
-    fn specialization_map_entries(&self) -> [vk::SpecializationMapEntry; 3] {
+    fn specialization_map_entries(&self) -> [vk::SpecializationMapEntry; 2] {
         // Each shader constant of a shader stage corresponds to one map entry
         [
             vk::SpecializationMapEntry {
@@ -60,12 +59,7 @@ impl ComputeConstants {
             vk::SpecializationMapEntry {
                 constant_id: 1,
                 offset: offset_of!(Self, tile_numns) as _,
-                size: mem::size_of::<cgmath::Vector2<i32>>(),
-            },
-            vk::SpecializationMapEntry {
-                constant_id: 2,
-                offset: offset_of!(Self, viewport_size) as _,
-                size: mem::size_of::<cgmath::Vector2<i32>>(),
+                size: mem::size_of::<i32>(),
             },
         ]
     }

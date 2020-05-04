@@ -3,7 +3,7 @@ mod pipeline;
 use examples::utils;
 use vulkan::{
     prelude::*, utilities::as_byte_slice, utilities::FPSLimiter, Context, Framebuffer, Queue,
-    Swapchain, VkThread,
+    Swapchain, VkThread, PipelineType
 };
 use winit::event::{Event, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop};
@@ -23,7 +23,7 @@ fn main() {
     let vulkan = Arc::new(Context::new(&window, "load_model", true));
     let mut queue = Queue::new(vulkan.clone());
 
-    let instance = VkThread::new(vulkan.clone());
+    let instance = VkThread::new(PipelineType::Draw, vulkan.clone());
 
     let swapchain = Swapchain::new(vulkan.clone());
 

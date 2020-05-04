@@ -14,3 +14,9 @@ impl DeviceExtension {
         ]
     }
 }
+
+pub enum PipelineType {
+    Compute, 
+    Draw
+}
+

@@ -1,7 +1,7 @@
 mod pipelines;
 use vulkan::{
-    prelude::*, utilities::as_byte_slice, utilities::FPSLimiter, Context, Queue, Swapchain,
-    VkThread,
+    prelude::*, utilities::as_byte_slice, utilities::FPSLimiter, Context, PipelineType, Queue,
+    Swapchain, VkThread,
 };
 
 use examples::utils::{events, gltf_importer};
@@ -20,15 +20,16 @@ fn main() {
         .expect("Failed to create window.");
 
     let vulkan = Arc::new(Context::new(&window, "gltf", true));
-    let instance = VkThread::new(vulkan.clone());
+    let draw_instance = VkThread::new(PipelineType::Draw, vulkan.clone());
+    let compute_instance = VkThread::new(PipelineType::Compute, vulkan.clone());
     let mut swapchain = Swapchain::new(vulkan.clone());
     let mut queue = Queue::new(vulkan.clone());
 
     //../../GLTF_tests/multi_texture.gltf
     let mut scene =
-        gltf_importer::Importer::load(Path::new("assets/multi_texture.gltf")).build(&instance);
+        gltf_importer::Importer::load(Path::new("assets/multi_texture.gltf")).build(&draw_instance);
 
-    let command_buffers = instance.create_command_buffers(swapchain.image_views.len());
+    let command_buffers = draw_instance.create_command_buffers(swapchain.image_views.len());
     let mut tick_counter = FPSLimiter::new();
     let mut events = events::Event::new();
 
@@ -39,7 +40,7 @@ fn main() {
             WindowEvent::DroppedFile(path) => {
                 //Drop GLTF file on running window to load new file
                 println!("Loading model at {:?}", path);
-                scene = gltf_importer::Importer::load(&path).build(&instance);
+                scene = gltf_importer::Importer::load(&path).build(&draw_instance);
             }
             _ => {
                 events.handle_event(event);

@@ -5,20 +5,27 @@ use std::cmp::max;
 use std::ptr;
 use std::sync::Arc;
 
+use crate::constants::PipelineType;
 use crate::utilities::Buffer;
 
 pub struct VkThread {
     pub context: Arc<Context>,
     pub command_pool: vk::CommandPool,
+    _family: PipelineType,
 }
 
 impl VkThread {
-    pub fn new(context: Arc<Context>) -> VkThread {
-        let command_pool = Self::create_command_pool(context.clone());
+    pub fn new(family: PipelineType, context: Arc<Context>) -> VkThread {
+        let family_index = match family {
+            PipelineType::Draw => context.queue_family.graphics_family.unwrap(),
+            PipelineType::Compute => context.queue_family.compute_family.unwrap(),
+        };
+        let command_pool = Self::create_command_pool(context.clone(), family_index);
 
         VkThread {
             context,
             command_pool,
+            _family: family,
         }
     }
 }
@@ -46,14 +53,14 @@ impl VkThread {
         }
     }
 
-    pub fn create_command_pool(context: Arc<Context>) -> vk::CommandPool {
+    fn create_command_pool(context: Arc<Context>, family_index: u32) -> vk::CommandPool {
         unsafe {
             context
                 .device
                 .create_command_pool(
                     &vk::CommandPoolCreateInfo::builder()
                         .flags(vk::CommandPoolCreateFlags::RESET_COMMAND_BUFFER)
-                        .queue_family_index(context.queue_family.graphics_family.unwrap()),
+                        .queue_family_index(family_index),
                     None,
                 )
                 .unwrap()
