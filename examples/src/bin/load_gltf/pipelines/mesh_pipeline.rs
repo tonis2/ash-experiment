@@ -2,7 +2,7 @@ use vulkan::{
     offset_of,
     prelude::*,
     utilities::{as_byte_slice, Shader},
-    Buffer, Context, Descriptor, DescriptorSet, Image, Swapchain, VkThread,
+    Buffer, Context, Descriptor, DescriptorSet, Image, Swapchain, VkThread, Framebuffer
 };
 
 use super::definitions::{PushTransform, SpecializationData};
@@ -16,6 +16,7 @@ pub struct Pipeline {
     pub pipeline: vk::Pipeline,
     pub layout: vk::PipelineLayout,
     pub pipeline_descriptor: Descriptor,
+    pub framebuffers: Vec<Framebuffer>,
 
     _empty_image: Image,
     pub depth_image: Image,
@@ -306,8 +307,26 @@ impl Pipeline {
                 .expect("Unable to create graphics pipeline")
         }[0];
 
+        let framebuffers = swapchain
+        .image_views
+        .iter()
+        .map(|image| {
+            Framebuffer::new(
+                vk::FramebufferCreateInfo::builder()
+                    .layers(1)
+                    .render_pass(renderpass)
+                    .attachments(&[*image, depth_image.view()])
+                    .width(swapchain.width())
+                    .height(swapchain.height())
+                    .build(),
+                vulkan.context(),
+            )
+        })
+        .collect();
+
         Pipeline {
             pipeline: pipeline,
+            framebuffers,
             pipeline_descriptor,
             layout: pipeline_layout,
             depth_image,

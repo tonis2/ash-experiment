@@ -10,6 +10,7 @@ use std::ptr;
 pub struct QueueFamilyIndices {
     pub graphics_family: Option<u32>,
     pub present_family: Option<u32>,
+    pub compute_family: Option<u32>,
 }
 
 //Queue contains all the functionality neccesary to get and render to frames
@@ -26,6 +27,7 @@ impl QueueFamilyIndices {
         QueueFamilyIndices {
             graphics_family: None,
             present_family: None,
+            compute_family: None,
         }
     }
 
@@ -84,7 +86,10 @@ impl Queue {
 
     pub fn wait_queue_idle(&self) {
         unsafe {
-            self.context.device.queue_wait_idle(self.context.graphics_queue).expect("Failed to wait graphics queue");
+            self.context
+                .device
+                .queue_wait_idle(self.context.graphics_queue)
+                .expect("Failed to wait graphics queue");
         }
     }
 

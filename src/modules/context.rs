@@ -4,13 +4,13 @@ use ash::{
     vk, Device, Entry, Instance,
 };
 
+use super::platform::{create_surface, extension_names};
 use super::{
     debug::{Debugger, ValidationInfo},
     device,
     queue::QueueFamilyIndices,
 };
 use crate::constants::*;
-use super::platform::{create_surface, extension_names};
 
 use std::ffi::CString;
 use winit::window::Window;
@@ -24,8 +24,11 @@ pub struct Context {
     pub physical_device: vk::PhysicalDevice,
     pub device: Device,
     pub queue_family: QueueFamilyIndices,
+
     pub graphics_queue: vk::Queue,
     pub present_queue: vk::Queue,
+    pub compute_queue: vk::Queue,
+    
     pub memory: vk_mem::Allocator,
     pub image_count: u32,
 }
@@ -90,6 +93,7 @@ impl Context {
                 physical_device,
                 graphics_queue: device.get_device_queue(queue.graphics_family.unwrap(), 0),
                 present_queue: device.get_device_queue(queue.present_family.unwrap(), 0),
+                compute_queue: device.get_device_queue(queue.compute_family.unwrap(), 0),
                 queue_family: queue,
                 device,
                 memory: vk_mem::Allocator::new(&memory_info).unwrap(),

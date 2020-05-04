@@ -5,7 +5,7 @@ use vulkan::{
 
 use std::{default::Default, ffi::CString, path::Path};
 
-use super::definitions::{PushTransform, SpecializationData};
+use super::definitions::{ForwardConstants, PushTransform};
 use examples::utils::{
     gltf_importer::{Light, MaterialRaw, Scene, Vertex},
     Camera, CameraRaw,
@@ -253,7 +253,7 @@ pub fn new(scene: &Scene, swapchain: &Swapchain, vulkan: &VkThread) {
     );
 
     //Renderpasses
-
+    let depth_image = examples::create_depth_resources(&swapchain, vulkan.context());
     let forward_pass = Renderpass::new(
         vk::RenderPassCreateInfo::builder()
             .subpasses(&[vk::SubpassDescription::builder()
@@ -261,6 +261,10 @@ pub fn new(scene: &Scene, swapchain: &Swapchain, vulkan: &VkThread) {
                     attachment: 0,
                     layout: vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL,
                 }])
+                .depth_stencil_attachment(&vk::AttachmentReference {
+                    attachment: 1,
+                    layout: vk::ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+                })
                 .build()])
             .dependencies(&[vk::SubpassDependency {
                 src_subpass: vk::SUBPASS_EXTERNAL,
@@ -272,22 +276,34 @@ pub fn new(scene: &Scene, swapchain: &Swapchain, vulkan: &VkThread) {
                     | vk::AccessFlags::COLOR_ATTACHMENT_WRITE,
                 dependency_flags: vk::DependencyFlags::empty(),
             }])
-            .attachments(&[vk::AttachmentDescription {
-                flags: vk::AttachmentDescriptionFlags::empty(),
-                format: swapchain.format,
-                samples: vk::SampleCountFlags::TYPE_1,
-                load_op: vk::AttachmentLoadOp::CLEAR,
-                store_op: vk::AttachmentStoreOp::STORE,
-                stencil_load_op: vk::AttachmentLoadOp::DONT_CARE,
-                stencil_store_op: vk::AttachmentStoreOp::DONT_CARE,
-                initial_layout: vk::ImageLayout::UNDEFINED,
-                final_layout: vk::ImageLayout::PRESENT_SRC_KHR,
-            }])
+            .attachments(&[
+                vk::AttachmentDescription {
+                    flags: vk::AttachmentDescriptionFlags::empty(),
+                    format: swapchain.format,
+                    samples: vk::SampleCountFlags::TYPE_1,
+                    load_op: vk::AttachmentLoadOp::CLEAR,
+                    store_op: vk::AttachmentStoreOp::STORE,
+                    stencil_load_op: vk::AttachmentLoadOp::DONT_CARE,
+                    stencil_store_op: vk::AttachmentStoreOp::DONT_CARE,
+                    initial_layout: vk::ImageLayout::UNDEFINED,
+                    final_layout: vk::ImageLayout::PRESENT_SRC_KHR,
+                },
+                vk::AttachmentDescription {
+                    flags: vk::AttachmentDescriptionFlags::empty(),
+                    format: depth_image.format,
+                    samples: vk::SampleCountFlags::TYPE_1,
+                    load_op: vk::AttachmentLoadOp::CLEAR,
+                    store_op: vk::AttachmentStoreOp::DONT_CARE,
+                    stencil_load_op: vk::AttachmentLoadOp::DONT_CARE,
+                    stencil_store_op: vk::AttachmentStoreOp::DONT_CARE,
+                    initial_layout: vk::ImageLayout::UNDEFINED,
+                    final_layout: vk::ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+                },
+            ])
             .build(),
         vulkan.context(),
     );
 
-    let depth_image = examples::create_depth_resources(&swapchain, vulkan.context());
     let depth_pass = Renderpass::new(
         vk::RenderPassCreateInfo::builder()
             .attachments(&[vk::AttachmentDescription {
@@ -340,17 +356,10 @@ pub fn new(scene: &Scene, swapchain: &Swapchain, vulkan: &VkThread) {
         vulkan.context(),
     );
 
-    let specialization_data = SpecializationData {
+    let specialization_data = ForwardConstants {
         materials_amount: scene.materials.len() as u32,
         textures_amount: scene.textures.len() as u32,
         lights_amount: scene.lights.len() as u32,
-    };
-
-    let specialization_info = unsafe {
-        vk::SpecializationInfo::builder()
-            .map_entries(&specialization_data.specialization_map_entries())
-            .data(as_byte_slice(&specialization_data))
-            .build()
     };
 
     let forward_shader = vec![
@@ -367,7 +376,7 @@ pub fn new(scene: &Scene, swapchain: &Swapchain, vulkan: &VkThread) {
             &shader_name,
             vulkan.context(),
         )
-        .use_specialization(specialization_info)
+        .use_specialization(specialization_data.get_info())
         .info(),
     ];
 
