@@ -5,9 +5,12 @@ glslangValidator -V ./src/bin/load_gltf/shaders/model.vert -o ./src/bin/load_glt
 glslangValidator -V ./src/bin/load_gltf/shaders/model.frag -o ./src/bin/load_gltf/shaders/model.frag.spv
 
 
-# Load json model
-glslangValidator -V ./src/bin/load_model/shaders/model.vert -o ./src/bin/load_model/shaders/model.vert.spv
-glslangValidator -V ./src/bin/load_model/shaders/model.frag -o ./src/bin/load_model/shaders/model.frag.spv
+# Lights
+glslangValidator -V ./src/bin/lights/shaders/mesh.vert -o ./src/bin/lights/shaders/mesh.vert.spv
+glslangValidator -V ./src/bin/lights/shaders/mesh.frag -o ./src/bin/lights/shaders/mesh.frag.spv
+
+glslangValidator -V ./src/bin/lights/shaders/offscreen.vert -o ./src/bin/lights/shaders/offscreen.vert.spv
+
 
 
 # Defferred rendering 
