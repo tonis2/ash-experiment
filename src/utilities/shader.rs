@@ -1,13 +1,8 @@
-use ash::version::DeviceV1_0;
 use crate::Context;
 use ash::util::read_spv;
+use ash::version::DeviceV1_0;
 use ash::vk;
-use std::{
-    default::Default,
-    ffi::{CString},
-    path::Path,
-    sync::Arc,
-};
+use std::{default::Default, ffi::CString, path::Path, sync::Arc};
 
 pub struct Shader {
     pub shader_info: vk::PipelineShaderStageCreateInfo,

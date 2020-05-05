@@ -167,7 +167,7 @@ pub fn find_queue_family(
 
             if queue_family.queue_flags.contains(vk::QueueFlags::COMPUTE)
                 && !queue_family.queue_flags.contains(vk::QueueFlags::GRAPHICS)
-            {   
+            {
                 //Device has special compute queue, that doese not support graphics
                 queue_family_indices.compute_family = Some(index);
             } else if queue_family.queue_flags.contains(vk::QueueFlags::COMPUTE) {

@@ -62,7 +62,7 @@ impl Buffer {
             );
             align.copy_from_slice(data);
         }
-      
+        self.unmap_memory().unwrap();
     }
 
     pub fn map_memory(&self) -> vk_mem::error::Result<*mut u8> {
@@ -85,14 +85,6 @@ impl Buffer {
 
     pub fn offset(&self) -> u64 {
         self.allocation_info.get_offset() as u64
-    }
-
-    pub fn descriptor_info(&self, offset: u64) -> vk::DescriptorBufferInfo {
-        vk::DescriptorBufferInfo {
-            buffer: self.buffer,
-            offset: offset,
-            range: self.size,
-        }
     }
 }
 

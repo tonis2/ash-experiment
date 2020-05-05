@@ -54,7 +54,7 @@ impl Descriptor {
                         s_type: vk::StructureType::DESCRIPTOR_POOL_CREATE_INFO,
                         p_next: ptr::null(),
                         flags: vk::DescriptorPoolCreateFlags::empty(),
-                        max_sets: context.image_count, 
+                        max_sets: context.image_count,
                         pool_size_count: pool_sizes.len() as u32,
                         p_pool_sizes: pool_sizes.as_ptr(),
                     },

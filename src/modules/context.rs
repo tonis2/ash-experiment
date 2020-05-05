@@ -28,7 +28,7 @@ pub struct Context {
     pub graphics_queue: vk::Queue,
     pub present_queue: vk::Queue,
     pub compute_queue: vk::Queue,
-    
+
     pub memory: vk_mem::Allocator,
     pub image_count: u32,
 }
