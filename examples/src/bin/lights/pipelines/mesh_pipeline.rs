@@ -62,7 +62,11 @@ impl Pipeline {
         let shadow_pipeline = shadowmap_pipeline::Pipeline::new(
             &swapchain,
             &vulkan,
-            light_buffer.descriptor_info(0),
+            vk::DescriptorBufferInfo {
+                buffer: light_buffer.buffer,
+                offset: 0,
+                range: light_buffer.size,
+            },
             push_constant_range,
         );
 
