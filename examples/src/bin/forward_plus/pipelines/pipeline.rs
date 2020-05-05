@@ -5,7 +5,10 @@ use vulkan::{
 
 use std::{default::Default, ffi::CString, path::Path};
 
-use super::definitions::{ForwardConstants, PushTransform};
+use super::definitions::{
+    ComputeConstants, ComputePushConstant, ForwardConstants, ForwardPushConstant, LightVisibility,
+    MAX_POINT_LIGHT_PER_TILE,
+};
 use examples::utils::{
     gltf_importer::{Light, MaterialRaw, Scene, Vertex},
     Camera, CameraRaw,
@@ -35,6 +38,9 @@ pub struct Pipes {
 }
 
 pub fn new(scene: &Scene, swapchain: &Swapchain, vulkan: &VkThread) {
+    let depth_image = examples::create_depth_resources(&swapchain, vulkan.context());
+    let empty_image = examples::create_empty_image(&vulkan);
+
     //Pipeline stuff
     let viewports = vk::Viewport {
         x: 0.0,
@@ -57,6 +63,18 @@ pub fn new(scene: &Scene, swapchain: &Swapchain, vulkan: &VkThread) {
         compare_op: vk::CompareOp::ALWAYS,
         ..Default::default()
     };
+
+    //Light culling data
+    const TILE_SIZE: u32 = 16;
+    let row_count: u32 = (swapchain.width() - 1) / TILE_SIZE + 1;
+    let column_count: u32 = (swapchain.height() - 1) / TILE_SIZE + 1;
+
+    let culling_data = Buffer::new_mapped_basic(
+        (row_count * column_count * mem::size_of::<LightVisibility>() as u32 + 1u32) as u64,
+        vk::BufferUsageFlags::STORAGE_BUFFER,
+        vk_mem::MemoryUsage::CpuOnly,
+        vulkan.context(),
+    );
 
     //Create camera buffer
     let camera = Camera::new(cgmath::Point3::new(0.0, 0.0, 0.0), 15.0, 1.3);
@@ -99,7 +117,7 @@ pub fn new(scene: &Scene, swapchain: &Swapchain, vulkan: &VkThread) {
     );
 
     //Bind scene textures
-    let empty_image = examples::create_empty_image(&vulkan);
+
     let texture_data: Vec<vk::DescriptorImageInfo> = {
         if scene.textures.len() > 0 {
             scene
@@ -252,8 +270,54 @@ pub fn new(scene: &Scene, swapchain: &Swapchain, vulkan: &VkThread) {
         vulkan.context(),
     );
 
+    let compute_descriptor = Descriptor::new(
+        vec![
+            DescriptorSet {
+                bind_index: 0,
+                flag: vk::ShaderStageFlags::VERTEX,
+                bind_type: vk::DescriptorType::STORAGE_BUFFER,
+                buffer_info: Some(vec![vk::DescriptorBufferInfo {
+                    buffer: culling_data.buffer,
+                    offset: 0,
+                    range: culling_data.size,
+                }]),
+                ..Default::default()
+            },
+            DescriptorSet {
+                bind_index: 1,
+                flag: vk::ShaderStageFlags::VERTEX,
+                bind_type: vk::DescriptorType::UNIFORM_BUFFER,
+                buffer_info: Some(vec![vk::DescriptorBufferInfo {
+                    buffer: camera_buffer.buffer,
+                    offset: 0,
+                    range: camera_buffer.size,
+                }]),
+                ..Default::default()
+            },
+            DescriptorSet {
+                bind_index: 2,
+                flag: vk::ShaderStageFlags::FRAGMENT,
+                bind_type: vk::DescriptorType::UNIFORM_BUFFER,
+                buffer_info: Some(light_bindings),
+                ..Default::default()
+            },
+            DescriptorSet {
+                bind_index: 3,
+                flag: vk::ShaderStageFlags::FRAGMENT,
+                bind_type: vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
+                image_info: Some(vec![vk::DescriptorImageInfo {
+                    sampler: depth_image.sampler(),
+                    image_view: depth_image.view(),
+                    image_layout: vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
+                }]),
+                ..Default::default()
+            },
+        ],
+        vulkan.context(),
+    );
+
     //Renderpasses
-    let depth_image = examples::create_depth_resources(&swapchain, vulkan.context());
+
     let forward_pass = Renderpass::new(
         vk::RenderPassCreateInfo::builder()
             .subpasses(&[vk::SubpassDescription::builder()
@@ -356,7 +420,7 @@ pub fn new(scene: &Scene, swapchain: &Swapchain, vulkan: &VkThread) {
         vulkan.context(),
     );
 
-    let specialization_data = ForwardConstants {
+    let forward_specialisation = ForwardConstants {
         materials_amount: scene.materials.len() as u32,
         textures_amount: scene.textures.len() as u32,
         lights_amount: scene.lights.len() as u32,
@@ -376,12 +440,26 @@ pub fn new(scene: &Scene, swapchain: &Swapchain, vulkan: &VkThread) {
             &shader_name,
             vulkan.context(),
         )
-        .use_specialization(specialization_data.get_info())
+        .use_specialization(forward_specialisation.get_info())
         .info(),
     ];
 
-    //Create pipelines
+    let light_culling_constants = ComputeConstants {
+        lights_amount: scene.lights.len() as u32,
+        max_points_per_light: MAX_POINT_LIGHT_PER_TILE,
+        tile_size: TILE_SIZE,
+    };
 
+    let compute_shader = Shader::new(
+        &Path::new("src/bin/forward_plus/shaders/light_culling.compute.spv"),
+        vk::ShaderStageFlags::VERTEX,
+        &shader_name,
+        vulkan.context(),
+    )
+    .use_specialization(light_culling_constants.get_info())
+    .info();
+
+    //Create pipelines
     let mut pipelines = Pipeline::new(vulkan.context());
 
     //Depth layout
@@ -390,7 +468,7 @@ pub fn new(scene: &Scene, swapchain: &Swapchain, vulkan: &VkThread) {
             .set_layouts(&[depth_descriptor.layout])
             .push_constant_ranges(&[vk::PushConstantRange {
                 stage_flags: vk::ShaderStageFlags::VERTEX,
-                size: mem::size_of::<PushTransform>() as u32,
+                size: mem::size_of::<ForwardPushConstant>() as u32,
                 offset: 0,
             }])
             .build(),
@@ -402,7 +480,19 @@ pub fn new(scene: &Scene, swapchain: &Swapchain, vulkan: &VkThread) {
             .set_layouts(&[forward_descriptor.layout])
             .push_constant_ranges(&[vk::PushConstantRange {
                 stage_flags: vk::ShaderStageFlags::VERTEX,
-                size: mem::size_of::<PushTransform>() as u32,
+                size: mem::size_of::<ForwardPushConstant>() as u32,
+                offset: 0,
+            }])
+            .build(),
+    );
+
+    //Create compute layout
+    pipelines.add_layout(
+        vk::PipelineLayoutCreateInfo::builder()
+            .set_layouts(&[compute_descriptor.layout])
+            .push_constant_ranges(&[vk::PushConstantRange {
+                stage_flags: vk::ShaderStageFlags::COMPUTE,
+                size: mem::size_of::<ComputePushConstant>() as u32,
                 offset: 0,
             }])
             .build(),
@@ -488,4 +578,12 @@ pub fn new(scene: &Scene, swapchain: &Swapchain, vulkan: &VkThread) {
     pipeline_description.layout = pipelines.layout(1);
     pipeline_description.render_pass = forward_pass.pass();
     pipelines.add_pipeline(pipeline_description);
+
+    //Add compute pipeline
+    pipelines.add_compute(
+        vk::ComputePipelineCreateInfo::builder()
+            .stage(compute_shader)
+            .layout(pipelines.layout(2))
+            .build(),
+    );
 }

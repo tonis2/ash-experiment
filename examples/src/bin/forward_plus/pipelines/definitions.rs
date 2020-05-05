@@ -43,12 +43,13 @@ impl ForwardConstants {
 #[allow(dead_code)]
 pub struct ComputeConstants {
     pub lights_amount: u32,
-    pub tile_numns: i32,
+    pub max_points_per_light: u32,
+    pub tile_size: u32,
 }
 
 #[allow(dead_code)]
 impl ComputeConstants {
-    fn specialization_map_entries(&self) -> [vk::SpecializationMapEntry; 2] {
+    fn specialization_map_entries(&self) -> [vk::SpecializationMapEntry; 3] {
         // Each shader constant of a shader stage corresponds to one map entry
         [
             vk::SpecializationMapEntry {
@@ -58,8 +59,13 @@ impl ComputeConstants {
             },
             vk::SpecializationMapEntry {
                 constant_id: 1,
-                offset: offset_of!(Self, tile_numns) as _,
-                size: mem::size_of::<i32>(),
+                offset: offset_of!(Self, max_points_per_light) as _,
+                size: mem::size_of::<u32>(),
+            },
+            vk::SpecializationMapEntry {
+                constant_id: 3,
+                offset: offset_of!(Self, tile_size) as _,
+                size: mem::size_of::<u32>(),
             },
         ]
     }
@@ -76,6 +82,29 @@ impl ComputeConstants {
 
 #[repr(C)]
 #[derive(Clone, Debug, Copy)]
-pub struct PushTransform {
+pub struct ForwardPushConstant {
     pub transform: cgmath::Matrix4<f32>,
+    pub screen_width: u32,
+    pub screen_height: u32,
+    pub row_count: u32,
+    pub column_count: u32,
+}
+
+#[repr(C)]
+#[derive(Clone, Debug, Copy)]
+pub struct ComputePushConstant {
+    pub screen_width: u32,
+    pub screen_height: u32,
+    pub row_count: u32,
+    pub column_count: u32,
+}
+
+#[allow(dead_code)]
+pub const MAX_POINT_LIGHT_PER_TILE: u32 = 1023;
+
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct LightVisibility {
+    pub count: u32,
+    pub indicies: [u32; MAX_POINT_LIGHT_PER_TILE as usize],
 }

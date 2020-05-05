@@ -24,3 +24,6 @@ glslangValidator -V ./src/bin/deferred_rendering/shaders/deferred.frag -o ./src/
 # Forward plus
 glslangValidator -V ./src/bin/forward_plus/shaders/depth.vert -o ./src/bin/forward_plus/shaders/depth.vert.spv
 glslangValidator -V ./src/bin/forward_plus/shaders/light_culling.comp -o ./src/bin/forward_plus/shaders/light_culling.compute.spv
+
+glslangValidator -V ./src/bin/forward_plus/shaders/forward.frag -o ./src/bin/forward_plus/shaders/forward.frag.spv
+glslangValidator -V ./src/bin/forward_plus/shaders/forward.vert -o ./src/bin/forward_plus/shaders/forward.vert.spv

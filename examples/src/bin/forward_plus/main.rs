@@ -6,7 +6,7 @@ use vulkan::{
 
 use examples::utils::{events, gltf_importer};
 
-use pipelines::PushTransform;
+
 use std::{path::Path, sync::Arc};
 use winit::event::{Event, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop};
