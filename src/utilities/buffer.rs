@@ -62,7 +62,7 @@ impl Buffer {
             );
             align.copy_from_slice(data);
         }
-        // self.unmap_memory().unwrap();
+        self.unmap_memory().unwrap();
     }
 
     pub fn map_memory(&self) -> vk_mem::error::Result<*mut u8> {
@@ -91,7 +91,6 @@ impl Buffer {
 impl Drop for Buffer {
     fn drop(&mut self) {
         self.context.wait_idle();
-        self.unmap_memory().unwrap();
         self.context
             .memory
             .destroy_buffer(self.buffer, &self.allocation)
