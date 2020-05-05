@@ -5,7 +5,7 @@ use vulkan::{
 
 use super::{Light, PushConstantModel, Vertex, shadowmap_pipeline};
 use std::{default::Default, ffi::CString, mem, path::Path, sync::Arc};
-use examples::utils::Camera;
+use examples::utils::{Camera, CameraRaw};
 
 pub struct Pipeline {
     pub pipeline: vk::Pipeline,
@@ -38,14 +38,14 @@ impl Pipeline {
         let depth_image = examples::create_depth_resources(&swapchain, vulkan.context());
 
         let uniform_buffer = Buffer::new_mapped_basic(
-            mem::size_of::<Camera>() as vk::DeviceSize,
+            mem::size_of::<CameraRaw>() as u64,
             vk::BufferUsageFlags::UNIFORM_BUFFER,
             vk_mem::MemoryUsage::CpuOnly,
             vulkan.context(),
         );
 
         let light_buffer = Buffer::new_mapped_basic(
-            std::mem::size_of_val(&light_data) as u64,
+            mem::size_of::<Light>() as u64,
             vk::BufferUsageFlags::UNIFORM_BUFFER,
             vk_mem::MemoryUsage::CpuOnly,
             vulkan.context(),

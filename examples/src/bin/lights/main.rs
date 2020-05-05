@@ -3,7 +3,7 @@ mod pipelines;
 use vulkan::{
     prelude::*,
     utilities::{as_byte_slice, FPSLimiter},
-    Context, Framebuffer, Queue, Swapchain, VkThread, PipelineType
+    Context, Framebuffer, PipelineType, Queue, Swapchain, VkThread,
 };
 
 use examples::utils::{events, Batch, Camera, Mesh};

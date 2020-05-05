@@ -10,7 +10,7 @@ layout (location = 3) out vec4 out_color;
 layout (location = 4) out vec4 view_direction;
 
 layout (binding = 0) uniform Camera {
-    vec4 pos;
+    vec4 position;
     mat4 view;
     mat4 proj;
 } camera;
@@ -34,7 +34,7 @@ const mat4 biasMat = mat4(
 	0.5, 0.5, 0.0, 1.0 );
 
 void main() {
-    view_direction = normalize(camera.pos - out_position);
+    view_direction = normalize(camera.position - out_position);
     shadow_cordinate = biasMat * light.projection * constants.model_transform * vec4(pos, 1.0);
     
     out_color = constants.color;
