@@ -24,6 +24,7 @@ layout (location = 4) in vec4 view_direction;
 layout (location = 0) out vec4 outColor;
 
 float specularStrength = 0.1;
+//Todo add specular reflection
 
 vec3 CalculateLightColor(Light light, vec4 object_color, vec3 normal, vec4 object_pos) {
    
