@@ -7,12 +7,6 @@ Many thanks to these [vulkan examples](https://github.com/unknownue/vulkan-tutor
 
 
 
-##### Usage
-----
-
-Download assets `python3 ./download_assets.py` 
-
-
 ##### Running examples
 
 Open examples folders and run with --bin.
