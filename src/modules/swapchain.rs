@@ -174,11 +174,6 @@ impl Drop for Swapchain {
     }
 }
 
-pub struct SwapchainSupport {
-    pub capabilities: vk::SurfaceCapabilitiesKHR,
-    pub formats: Vec<vk::SurfaceFormatKHR>,
-    pub present_modes: Vec<vk::PresentModeKHR>,
-}
 
 pub fn choose_swapchain_present_mode(
     available_present_modes: &Vec<vk::PresentModeKHR>,

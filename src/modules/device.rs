@@ -3,12 +3,18 @@ use ash::{extensions::khr::Surface, version::InstanceV1_0, vk};
 use super::platform::DeviceExtension;
 
 use super::queue::QueueFamilyIndices;
-use super::swapchain::SwapchainSupport;
+
 use std::collections::HashSet;
 use std::ptr;
 
 use std::ffi::CString;
 use std::os::raw::c_char;
+
+pub struct SwapchainSupport {
+    pub capabilities: vk::SurfaceCapabilitiesKHR,
+    pub formats: Vec<vk::SurfaceFormatKHR>,
+    pub present_modes: Vec<vk::PresentModeKHR>,
+}
 
 pub fn pick_physical_device(
     instance: &ash::Instance,

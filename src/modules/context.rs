@@ -33,6 +33,8 @@ pub struct Context {
     pub image_count: u32,
 }
 
+const VALIDATION_LAYERS:&str = "VK_LAYER_KHRONOS_validation";
+
 impl Context {
     pub fn new(window: &Window, app_name: &str, validation_enabled: bool) -> Self {
         let (entry, instance) = create_entry(app_name);
@@ -46,7 +48,7 @@ impl Context {
 
         let validation: ValidationInfo = ValidationInfo {
             is_enable: validation_enabled,
-            required_validation_layers: ["VK_LAYER_KHRONOS_validation"],
+            required_validation_layers: [VALIDATION_LAYERS],
         };
 
         let (device, queue) = device::create_logical_device(
@@ -179,7 +181,7 @@ pub fn create_entry(app_name: &str) -> (Entry, Instance) {
     let entry = Entry::new().unwrap();
     let app_name = CString::new(app_name).unwrap();
 
-    let layer_names = [CString::new("VK_LAYER_LUNARG_standard_validation").unwrap()];
+    let layer_names = [CString::new(VALIDATION_LAYERS).unwrap()];
     let layers_names_raw: Vec<*const i8> = layer_names
         .iter()
         .map(|raw_name| raw_name.as_ptr())
